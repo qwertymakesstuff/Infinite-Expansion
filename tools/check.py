@@ -9,16 +9,19 @@ without it, using the compilers iw7-mod embeds (tools/setup_compilers.sh):
   parity   both compilers emit the same instructions and call the same natives
   natives  no calls to natives the game exe leaves unimplemented (stubs) and
            no unknown raw ids
-  calls    every far call and far function reference names a defined function
-           (stock targets are checked against the decompiled stock scripts)
-  modes    mode-separation rules (ARCHITECTURE.md section 7), script locations,
-           entry points, unreachable modules
+  calls    every far call and far function reference names a defined function;
+           a stock target must also be loaded on every zombies map, because a far
+           call into a script the map did not load is a script link error that
+           ends the match (stock scripts come from the decompiled dump)
+  layout   script locations (the mod is zombies-only), init()/main() only in the
+           entry script, every module reachable from it
   raw ids  _meth_XXXX / _func_XXX ids appear only in ix/core/compat.gsc and never
            in the range iw7-mod assigns to its extension built-ins
-  source   no #include (modules call each other by explicit path) and no /# #/
-           dev blocks (iw7-mod compiles those only with developer_script 1, so the
-           checked code would differ from what runs)
-  budget   custom-script memory per mode (bytecode + 1 per loaded script) against a
+  source   no #include (modules call each other by explicit path), no /# #/ dev
+           blocks (iw7-mod compiles those only with developer_script 1, so the
+           checked code would differ from what runs), and no // comment ending in
+           a backslash (both compilers then drop the next line without an error)
+  budget   custom-script memory (bytecode + 1 per loaded script) against a
            512 KiB limit; iw7-mod has 1 MiB and running out is fatal
 
 Usage:
@@ -58,23 +61,13 @@ DEFAULT_BUDGET = 512 * 1024
 FIRST_CUSTOM_FUNCTION = 807
 FIRST_CUSTOM_METHOD = 0x8000 + 1484
 
-# Script location -> mode. Shared code runs in every mode.
-ENTRY_DIRS = {"custom_scripts/cp": "cp", "custom_scripts/mp": "mp"}
-MODULE_AREAS = {
-    "core": "shared",
-    "ui": "shared",
-    "player": "shared",
-    "weapons": "shared",
-    "debug": "shared",
-    "zombies": "cp",
-    "mp": "mp",
-}
-# ARCHITECTURE.md section 7: path prefixes each mode must not reference.
-FORBIDDEN_PREFIXES = {
-    "shared": ("scripts/cp/", "scripts/mp/", "custom_scripts/ix/zombies/", "custom_scripts/ix/mp/"),
-    "cp": ("scripts/mp/", "custom_scripts/ix/mp/"),
-    "mp": ("scripts/cp/", "custom_scripts/ix/zombies/"),
-}
+# The mod is zombies-only: iw7-mod auto-loads custom_scripts/cp/ in zombies
+# (CP) only. Modules live in custom_scripts/ix/<area>/ and load by reference.
+ENTRY_DIR = "custom_scripts/cp"
+# A zombies match loads the map's level script and the gametype script; the
+# engine links every script they reference, transitively.
+ZOMBIES_MAPS = ("cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final")
+ZOMBIES_ROOTS = ("scripts/cp/gametypes/zombie",)
 RAW_ID_FILES = {"custom_scripts/ix/core/compat.gsc"}
 
 RAW_ID = re.compile(r"\b_(meth|func)_([0-9A-Fa-f]+)\b")
@@ -167,14 +160,32 @@ def strip_code(text):
     return "".join(out)
 
 
-def classify(rel):
-    """Return the mode a script runs in, or None for an unsupported location."""
+def comment_continuations(text):
+    """Line numbers of // comments that end in a backslash."""
+    lines = []
+    for number, line in enumerate(text.splitlines(), start=1):
+        in_string = False
+        i = 0
+        while i < len(line):
+            if line[i] == '"':
+                in_string = not in_string
+            elif line[i] == "\\" and in_string:
+                i += 1
+            elif line.startswith("//", i) and not in_string:
+                if line.rstrip().endswith("\\"):
+                    lines.append(number)
+                break
+            i += 1
+    return lines
+
+
+def location(rel):
+    """'entry', 'module', or None for a location the mod does not use."""
     parts = rel.split("/")
-    parent = "/".join(parts[:-1])
-    if parent in ENTRY_DIRS:
-        return ENTRY_DIRS[parent]
-    if len(parts) >= 4 and parts[0] == "custom_scripts" and parts[1] == "ix":
-        return MODULE_AREAS.get(parts[2])
+    if "/".join(parts[:-1]) == ENTRY_DIR:
+        return "entry"
+    if len(parts) >= 4 and parts[:2] == ["custom_scripts", "ix"]:
+        return "module"
     return None
 
 
@@ -238,18 +249,46 @@ def disassemble(tools, work, variant):
     return out_dir / "disassembled" / "iw7"
 
 
-def stock_defines(stock_root, path, func, cache):
-    if path not in cache:
-        source = stock_root / (path + ".gsc")
-        if source.is_file():
-            names = re.findall(r"^([A-Za-z_][A-Za-z_0-9]*)\s*\(", source.read_text(encoding="utf-8", errors="replace"), re.MULTILINE)
-            cache[path] = {name.lower() for name in names}
-        else:
-            cache[path] = None
-    defined = cache[path]
-    if defined is None:
-        return "missing-file"
-    return "ok" if func.lower() in defined else "missing-function"
+class StockScripts:
+    """The decompiled stock scripts: what each defines and references, and
+    which of them a zombies match loads."""
+
+    NAMED_REF = re.compile(r"\b(scripts(?:\\[a-z0-9_]+)+)::", re.IGNORECASE)
+    HASHED_REF = re.compile(r"\b_id_([0-9a-f]+)::", re.IGNORECASE)  # _id_0D60:: is 3424.gsc
+    DEFINITION = re.compile(r"^([A-Za-z_][A-Za-z_0-9]*)\s*\(", re.MULTILINE)
+
+    def __init__(self, root):
+        self.root = root
+        self.parsed = {}
+
+    def parse(self, path):
+        """(defined function names, referenced script paths), or None if there is no such script."""
+        if path not in self.parsed:
+            source = self.root / (path + ".gsc")
+            if not source.is_file():
+                self.parsed[path] = None
+            else:
+                text = source.read_text(encoding="utf-8", errors="replace")
+                defined = {name.lower() for name in self.DEFINITION.findall(text)}
+                referenced = {ref.replace("\\", "/").lower() for ref in self.NAMED_REF.findall(text)}
+                referenced |= {str(int(ident, 16)) for ident in self.HASHED_REF.findall(text)}
+                self.parsed[path] = (defined, referenced)
+        return self.parsed[path]
+
+    def linked(self, roots):
+        seen, pending = set(), list(roots)
+        while pending:
+            path = pending.pop()
+            if path in seen:
+                continue
+            seen.add(path)
+            parsed = self.parse(path)
+            if parsed:
+                pending.extend(parsed[1] - seen)
+        return seen
+
+    def linked_per_map(self):
+        return {name: self.linked([f"scripts/cp/maps/{name}/{name}", *ZOMBIES_ROOTS]) for name in ZOMBIES_MAPS}
 
 
 def main():
@@ -277,12 +316,14 @@ def main():
     report = Report()
     scripts_root = mod_root / "custom_scripts"
     scripts = sorted(path.relative_to(mod_root).as_posix() for path in scripts_root.rglob("*.gsc"))
-    have_stock = stock_root.is_dir()
+    stock = StockScripts(stock_root) if stock_root.is_dir() else None
+    per_map = stock.linked_per_map() if stock else {}
+    everywhere = set.intersection(*per_map.values()) if per_map else set()
 
     print("Infinite Expansion static check")
     print(f"  mod:        {display(mod_root)} ({len(scripts)} scripts)")
     print("  compilers:  " + ", ".join(f"ixcc-{v} ({VARIANT_LABELS[v]})" for v in VARIANTS))
-    print(f"  stock dump: {display(stock_root) if have_stock else 'not found; stock far calls are not verified'}")
+    print(f"  stock dump: {display(stock_root) if stock else 'not found; stock far calls are not verified'}")
     print()
 
     # Mod folder: fs_game must start with "mods/" and contain no "." (iw7-mod party.cpp).
@@ -350,7 +391,6 @@ def main():
         print(f"[natives]  {native_calls} built-in calls checked")
 
         # calls
-        stock_cache = {}
         far_count = stock_count = 0
         unverified_stock = set()
         for rel, (_, far_refs, _) in parsed.items():
@@ -365,60 +405,52 @@ def main():
                         report.error("calls", where, f"{path}::{target}: function not defined there")
                 elif path.startswith("scripts/"):
                     stock_count += 1
-                    if not have_stock:
+                    if stock is None:
                         unverified_stock.add(f"{path}::{target}")
                         continue
-                    state = stock_defines(stock_root, path, target, stock_cache)
-                    if state == "missing-file":
+                    parsed_stock = stock.parse(path)
+                    if parsed_stock is None:
                         report.error("calls", where, f"{path}::{target}: no such stock script in the dump")
-                    elif state == "missing-function":
+                    elif target.lower() not in parsed_stock[0]:
                         report.error("calls", where, f"{path}::{target}: function not defined in the stock script")
+                    elif path not in everywhere:
+                        maps = [name for name in ZOMBIES_MAPS if path in per_map[name]]
+                        loaded = "only on " + ", ".join(maps) if maps else "on no zombies map"
+                        report.error("calls", where, f"{path}::{target}: that script is loaded {loaded}; where it is missing, this far call is a script link error that ends the match")
                 else:
                     report.error("calls", where, f"{op} {path}::{target}: unexpected script path")
         for name in sorted(unverified_stock):
             report.warn("calls", name, "stock target not verified (no stock dump)")
-        print(f"[calls]    {far_count} far references checked ({stock_count} into stock scripts)")
+        stock_note = f"; {len(everywhere)} stock scripts load on every zombies map" if stock else ""
+        print(f"[calls]    {far_count} far references checked ({stock_count} into stock scripts{stock_note})")
 
-        # modes
-        modes = {}
-        for rel in scripts:
-            mode = classify(rel)
-            if mode is None:
-                report.error("modes", rel, "unsupported location: entry scripts go in custom_scripts/cp|mp/, modules in custom_scripts/ix/<area>/ (areas: " + ", ".join(sorted(MODULE_AREAS)) + ")")
-            modes[rel] = mode
-        for rel, (_, far_refs, _) in parsed.items():
-            mode = modes[rel]
-            if mode is None:
-                continue
-            for func, _, path, target in far_refs:
-                for prefix in FORBIDDEN_PREFIXES[mode]:
-                    if (path + "/").startswith(prefix):
-                        report.error("modes", f"{rel} ({func})", f"{mode} code must not reference {path}::{target}")
-        entries = [rel for rel in scripts if "/".join(rel.split("/")[:-1]) in ENTRY_DIRS]
+        # layout
+        locations = {rel: location(rel) for rel in scripts}
+        for rel, kind in locations.items():
+            if kind is None:
+                report.error("layout", rel, f"unsupported location: the entry script goes in {ENTRY_DIR}/ (iw7-mod loads it in zombies only), modules in custom_scripts/ix/<area>/")
+        entries = [rel for rel, kind in locations.items() if kind == "entry"]
+        if not entries:
+            report.error("layout", ENTRY_DIR, "no entry script; iw7-mod would load nothing")
         for rel in entries:
             if rel in defined and not defined[rel] & {"init", "main"}:
-                report.error("modes", rel, "entry script defines neither init() nor main(); iw7-mod would run nothing")
+                report.error("layout", rel, "entry script defines neither init() nor main(); iw7-mod would run nothing")
         for rel, names in defined.items():
-            if rel not in entries and modes[rel] is not None and names & {"init", "main"}:
-                report.error("modes", rel, "only entry scripts define init() or main() (iw7-mod runs them in every file it auto-loads); use register() or setup()")
-        loaded = {}
-        for entry in entries:
-            mode = modes[entry]
-            seen = loaded.setdefault(mode, set())
-            pending = [entry]
-            while pending:
-                rel = pending.pop()
-                if rel in seen:
-                    continue
-                seen.add(rel)
-                for _, _, path, _ in parsed.get(rel, ([], [], []))[1]:
-                    if path.startswith("custom_scripts/") and path + ".gsc" in scripts:
-                        pending.append(path + ".gsc")
-        reachable = set().union(*loaded.values()) if loaded else set()
+            if locations[rel] == "module" and names & {"init", "main"}:
+                report.error("layout", rel, "only the entry script defines init() or main() (iw7-mod runs them in every file it auto-loads); use register() or setup()")
+        loaded, pending = set(), list(entries)
+        while pending:
+            rel = pending.pop()
+            if rel in loaded:
+                continue
+            loaded.add(rel)
+            for _, _, path, _ in parsed.get(rel, ([], [], []))[1]:
+                if path.startswith("custom_scripts/") and path + ".gsc" in scripts:
+                    pending.append(path + ".gsc")
         for rel in scripts:
-            if modes[rel] is not None and rel not in reachable:
-                report.warn("modes", rel, "not reachable from any entry script; it never loads")
-        print("[modes]    " + ", ".join(f"{mode}: {len(files)} scripts load" for mode, files in sorted(loaded.items())))
+            if locations[rel] == "module" and rel not in loaded:
+                report.warn("layout", rel, "not reachable from the entry script; it never loads")
+        print(f"[layout]   {plural(len(entries), 'entry script')}; {plural(len(loaded), 'script')} load in a zombies match")
 
         # raw ids, include
         raw_total = 0
@@ -437,7 +469,11 @@ def main():
         print(f"[raw ids]  {raw_total} in " + ", ".join(sorted(RAW_ID_FILES)))
         source_issues = 0
         for rel in scripts:
-            code = strip_code((mod_root / rel).read_text(encoding="utf-8"))
+            text = (mod_root / rel).read_text(encoding="utf-8")
+            for line in comment_continuations(text):
+                source_issues += 1
+                report.error("source", f"{rel}:{line}", "// comment ends in a backslash; the compilers silently drop the next line")
+            code = strip_code(text)
             for pattern, message in (
                 (INCLUDE, "#include is not used in this mod; call other files by explicit path"),
                 (DEV_BLOCK, "/# #/ dev blocks compile only with developer_script 1; gate debug code with a dvar instead"),
@@ -446,7 +482,7 @@ def main():
                     source_issues += 1
                     line = code.count("\n", 0, match.start()) + 1
                     report.error("source", f"{rel}:{line}", message)
-        print(f"[source]   {source_issues} #include / dev-block issues")
+        print(f"[source]   {source_issues} #include / dev-block / comment issues")
 
         # budget
         sizes = {}
@@ -454,11 +490,10 @@ def main():
             values = [results[(variant, rel)][1] for variant in VARIANTS if results[(variant, rel)][0]]
             if values:
                 sizes[rel] = max(values) + 1
-        for mode, files in sorted(loaded.items()):
-            total = sum(sizes.get(rel, 0) for rel in files)
-            print(f"[budget]   {mode}: {total:,} bytes of custom-script memory ({100 * total / SCRIPT_MEMORY:.2f}% of 1 MiB; limit {args.budget:,})")
-            if total > args.budget:
-                report.error("budget", mode, f"{total:,} bytes exceeds the limit of {args.budget:,}")
+        total = sum(sizes.get(rel, 0) for rel in loaded)
+        print(f"[budget]   {total:,} bytes of custom-script memory ({100 * total / SCRIPT_MEMORY:.2f}% of 1 MiB; limit {args.budget:,})")
+        if total > args.budget:
+            report.error("budget", "zombies", f"{total:,} bytes exceeds the limit of {args.budget:,}")
 
     print()
     for line in report.errors + report.warnings:

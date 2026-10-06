@@ -6,14 +6,14 @@
 
 | Constraint (verified) | Design consequence |
 |-----------------------|--------------------|
-| iw7-mod auto-loads only top-level `.gsc` files in `custom_scripts/`, `custom_scripts/<mode>/`, and `custom_scripts/cp_mp/` | One small **entry script per mode**; every module lives in `custom_scripts/ix/…`, which is never auto-loaded |
+| iw7-mod auto-loads only top-level `.gsc` files in `custom_scripts/`, `custom_scripts/<mode>/`, and `custom_scripts/cp_mp/` | One small **entry script** in `custom_scripts/cp/` (zombies only); every module lives in `custom_scripts/ix/…`, which is never auto-loaded |
 | Far calls to other custom files compile to `OP_ScriptFarFunctionCall custom_scripts/ix/<area>/<file> <func>` (compiled and disassembled in Phase 0) | Modules call each other by explicit path (`custom_scripts\ix\core\util::fn()`); no `#include` chains |
 | `init()` runs before the map's `main()` | Bootstrap waits for the level before wrapping map-owned callbacks |
-| 1 MiB custom bytecode budget, fatal if exceeded | Keep modules small; `tools/check.py` reports the total per mode (limit 512 KiB) |
+| 1 MiB custom bytecode budget, fatal if exceeded | Keep modules small; `tools/check.py` reports the total (limit 512 KiB) |
 | An unresolved reference in any loaded script is a `script link error` that drops the match (L23) | Every script must pass `tools/check.py` (compile, calls) before a release |
 | v1.1.0 compiler mislabels/lacks many method names | Every raw `_meth_` / `_func_` id lives in **one** module (`ix\core\compat`) |
 | File I/O only with `fs_game` | Persistence layer with a dvar-only fallback |
-| CP and MP have different stock script sets | Shared modules never reference `scripts\cp\…` or `scripts\mp\…`; mode modules are referenced only by their own entry script |
+| A zombies match links only the stock scripts its map and the gametype reference; 126 are common to all five maps | Stock calls target only those; map-specific code is reached through the pointers maps assign, never by path (§7) |
 | Server-side GSC; per-player HUD elements | Per-player state lives on the player entity (`self.ix`) |
 
 ## 2. Layout
@@ -26,8 +26,7 @@ Infinite-Expansion/                          (repository)
 │   └── infinite_expansion/                  → <Infinite Warfare>/mods/infinite_expansion/
 │       ├── desc.txt                         Mods-menu description                         (Phase 1)
 │       └── custom_scripts/
-│           ├── cp/ix_main.gsc               ENTRY (zombies)       — auto-loaded          (Phase 1)
-│           ├── mp/ix_main.gsc               ENTRY (multiplayer)   — auto-loaded          (Phase 1)
+│           ├── cp/ix_main.gsc               ENTRY (zombies only)  — auto-loaded          (Phase 1)
 │           └── ix/                          MODULES               — loaded by reference only
 │               ├── core/                    ≙ requested /scripts/core/
 │               │   ├── bootstrap.gsc        init order, duplicate-init guard, lifecycle   (Phase 1)
@@ -42,15 +41,14 @@ Infinite-Expansion/                          (repository)
 │               │   ├── menu.gsc             menu engine (pages, items, rendering, input)
 │               │   ├── menu_tree.gsc        menu definition (data only)
 │               │   └── hud.gsc              info HUD (create-once/update)
-│               ├── player/                  ≙ /scripts/player/   (shared MP/CP)
+│               ├── player/                  ≙ /scripts/player/
 │               │   ├── player.gsc           health, god mode, third person, utilities
 │               │   └── movement.gsc         speed, gravity, sprint/slide/mantle options
-│               ├── weapons/                 ≙ /scripts/weapons/  (shared)
+│               ├── weapons/                 ≙ /scripts/weapons/
 │               │   └── weapons.gsc          ammo, fire-rate, recoil, spread, give/take, info
-│               ├── zombies/                 ≙ /scripts/zombies/  (CP ONLY)
+│               ├── zombies/                 ≙ /scripts/zombies/
 │               │   ├── zombies.gsc          speed, health, counts, spawn tuning
 │               │   └── rounds.gsc           round utilities and round hooks
-│               ├── mp/mp.gsc                MP-only helpers                               (Phase 1: placeholder)
 │               └── debug/                   ≙ /scripts/debug/   (gated)
 │                   └── debug.gsc            inspector, trace info, perf/log read-outs
 ├── tools/                                   offline verification (Linux)
@@ -66,29 +64,26 @@ Phase 1 also created one placeholder per feature area (`ui/ui.gsc`, `player/play
 Implemented in Phase 1 unless marked *(Phase 2+)*.
 
 ```text
-iw7-mod loads custom_scripts/<mode>/ix_main.gsc
+iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
 │
 ├─ main()     [G_LoadStructs — before stock level scripts]
 │   └─ (reserved for replacefunc hooks; not defined yet)
 │
 └─ init()     [Scr_LoadLevel — before the map's main()]
-    └─ ix\core\bootstrap::start(mode, modules())
+    └─ ix\core\bootstrap::start(modules())
         ├─ guard: level.ix already exists → log a warning, return      (no double init)
         ├─ master switch: dvar ix_enabled "0" → log, return           (mod fully off)
-        ├─ level.ix = { version, mode, map, ready = 0, modules = [] }; dvar ix_version
+        ├─ level.ix = { version, map, ready = 0, modules = [] }; dvar ix_version
         ├─ core setup():  log → compat (client feature flags)
         ├─ (Phase 2+) events → features → config: register settings, load file or dvars
-        ├─ modules' register(), in entry-script order:
-        │     cp: player, weapons, zombies, debug, ui
-        │     mp: player, weapons, mp, debug, ui
-        ├─ log "init <version> mode=… map=… modules=…" and "client fs_game=… omnimovement=…"
+        ├─ modules' register(), in entry-script order: player, weapons, zombies, debug, ui
+        ├─ log "init <version> map=… modules=…" and "client fs_game=… omnimovement=…"
         ├─ thread wait_until_ready: first "connected" + waittillframeend
         │     → level.ix.ready = 1, notify "ix_ready"
         │     (Phase 2+) wrap map-owned callbacks, apply enabled global features
         ├─ thread watch_players: every "connected"
         │     → self.ix = { spawn_count }, notify "ix_player_connected"
-        │     → one thread per spawn notify ("spawned_player", "faux_spawn")
-        │          → notify "ix_player_spawned" on every spawn
+        │     → spawn watcher thread: notify "ix_player_spawned" on every "spawned_player"
         │     (Phase 2+) menu input watcher; re-apply per-player features on spawn
         └─ thread watch_shutdown: "game_ended" → notify "ix_shutdown"
 ```
@@ -111,12 +106,12 @@ iw7-mod loads custom_scripts/<mode>/ix_main.gsc
 ### 4.1 Feature manager (`ix\core\features`)
 
 ```text
-register(id, category, modes[], scope, fn_enable, fn_disable, fn_player_apply, requires[])
+register(id, category, scope, fn_enable, fn_disable, fn_player_apply, requires[])
 enable(id) / disable(id) / is_enabled(id) / toggle(id)
 ```
 
 - **Duplicate-registration guard.** Registering the same `id` twice is logged and ignored.
-- **Compatibility gating.** `modes` must include the current mode. Any entry in `requires` (such as `"dvar:bg_omnimovement"` or `"fs_game"`) must be satisfied, otherwise the feature is shown as *unavailable* and cannot be enabled.
+- **Compatibility gating.** Every entry in `requires` (such as `"dvar:bg_omnimovement"` or `"fs_game"`) must be satisfied, otherwise the feature is shown as *unavailable* and cannot be enabled.
 - **Scope.** `global` features have enable/disable functions. `player` features have a per-player apply function that runs on enable and on every spawn.
 
 ### 4.2 Configuration manager (`ix\core\config`)
@@ -142,18 +137,18 @@ subscribe(event, fn)        dispatches level thread [[fn]](args…)
 
 Only real IW7 sources are used:
 
-| Bus event | Source (verified) | Modes |
-|-----------|-------------------|-------|
-| `player_connect` | `level waittill("connected", p)` | MP, CP |
-| `player_spawn` | `self waittill("spawned_player")` | MP, CP |
-| `player_death` | `self waittill("death")` | MP, CP |
-| `player_disconnect` | `self waittill("disconnect")` | all |
-| `player_laststand` | `self waittill("last_stand")` | CP |
-| `weapon_change` / `weapon_fired` / `reload` | `self waittill("weapon_change" / "weapon_fired" / "reload")` | MP, CP |
-| `round_start` | `level waittill("regular_wave_starting")` and `"event_wave_starting"` | CP |
-| `round_end` | `level waittill("spawn_wave_done")` | CP |
-| `game_end` | `level waittill("game_ended")` | all |
-| `chat` | `level waittill("say", p, msg)` (iw7-mod ≥ 1.0.3) | all |
+| Bus event | Source (verified) |
+|-----------|-------------------|
+| `player_connect` | `level waittill("connected", p)` (Phase 1: `ix_player_connected`) |
+| `player_spawn` | `self waittill("spawned_player")` (Phase 1: `ix_player_spawned`) |
+| `player_death` | `self waittill("death")` |
+| `player_disconnect` | `self waittill("disconnect")` |
+| `player_laststand` | `self waittill("last_stand")` |
+| `weapon_change` / `weapon_fired` / `reload` | `self waittill("weapon_change" / "weapon_fired" / "reload")` |
+| `round_start` | `level waittill("regular_wave_starting")` and `"event_wave_starting"` |
+| `round_end` | `level waittill("spawn_wave_done")` |
+| `game_end` | `level waittill("game_ended")` |
+| `chat` | `level waittill("say", p, msg)` (iw7-mod ≥ 1.0.3) |
 
 One listener thread exists per source notify (per player where relevant), never one per subscriber.
 
@@ -188,8 +183,8 @@ One listener thread exists per source notify (per player where relevant), never 
   | Value change on sliders/selects | Frag (+) / Tactical (−) |
 
   Weapons and offhands are disabled while the menu is open. Controls are polled with `adsbuttonpressed`, `attackbuttonpressed`, `usebuttonpressed`, `meleebuttonpressed`, `fragbuttonpressed`, and `secondaryoffhandbuttonpressed`, all present in both compilers.
-- **Access:** in MP, host only. In CP, every player can open the menu, but global options are host-only (setting `menu_global_access`).
-- **Top-level tree:** Player, Movement, Weapons, Zombies (CP), HUD, Gameplay, Quality of Life, Visuals, Utilities, Debug (gated), Settings (presets, reset, save/load). The final tree is set after the BO3 menu analysis.
+- **Access:** every player in the match can open the menu, but global options are host-only (setting `menu_global_access`).
+- **Top-level tree:** Player, Movement, Weapons, Zombies, HUD, Gameplay, Quality of Life, Visuals, Utilities, Debug (gated), Settings (presets, reset, save/load). The final tree is set after the BO3 menu analysis.
 
 ## 6. HUD design (`ix\ui\hud`)
 
@@ -197,14 +192,16 @@ One listener thread exists per source notify (per player where relevant), never 
 - Elements are created when enabled and destroyed when disabled; they are **never** recreated per frame.
 - A single per-player update thread ticks every 0.1–0.25 s and skips disabled elements. Numbers use `setvalue`; text changes only when the value changes, which minimises unique strings (`KNOWN_LIMITATIONS.md` L12).
 
-## 7. Mode separation rules
+## 7. Scope rules (zombies only)
 
-1. `ix\core\*`, `ix\ui\*`, `ix\player\*`, `ix\weapons\*`, and `ix\debug\*` must not reference `scripts\cp\…` or `scripts\mp\…`. They may use `scripts\engine\utility` and `scripts\common\…`, which exist in every mode.
-2. `ix\zombies\*` is referenced **only** from `custom_scripts/cp/ix_main.gsc`.
-3. `ix\mp\*` is referenced **only** from `custom_scripts/mp/ix_main.gsc`.
-4. Mode modules plug into shared code through function pointers stored in `level.ix` (for example `level.ix.fn_get_round`), never through direct calls.
+Multiplayer support was dropped on 2026-10-06; the mod targets the zombies mode only.
 
-`tools/check.py` (`modes`) verifies these rules on the compiled far-call paths. It also rejects scripts outside `custom_scripts/{cp,mp}/` and `custom_scripts/ix/<known area>/`, and warns about modules that no entry script reaches.
+1. The only entry script is `custom_scripts/cp/ix_main.gsc`. iw7-mod loads `custom_scripts/cp/` in zombies only, so the mod never runs in multiplayer or the campaign. Modules live in `custom_scripts/ix/<area>/`.
+2. Every module may use the zombies APIs (`scripts\cp\…`); the `ix/<area>/` folders only organise the code.
+3. A far call into a stock script must target a script that **every** zombies map loads. A match loads the map's level script (`scripts\cp\maps\<map>\<map>`) and the gametype script (`scripts\cp\gametypes\zombie`) and links everything they reference; a call into anything else is a `script link error` that ends the match (L23). 126 stock scripts are common to all five maps, including some under `scripts\mp\` (`mp_agent`, the zombie agent scripts).
+4. Map-specific behaviour is reached through the pointers each map assigns (`level.callbackplayerdamage`, `level.agent_funcs[…]`, `level.movemodefunc[…]`), never by a far call into `scripts\cp\maps\…`.
+
+`tools/check.py` verifies rules 1 and 3 (`layout`, `calls`). It computes each map's link closure from the decompiled dump, rejects scripts in other locations, and warns about modules the entry script never reaches.
 
 ## 8. Naming conventions
 
@@ -234,7 +231,7 @@ One listener thread exists per source notify (per player where relevant), never 
 
 | AAE v3.9.5 (from the decompiled package) | Infinite Expansion | Why it differs |
 |------------------------------------------|--------------------|----------------|
-| `autoexec` functions + `system::register(name, __init__, __main__, deps)` | One entry script per mode → `ix\core\bootstrap` calls each module's `register()` in a fixed order | IW7 has no `system::` manager; iw7-mod runs only `main()`/`init()` of auto-loaded files |
+| `autoexec` functions + `system::register(name, __init__, __main__, deps)` | One entry script (zombies) → `ix\core\bootstrap` calls each module's `register()` in a fixed order | IW7 has no `system::` manager; iw7-mod runs only `main()`/`init()` of auto-loaded files |
 | `tfoption.gsc` reads ~80 `tfoption_*` modvars **once** at match start | `ix\core\config`: flat `ix_*` keys, applied at start **and live** | Same flat-key model; live apply because the menu is in-game |
 | LUI save data + `exec AAECustomMutations` + `tfoption_master_ver` reset | `ix\core\persist`: `ix_settings.cfg` via GSC file I/O + `settings_version` | GSC can write files in IW7 (with `fs_game`); BO3 GSC could not |
 | LUI "Custom Mutations" lobby menus (`tfoptions*.lua`) | GSC HUD menu, Settings pages | A LUI front-end would be client code every player needs (L22) |

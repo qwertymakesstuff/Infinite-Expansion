@@ -1,8 +1,8 @@
-// shared code breaking several rules; the last four calls must NOT be reported
+// breaks several rules; the calls after the comment line must NOT be reported
 run()
 {
-    scripts\cp\utility::_hasperk( "specialty_x" );
-    custom_scripts\ix\zombies\z::run();
+    scripts\cp\maps\cp_town\cp_town_damage::callback_townzombieplayerdamage();
+    scripts\mp\hud_util::createfontstring( "default", 1 );
     self disableinvulnerability();
     line( ( 0, 0, 0 ), ( 1, 1, 1 ) );
     self _meth_845E( 1 );
@@ -12,4 +12,5 @@ run()
     logprint( "logprint is a stub in the table but iw7-mod implements it" );
     self tell( "tell is an iw7-mod extension method" );
     c = fileexists( "x" );
+    d = scripts\cp\utility::isreallyalive( self );
 }

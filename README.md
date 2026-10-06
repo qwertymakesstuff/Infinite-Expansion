@@ -1,6 +1,6 @@
 # Infinite Expansion
 
-A modular enhancement framework for **Call of Duty: Infinite Warfare** (IW7), with zombies as the first target. It is inspired by *All-Around Enhancement* for Black Ops III: an in-game menu, configurable gameplay, player, weapon, and zombie options, an info HUD, quality-of-life features, and developer tools.
+A modular enhancement framework for the **zombies** mode of **Call of Duty: Infinite Warfare** (IW7). It is inspired by *All-Around Enhancement* for Black Ops III: an in-game menu, configurable gameplay, player, weapon, and zombie options, an info HUD, quality-of-life features, and developer tools.
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
@@ -22,7 +22,7 @@ in game: Mods menu → infinite_expansion   (or launch with +set fs_game "mods/i
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.1.0 mode=cp map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.1.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=1 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: ready
 ```

@@ -1,18 +1,17 @@
-// Infinite Expansion - zombies (CP) entry point.
+// Infinite Expansion - entry point. The mod targets zombies only.
 //
-// iw7-mod auto-loads every .gsc directly inside custom_scripts/cp/ and runs its
-// init() when the level loads, before the map's own main(). The rest of the mod
-// lives in custom_scripts/ix/, which is never auto-loaded: those files are
-// compiled and loaded only because this file references them.
+// iw7-mod auto-loads every .gsc directly inside custom_scripts/cp/ (zombies
+// only) and runs its init() when the level loads, before the map's own main().
+// The rest of the mod lives in custom_scripts/ix/, which is never auto-loaded:
+// those files are compiled and loaded only because this file references them.
 
 init()
 {
-    custom_scripts\ix\core\bootstrap::start( "cp", modules() );
+    custom_scripts\ix\core\bootstrap::start( modules() );
 }
 
-// Module register() functions in the order bootstrap calls them. Zombie
-// modules are referenced from this file only (ARCHITECTURE.md section 7). ui
-// comes last so it can see everything the other modules registered.
+// Module register() functions in the order bootstrap calls them. ui comes
+// last so it can see everything the other modules registered.
 modules()
 {
     list = [];

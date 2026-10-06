@@ -17,6 +17,7 @@ If an API is not listed here, verify it the same way before using it. The rule i
 
 ## 1. Runtime environment
 
+- **Project scope: zombies (CP) only** (multiplayer dropped 2026-10-06). Multiplayer facts in this file are kept as reference.
 - Mods run under the **iw7-mod** client. Its latest release is **v1.1.0**; `develop` is ahead. `[MOD]`
 - Game modes: `GAME_MODE_SP=1`, `GAME_MODE_MP=2`, `GAME_MODE_CP=3`. "CP" is Zombies. `[MOD structs.hpp]`
 - Zombies maps: `cp_zmb`, `cp_rave`, `cp_disco`, `cp_town`, `cp_final`. `[DUMP scripts/cp/maps/]`
@@ -41,6 +42,7 @@ If an API is not listed here, verify it the same way before using it. The rule i
 | Ordering consequence | Anything that wraps a callback a map script assigns (for example `level.callbackplayerdamage`, which `cp_town`, `cp_rave`, `cp_disco`, and `cp_final` reassign) must **wait** first, for instance until `level waittill("connected")` or `"prematch_done"`, before wrapping. |
 | Custom bytecode budget | `script_memory.size = 0x100000` (**1 MiB**) for **all** custom scripts in one load. Each loaded script takes its bytecode length + 1 (`allocate_buffer`); strings and the stack are allocated elsewhere. Exceeding it is a **fatal** `Com_Error("Out of custom script memory")`. iw7-mod's own bundled scripts count toward it: **711 bytes in CP** (`cp/patches.gsc`, `cp_mp/inspect.gsc`) and **6,823 bytes in MP** (`mp/bots.gsc`, `mp/bots_loadout.gsc`, `mp/ranked.gsc`, `cp_mp/inspect.gsc`), the same at v1.1.0 and develop `[COMPILED]`. |
 | Includes | `#include path\to\file;` resolves raw `.gsc` files from the search paths first; otherwise the stock compiled script is decompiled. |
+| Stock scripts per zombies map | A match loads the map's level script (`scripts\cp\maps\<map>\<map>`) and the gametype script (`scripts\cp\gametypes\zombie`) and links what they reference, transitively. In the dump, **126** scripts are common to all five maps, among them `cp\utility`, `cp\cp_persistence`, `cp\loot`, `cp\cp_laststand`, `cp\cp_agent_utils`, `cp\cp_outline`, `cp\zombies\zombie_damage`, `cp\zombies\zombies_spawning`, `cp\zombies\zombies_perk_machines`, `cp\zombies\zombies_consumables`, `engine\utility`, and `mp\mp_agent`. `scripts\mp\hud_util` is linked on none. `[DUMP]` (computed by `tools/check.py`) |
 | `developer_script` dvar | When enabled, the compiler includes `/# … #/` dev blocks. It defaults to off in release builds. |
 
 ## 3. Packaging `[MOD party.cpp, fastfiles.cpp, ui_scripts/Mods]` `[DOCS loading-mods.md]`
@@ -170,7 +172,7 @@ Ordering and helper traps `[DUMP]`:
 - Fields (all in the token table): `x y alignx aligny horzalign vertalign font fontscale color alpha label sort foreground archived hidewheninmenu hidewhendead showinkillcam glowcolor glowalpha elemtype`.
   - `hidewheninkillcam` is **not** a token. Do not use it.
 - Values seen in stock: fonts `default`, `bigfixed`, `objective`; `horzalign`/`vertalign` `fullscreen`, `left`, `center`, `top`, `middle`, `bottom` (`right` is assumed, NEEDS TESTING).
-- Both CP and MP set `level.uiparent` and `level.fontheight = 12`, so `scripts\mp\hud_util::createfontstring` works. The project sets fields directly instead.
+- Both CP and MP set `level.uiparent` and `level.fontheight = 12`, but `scripts\mp\hud_util` (`createfontstring`, …) is **not linked on any zombies map**, so a far call to it risks a script link error (§2). The project sets HUD fields directly.
 - `clearalltextafterhudelem` is a **stub**. The classic configstring-overflow workaround is unavailable. Prefer `setvalue` for numbers and a small, fixed set of strings (risk: NEEDS TESTING).
 
 ## 8. Input `[DUMP]` `[TOOL-R/D]`
@@ -282,4 +284,5 @@ Rules 1 and 2 are enforced by `tools/check.py` (`compile`, `parity`, `natives`, 
   - an unknown built-in gives `couldn't determine function call type`;
   - a syntax error gives `expected ';'…` (develop) or `syntax error, unexpected …` (v1.1.0);
   - a function named after a built-in gives `function name 'x' already defined as builtin`;
-  - an unknown raw id (`_meth_85CB`) compiles **without** an error.
+  - an unknown raw id (`_meth_85CB`) compiles **without** an error;
+  - a `//` comment that ends in a backslash swallows the next line, silently, on both compilers.

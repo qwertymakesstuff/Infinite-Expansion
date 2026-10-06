@@ -6,6 +6,7 @@ init()
     custom_scripts\ix\core\nowhere::run();
     custom_scripts\ix\core\compat::unknown_native();
     custom_scripts\ix\core\include_user::run();
+    custom_scripts\ix\core\swallow::run();
     custom_scripts\ix\core\broken::run();
     custom_scripts\ix\core\develop_only::run();
     custom_scripts\ix\zombies\z::run();

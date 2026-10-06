@@ -63,15 +63,15 @@ class BadMod(unittest.TestCase):
         self.assert_reported("[calls]", "custom_scripts/ix/core/nowhere::run", "no such script")
         self.assert_reported("[calls]", "scripts/engine/utility::not_a_stock_function", "not defined in the stock script")
         self.assert_reported("[calls]", "scripts/engine/no_such_script::run", "no such stock script")
+        self.assert_reported("[calls]", "scripts/cp/maps/cp_town/cp_town_damage::callback_townzombieplayerdamage", "loaded only on cp_town")
+        self.assert_reported("[calls]", "scripts/mp/hud_util::createfontstring", "loaded on no zombies map")
 
-    def test_modes(self):
-        self.assert_reported("[modes]", "shared.gsc", "shared code must not reference scripts/cp/utility::_hasperk")
-        self.assert_reported("[modes]", "shared.gsc", "shared code must not reference custom_scripts/ix/zombies/z::run")
-        self.assert_reported("[modes]", "mp/entry.gsc", "mp code must not reference custom_scripts/ix/zombies/z::run")
-        self.assert_reported("[modes]", "no_entry.gsc", "neither init() nor main()")
-        self.assert_reported("[modes]", "custom_scripts/loose.gsc", "unsupported location")
-        self.assert_reported("[modes]", "custom_scripts/ix/hud/x.gsc", "unsupported location")
-        self.assert_reported("[modes]", "zombies/z.gsc", "only entry scripts define init() or main()")
+    def test_layout(self):
+        self.assert_reported("[layout]", "custom_scripts/cp/no_entry.gsc", "neither init() nor main()")
+        self.assert_reported("[layout]", "custom_scripts/loose.gsc", "unsupported location")
+        self.assert_reported("[layout]", "custom_scripts/mp/entry.gsc", "unsupported location")
+        self.assert_reported("[layout]", "custom_scripts/ix/x.gsc", "unsupported location")
+        self.assert_reported("[layout]", "zombies/z.gsc", "only the entry script defines init() or main()")
         self.assert_reported("WARNING", "orphan.gsc", "not reachable")
 
     def test_raw_ids(self):
@@ -82,14 +82,15 @@ class BadMod(unittest.TestCase):
     def test_source(self):
         self.assert_reported("[source]", "include_user.gsc:1", "#include")
         self.assert_reported("[source]", "include_user.gsc:6", "dev blocks")
+        self.assert_reported("[source]", "swallow.gsc:4", "ends in a backslash")
 
     def test_no_false_positives(self):
         # Comments and strings, iw7-mod extensions (logprint is a stub in the
-        # table but iw7-mod implements it) and a valid stock call are fine.
-        for name in ("_meth_80A1", "va", "logprint", "tell", "fileexists", "waittill_any"):
+        # table but iw7-mod implements it) and valid stock calls are fine.
+        for name in ("_meth_80A1", "va", "logprint", "tell", "fileexists", "waittill_any", "isreallyalive", "swallow.gsc:6"):
             for line in self.errors:
-                self.assertIsNone(re.search(rf"\b{name}\b", line), line)
-        self.assertEqual(len(self.errors), 23, "\n".join(self.errors))
+                self.assertIsNone(re.search(rf"\b{re.escape(name)}\b", line), line)
+        self.assertEqual(len(self.errors), 24, "\n".join(self.errors))
 
 
 @unittest.skipUnless(HAVE_TOOLCHAIN, "run tools/setup_compilers.sh first")
@@ -102,8 +103,7 @@ class GoodMod(unittest.TestCase):
     def test_budget_limit(self):
         code, output = run_check("good_mod", "--budget", "100")
         self.assertEqual(code, 1, output)
-        self.assertIn("ERROR   [budget] cp:", output)
-        self.assertIn("ERROR   [budget] mp:", output)
+        self.assertIn("ERROR   [budget] zombies:", output)
 
 
 if __name__ == "__main__":

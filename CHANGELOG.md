@@ -4,6 +4,25 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Scope: zombies only (2026-10-06)
+
+Multiplayer support was dropped at the project owner's request.
+
+**Removed**
+- The multiplayer entry script `custom_scripts/mp/ix_main.gsc` and the `ix/mp` module.
+- The `faux_spawn` watcher; only multiplayer sends that notify.
+
+**Changed**
+- `bootstrap::start(modules)` no longer takes a mode, and the init line no longer prints `mode=`.
+- `check.py`: the multiplayer/shared separation rule is replaced by a zombies rule. A stock far-call target must be a script that **every** zombies map loads; anything else ends the match with a script link error. The rule uses each map's link closure, computed from the dump. The `modes` check is now `layout`.
+- Docs: `ARCHITECTURE.md` §7 is now the zombies scope rules. `TESTING.md` R-S2 is now a co-op check.
+
+**Added**
+- `check.py` `source` rejects `//` comments that end in a backslash: both compilers silently drop the next line (C9).
+
+**Findings**
+- 126 stock scripts load on every zombies map, including everything the feature plan uses. `scripts\mp\hud_util` loads on none, so `IW_API_NOTES.md` §7 is corrected; map scripts load only on their own map (L25).
+
 ### Phase 1 — Foundation (2026-10-06)
 
 **Added**

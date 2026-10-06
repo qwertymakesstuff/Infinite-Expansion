@@ -1,8 +1,8 @@
 // Infinite Expansion - bootstrap.
 //
-// Called once per level load by the mode's entry script. It owns the init
-// order, the duplicate-init guard, the master switch and the lifecycle
-// notifies the rest of the mod builds on:
+// Called once per level load by the entry script. It owns the init order, the
+// duplicate-init guard, the master switch and the lifecycle notifies the rest
+// of the mod builds on:
 //
 //   level notify( "ix_ready" )                       once, at the end of the frame in which
 //                                                    the first player connects. The stock
@@ -10,7 +10,7 @@
 //                                                    main(), which never waits, so this is
 //                                                    after them
 //   level notify( "ix_player_connected", player )    once per player per level load
-//   level notify( "ix_player_spawned", player )      every spawn ("spawned_player" or "faux_spawn")
+//   level notify( "ix_player_spawned", player )      every "spawned_player"
 //   level notify( "ix_shutdown" )                    on "game_ended"
 //
 // Feature modules expose register() and core files setup(); only entry scripts
@@ -19,7 +19,7 @@
 // entry script lists them. They must not wait; anything that waits runs in its
 // own thread.
 
-start( mode, modules )
+start( modules )
 {
     if ( isdefined( level.ix ) )
     {
@@ -35,7 +35,6 @@ start( mode, modules )
 
     level.ix = spawnstruct();
     level.ix.version = "0.1.0";
-    level.ix.mode = mode;
     level.ix.map = getdvar( "mapname" );
     level.ix.ready = 0;
     level.ix.modules = [];
@@ -47,7 +46,7 @@ start( mode, modules )
     foreach ( module_register in modules )
         [[ module_register ]]();
 
-    custom_scripts\ix\core\log::info( "init " + level.ix.version + " mode=" + mode + " map=" + level.ix.map + " modules=" + custom_scripts\ix\core\util::join( level.ix.modules, "," ) );
+    custom_scripts\ix\core\log::info( "init " + level.ix.version + " map=" + level.ix.map + " modules=" + custom_scripts\ix\core\util::join( level.ix.modules, "," ) );
     custom_scripts\ix\core\log::info( "client " + custom_scripts\ix\core\compat::describe() );
 
     level thread wait_until_ready();
@@ -83,7 +82,7 @@ watch_players()
     }
 }
 
-// Runs on the player. The spawn watchers start immediately: in zombies the
+// Runs on the player. The spawn watcher starts immediately: in zombies the
 // first spawn follows "connected" after a single waittillframeend
 // (scripts\cp\cp_globallogic::defaultplayerconnect).
 player_lifecycle()
@@ -95,23 +94,19 @@ player_lifecycle()
     self.ix.spawn_count = 0;
     custom_scripts\ix\core\log::debug( "player connected: " + self.name );
     level notify( "ix_player_connected", self );
-
-    // Two independent watchers instead of scripts\engine\utility::waittill_any,
-    // which puts endon() on the calling thread for every notify but the first.
-    self thread watch_spawn( "spawned_player" );
-    self thread watch_spawn( "faux_spawn" );
+    self thread watch_spawns();
 }
 
-watch_spawn( message )
+watch_spawns()
 {
     self endon( "disconnect" );
     level endon( "game_ended" );
 
     for (;;)
     {
-        self waittill( message );
+        self waittill( "spawned_player" );
         self.ix.spawn_count++;
-        custom_scripts\ix\core\log::debug( "player spawned: " + self.name + " (" + message + ", spawn " + self.ix.spawn_count + ")" );
+        custom_scripts\ix\core\log::debug( "player spawned: " + self.name + " (spawn " + self.ix.spawn_count + ")" );
         level notify( "ix_player_spawned", self );
     }
 }

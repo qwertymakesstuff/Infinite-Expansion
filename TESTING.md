@@ -4,8 +4,8 @@
 
 | Level | Where it can run | Covers |
 |-------|------------------|--------|
-| **Static** | Any Linux machine with `tools/` (including this dev environment): `python3 tools/check.py` | Both compilers (with iw7-mod's extension built-ins), release/develop parity, stub natives and raw ids, far-call targets, mode separation, source rules, bytecode budget |
-| **Runtime** | **Windows + legally owned Infinite Warfare + iw7-mod only** | Everything else: behaviour, timing, HUD, input, multiplayer |
+| **Static** | Any Linux machine with `tools/` (including this dev environment): `python3 tools/check.py` | Both compilers (with iw7-mod's extension built-ins), release/develop parity, stub natives and raw ids, far-call targets (and stock scripts loaded on every zombies map), layout, source rules, bytecode budget |
+| **Runtime** | **Windows + legally owned Infinite Warfare + iw7-mod only** | Everything else: behaviour, timing, HUD, input, co-op |
 
 Runtime tests **cannot** be executed in the development environment. Every runtime item below stays **not run** until a tester reports a result, and `FEATURE_STATUS.md` will not mark a feature COMPLETE without one.
 
@@ -46,6 +46,15 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V24 | `check.py` without the stock dump (`--stock /nonexistent`) | ✅ stock far calls become warnings ("not verified"); exit 0 |
 | V25 | `check.py` with a missing toolchain | ✅ lists the missing files; exit 2 |
 
+### Scope change: zombies only
+
+| # | Check | Result |
+|---|-------|--------|
+| V26 | A `//` comment ending in a backslash, followed by `level.swallowed = 1;` | ⚠️ both compilers **silently drop** the next line (missing from the disassembly, no error; `KNOWN_LIMITATIONS.md` C9). `check.py` `source` now rejects such comments |
+| V27 | Link closure of each zombies map in the dump (level script + `scripts\cp\gametypes\zombie`, following named and hashed references) | ✅ 126 stock scripts are common to all five maps; every referenced script exists in the dump. `scripts\mp\hud_util` is linked on none, and `cp_town_damage` only on `cp_town` |
+| V28 | `python3 -m unittest discover -s tools/tests` after the change | ✅ 11 tests OK; `bad_mod` gives exactly its 24 planted errors and 1 planted warning, including the map-specific and never-loaded stock calls and the backslash comment |
+| V29 | `python3 tools/check.py` on the zombies-only mod | ✅ PASS, 0 errors, 0 warnings: 20/20 compiled, 10/10 identical, 23 far references, 10 scripts load, 1,430 bytes of custom-script memory |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -66,15 +75,15 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.1.0 mode=cp map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, then `[IX] INFO: ready` once you are in | not run | not run |
-| R-S2 | Start an MP private match | Same as R-S1 with `mode=mp` and `modules=player,weapons,mp,debug,ui` | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.1.0 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
 | R-S3 | Menu opens (ADS + Melee) *(Phase 3)* | Menu visible; weapons/offhands disabled while open | not run | not run |
 | R-S4 | Menu closes (Melee at root) *(Phase 3)* | Menu hidden; weapons restored | not run | not run |
 | R-S5 | `map_restart` / fast restart | One `init` line per load; with `ix_debug_log 1`, one `player connected` line per player per load | not run | not run |
 | R-S6 | Module loading by reference (`custom_scripts/ix/...`) | Modules compile and load in-game (the `modules=` list in R-S1 is complete) | not run | not run |
 | R-S7 | `set ix_enabled 0`, then load a map | Only `[IX] INFO: disabled by dvar ix_enabled 0`; no other `[IX]` lines | not run | not run |
 | R-S8 | Client feature line from R-S1 | v1.1.0: `omnimovement=0 sprint_unlimited=0 air_control=0`; develop: all `1`. `fs_game=1` when loaded from the Mods menu, `0` for a loose `iw7-mod/custom_scripts` install | not run | not run |
-| R-S9 | `set ix_debug_log 1`, spawn, then die and respawn (MP), or in CP co-op bleed out and respawn at the next round | `[IX] DEBUG: player connected: <name>` once; `[IX] DEBUG: player spawned: <name> (spawned_player, spawn N)` once per spawn, N rising by 1 | not run | not run |
+| R-S9 | `set ix_debug_log 1`, spawn; in co-op, also bleed out and respawn at the next round | `[IX] DEBUG: player connected: <name>` once; `[IX] DEBUG: player spawned: <name> (spawn N)` once per spawn, N rising by 1 | not run | not run |
 
 ### 4.2 Player
 
@@ -118,5 +127,4 @@ The mod claims support **only** for cells marked pass.
 | `cp_disco` (Shaolin Shuffle) | not run | not run |
 | `cp_town` (Attack of the Radioactive Thing) | not run | not run |
 | `cp_final` (The Beast from Beyond) | not run | not run |
-| MP private match / combat training (host) | not run | not run |
-| Dedicated server (MP/CP) | not run | not run |
+| Zombies co-op (host + 1–3 players) | not run | not run |

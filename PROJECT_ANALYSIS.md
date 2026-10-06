@@ -277,7 +277,7 @@ A) As a mod (recommended — enables file I/O persistence)
 ├── desc.txt                         ← shown in the in-game Mods menu
 ├── custom_scripts/
 │   ├── cp/ix_main.gsc               ← zombies entry point (auto-loaded)
-│   ├── mp/ix_main.gsc               ← multiplayer entry point (auto-loaded)
+│   ├── mp/ix_main.gsc               ← multiplayer entry point (auto-loaded; dropped 2026-10-06)
 │   └── ix/...                       ← modules (NOT auto-loaded; loaded by reference)
 └── (optional) ui_scripts/<Name>/__init__.lua, mod.ff
 Load: in-game "Mods" menu → sets fs_game=mods/infinite_expansion → vid_restart
@@ -529,5 +529,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
    - A LUI front-end stays an optional later phase.
 4. **Hooks over file overrides.** AAE ships patched copies of stock scripts. Infinite Expansion uses iw7-mod's `replacefunc` and callback wrapping instead, which avoids redistributing modified stock code and survives game-script differences between maps.
 5. **Zombies (CP) is the primary target**, MP is secondary (host only), and SP is out of scope.
+   - *Update 2026-10-06: the project owner dropped MP. The mod is zombies-only.*
 6. **Use one entry script per mode** (`custom_scripts/cp/ix_main.gsc`, `custom_scripts/mp/ix_main.gsc`) with modules under `custom_scripts/ix/`. CP-only modules (which reference `scripts\cp\…`) are never referenced from the MP entry.
+   - *Update 2026-10-06: with MP dropped, only the zombies entry script exists, and every module may use zombies APIs (`ARCHITECTURE.md` §7).*
 7. **Asset-dependent AAE features are deferred to an optional asset phase** (x64-zt on Windows): ported weapons, camos, sounds, and HUD art.
