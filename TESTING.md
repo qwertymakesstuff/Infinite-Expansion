@@ -35,7 +35,7 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 
 | # | Check | Result |
 |---|-------|--------|
-| V16 | `tools/setup_compilers.sh` (now also builds `ixcc` and fetches the stock dump) run from an empty directory | ✅ exit 0 from an empty `.toolchain/`: both pins and both `ixcc` binaries built. The stock-dump step, added afterwards, was verified by re-running the script on that toolchain (exit 0, dump at `1dd48a78`). A full run of the final script from an empty directory is recorded in the next update |
+| V16 | `tools/setup_compilers.sh` (now also builds `ixcc` and fetches the stock dump) run from an empty directory | ✅ exit 0 in 504 s from an empty directory: both pins, both `ixcc` binaries, and the stock dump at `1dd48a78`. `check.py` with that toolchain passes, and its compiled and disassembled output is byte-identical to the development toolchain's (`diff -r` clean) |
 | V17 | `ixcc` built by the setup script vs. built by hand | ✅ byte-identical `.gscbin` for all 12 mod scripts, both pins |
 | V18 | `python3 tools/check.py` on the mod | ✅ PASS, 0 errors, 0 warnings: 24/24 compiled, 12/12 identical between compilers, 31 built-in calls, 30 far references, 10 scripts load per mode, 9 raw ids (all in `compat.gsc`), 0 source issues, 1,481 bytes of custom-script memory per mode (0.14% of 1 MiB) |
 | V19 | `python3 -m unittest discover -s tools/tests` | ✅ 11 tests OK. `bad_mod` gives exactly the 23 planted errors and 1 planted warning; comments, strings, iw7-mod extensions (`va`, `tell`, `fileexists`, `logprint`), and a valid stock call are not flagged; `good_mod` passes with 0 warnings; `--budget 100` fails both modes |
