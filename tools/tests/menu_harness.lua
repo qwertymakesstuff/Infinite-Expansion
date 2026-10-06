@@ -22,6 +22,12 @@
 --   keys=a,b          soul keys the player has (soul_key_1 ...)
 --   merits=a,b        merits the player has (mt_dlc4_troll2)
 --   specials=<n>      ix_character_specials
+--   pack=a,b          the character pictures pack holds these materials
+--                     (iw7-mod/zone/ix_portraits.txt; "pack=" for none)
+--   zone=0            ... but iw7-mod/zone/ix_portraits.ff is missing
+--   map=<name>        ui_mapname, the map the lobby has selected
+--   pictures=0        ix_pictures 0
+--   loaded=1          the pack was loaded earlier this session (ix_pictures_loaded)
 --
 -- The stock lobby stand-ins follow the game's ui/frontend/cp/cpprivatematchbuttons.lua
 -- and cpprivatematchmenu.lua (IW_API_NOTES.md section 16): element names,
@@ -199,7 +205,8 @@ function RegisterMaterial(name)
 end
 function WipeGlobalModelsAtPath() end
 
-local dvars = { name = "Unknown Soldier", ix_character = options.character, ix_character_specials = options.specials }
+local dvars = { name = "Unknown Soldier", ix_character = options.character, ix_character_specials = options.specials,
+    ui_mapname = options.map, ix_pictures = options.pictures, ix_pictures_loaded = options.loaded }
 local stats = { characterSelect = 0, keys = set(options.keys), merits = set(options.merits) }
 local execs, nameSets = {}, 0
 
@@ -219,7 +226,7 @@ Engine = {
     end,
     Exec = function(command)
         execs[#execs + 1] = command
-        local dvar, value = string.match(command, "^seta (%S+) (.*)$")
+        local dvar, value = string.match(command, "^seta? (%S+) (.*)$")
         if dvar then
             dvars[dvar] = value
         end
@@ -244,10 +251,22 @@ Engine = {
 }
 
 local nameFile = nil
+local nameFilePath = "iw7-mod/ui_scripts/InfiniteExpansion/steam-name.txt"
+local pictureListPath = "iw7-mod/zone/ix_portraits.txt"
 io.fileexists = function(path)
-    return nameFile ~= nil and path == "iw7-mod/ui_scripts/InfiniteExpansion/steam-name.txt"
+    if path == pictureListPath then
+        return options.pack ~= nil
+    end
+    return nameFile ~= nil and path == nameFilePath
 end
-io.readfile = function()
+io.zoneexists = function(name)
+    return options.pack ~= nil and options.zone ~= "0" and name == "ix_portraits"
+end
+io.readfile = function(path)
+    if path == pictureListPath then
+        return (string.gsub(options.pack or "", ",", "\r\n")) .. "\r\n"
+    end
+    assert(path == nameFilePath, "unexpected file " .. tostring(path))
     return nameFile
 end
 
@@ -415,7 +434,15 @@ if scenario == "lobby" then
     print("field " .. stats.characterSelect)
 elseif scenario == "menu" then
     dofile(script)
+    print("loaded " .. table.concat(execs, ";"))
+    execs = {}
     local menu = MenuBuilder.BuildRegisteredType("IXCharacterMenu", { controllerIndex = 0 })
+    for index = 1, 10 do
+        local icon = menu.IXRowIcons[index]
+        if icon then
+            print(string.format("rowicon %d %s %s", index - 1, icon.image, rectText(icon)))
+        end
+    end
     for _, id in ipairs({ "IXInfoTitle", "IXInfoStatus", "IXInfoText", "IXSelected", "IXInitials" }) do
         local text = menu[id]
         print(string.format("text %s font=%g height=%g", id, text.fontSize, text.rect[4] - text.rect[2]))

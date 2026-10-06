@@ -95,6 +95,26 @@ The rules are enforced by the host's copy of the mod. A host without the mod run
 | `ix_character_announce 1` | 0 | Host: an "is playing as" line for each player after the intro |
 | `ix_player_card 0` | 1 | Host: hides the card; `ix_player_card_x` / `ix_player_card_y` move it |
 
+### Character pictures (optional, experimental)
+
+Out of the box, the CHARACTER menu has pictures only for the special characters (the game's own lobby pictures), and big initials for Sally, Poindexter, Andre and A.J. The cards the HUD shows in a match exist only inside each map's own files, which the menus cannot reach while you are in the lobby (`KNOWN_LIMITATIONS.md` L28). **`Build Character Pictures.cmd`** copies those cards out of *your own* game files into a small picture pack. Nothing of the game's art ships with this mod.
+
+1. Install the mod first (above), and close the game.
+2. Double-click **`Build Character Pictures.cmd`** (next to the setup). It takes a few minutes, mostly one pass per map.
+3. Start the game. In the CHARACTER menu, each character shows their card from the selected map, with their team card (the small picture the HUD shows for teammates) beside each row.
+
+What it does:
+
+- **Downloads the tool.** It fetches [x64-zt](https://github.com/Joelrau/x64-zt), the community fastfile tool, from its latest GitHub release and checks the checksum GitHub lists.
+- **Copies the cards.** It runs x64-zt in the game folder once per map to copy the cards, then builds `iw7-mod\zone\ix_portraits.ff` and a list of what it holds (`ix_portraits.txt`).
+- **Cleans up.** It deletes x64-zt and its work files afterwards. Your own files in `dump\`, `zonetool\` or `zone_source\` stay.
+- **Skips missing maps.** A map you do not have (DLC) is skipped, and those characters keep their initials.
+- **Logs.** Details go to `%TEMP%\InfiniteExpansionPictures.log`.
+
+`ix_pictures 0` turns the pictures off without deleting them. UNINSTALL also removes the pack. Run it again after a game update.
+
+This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK4 list what to check.
+
 ## Documentation
 
 | File | Contents |
@@ -107,7 +127,7 @@ The rules are enforced by the host's copy of the mod. A host without the mod run
 | `TESTING.md` | Verification levels, verification log (Phases 0–1), runtime test checklist |
 | `CHANGELOG.md` | History |
 | `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests |
-| `installer/` | The Windows setup: `IXSetup.ps1` (window), `IXSetup.Core.ps1` (install logic), `IXSetup.xaml` (layout and artwork) |
+| `installer/` | The Windows setup: `IXSetup.ps1` (window), `IXSetup.Core.ps1` (install logic), `IXSetup.xaml` (layout and artwork); the picture pack: `IXPictures.ps1` and `IXPictures.Core.ps1` |
 
 ## Roadmap
 

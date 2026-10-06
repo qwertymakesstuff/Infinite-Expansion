@@ -160,19 +160,89 @@ local function describe(character)
     return character.text .. regularNote
 end
 
--- The picture: a special character's own picture, or the initials on a dark
--- panel in the character's color for the four regular characters and Random,
--- which have no picture in the game's menus.
+-- Character pictures from the matches' own HUD cards, when the player built
+-- them with "Build Character Pictures" (installer/IXPictures.ps1): the zone
+-- iw7-mod/zone/ix_portraits.ff, and next to it the list of cards it holds. The
+-- game's menus can only draw pictures from a loaded zone, and the cards are
+-- otherwise only in each map's own zone (KNOWN_LIMITATIONS.md L28). iw7-mod's
+-- loadzone keeps a zone loaded for the rest of the session and does not check
+-- whether it already is (fastfiles.cpp), so it is loaded once per session
+-- (ix_pictures_loaded). ix_pictures 0 turns the pictures off.
+local pictureZone = "ix_portraits"
+local pictureList = "iw7-mod/zone/ix_portraits.txt"
+local packedPictures = {}
+
+local function loadPictures()
+    local ok, setting = pcall(Engine.GetDvarString, "ix_pictures")
+    if ok and setting == "0" then
+        return
+    end
+    if not io.fileexists(pictureList) or not io.zoneexists(pictureZone) then
+        return
+    end
+    for name in string.gmatch(io.readfile(pictureList) or "", "[%w_]+") do
+        packedPictures[name] = true
+    end
+    local _, loaded = pcall(Engine.GetDvarString, "ix_pictures_loaded")
+    if loaded ~= "1" then
+        Engine.Exec("loadzone " .. pictureZone)
+        Engine.Exec("set ix_pictures_loaded 1")
+    end
+end
+
+pcall(loadPictures)
+
+-- The map the lobby has selected, as the pack names it.
+local mapKeys = { cp_zmb = "zmb", cp_rave = "rave", cp_disco = "disco", cp_town = "town", cp_final = "final" }
+
+local function selectedMapKey()
+    local ok, map = pcall(Engine.GetDvarString, "ui_mapname")
+    return ok and mapKeys[map] or "zmb"
+end
+
+-- A picture from the pack: prefix "ix_card_" for the main card, "ix_icon_"
+-- for the team card (the small picture the HUD shows for each teammate). A
+-- special character's picture comes from their own map, a regular
+-- character's from the selected map. nil if the pack does not have it.
+local function packedPicture(prefix, character)
+    local name
+    if character.select then
+        name = prefix .. character.key
+    elseif character.key ~= "random" then
+        name = prefix .. selectedMapKey() .. "_" .. character.key
+    end
+    if name and packedPictures[name] then
+        return name
+    end
+    return nil
+end
+
+-- The picture: the character's main card from the pack, else a special
+-- character's own menu picture, else the team card from the pack, else the
+-- initials on a dark panel in the character's color (the four regular
+-- characters and Random have no picture in the game's menus). Main cards are
+-- 256 x 371 and team cards square (the HUD draws them 128 x 128,
+-- ui/ingame/cp/cpplayerinfo.lua); the game's menu pictures are half as wide as
+-- high (The Hoff's is square).
 local portraitLeft, portraitTop, portraitSize = 1254, 216, 360
+local cardWidth = math.floor(portraitSize * 256 / 371)
+local iconSize = 256
+local listLeft, listTop, rowHeight, rowSpacing = 130, 216, 30, 10
 
 local function showPortrait(menu, character)
     menu.IXPortraitEdge:SetRGBFromInt(character.color, 0)
-    if character.portrait then
-        local width = character.square and portraitSize or portraitSize / 2
+    local material, width, height = packedPicture("ix_card_", character), cardWidth, portraitSize
+    if not material and character.portrait then
+        material, width = character.portrait, character.square and portraitSize or portraitSize / 2
+    elseif not material then
+        material, width, height = packedPicture("ix_icon_", character), iconSize, iconSize
+    end
+    if material then
         local left = portraitLeft + (portraitSize - width) / 2
-        menu.IXPortrait:setImage(RegisterMaterial(character.portrait), 0)
+        local top = portraitTop + (portraitSize - height) / 2
+        menu.IXPortrait:setImage(RegisterMaterial(material), 0)
         menu.IXPortrait:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * (left + width),
-            _1080p * portraitTop, _1080p * (portraitTop + portraitSize))
+            _1080p * top, _1080p * (top + height))
         menu.IXPortrait:SetAlpha(1, 0)
         menu.IXInitials:SetAlpha(0, 0)
     else
@@ -365,7 +435,7 @@ function IXCharacterMenu(parent, controller)
     menu:addElement(infoText)
     menu.IXInfoText = infoText
 
-    -- Left side: the list.
+    -- Left side: the list, every row visible (it never scrolls).
     local list = LUI.UIDataSourceGrid.new(nil, {
         maxVisibleColumns = 1,
         maxVisibleRows = #characters,
@@ -376,9 +446,9 @@ function IXCharacterMenu(parent, controller)
         wrapX = true,
         wrapY = true,
         spacingX = _1080p * 10,
-        spacingY = _1080p * 10,
+        spacingY = _1080p * rowSpacing,
         columnWidth = _1080p * 500,
-        rowHeight = _1080p * 30,
+        rowHeight = _1080p * rowHeight,
         scrollingThresholdX = 1,
         scrollingThresholdY = 1,
         adjustSizeToContent = false,
@@ -389,9 +459,26 @@ function IXCharacterMenu(parent, controller)
     })
     list.id = "IXCharacterList"
     list:setUseStencil(false)
-    list:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * 130, _1080p * 630, _1080p * 216, _1080p * 886)
+    list:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * listLeft, _1080p * (listLeft + 500), _1080p * listTop, _1080p * 886)
     menu:addElement(list)
     menu.IXCharacterList = list
+
+    -- Each row's team card from the pack, left of the row, like the HUD shows
+    -- teammates. Rows are rowHeight tall and rowSpacing apart from the top.
+    menu.IXRowIcons = {}
+    for i = 1, #characters do
+        local icon = packedPicture("ix_icon_", characters[i])
+        if icon then
+            local top = listTop + (i - 1) * (rowHeight + rowSpacing)
+            local image = LUI.UIImage.new()
+            image.id = "IXRowIcon" .. i
+            image:setImage(RegisterMaterial(icon), 0)
+            image:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * (listLeft - rowHeight - 8), _1080p * (listLeft - 8),
+                _1080p * top, _1080p * (top + rowHeight))
+            menu:addElement(image)
+            menu.IXRowIcons[i] = image
+        end
+    end
 
     local selected = newText("IXSelected", 24, FONTS.MainBold.File, 130, 630, 640)
     selected:setText("Selected: " .. labelFor(currentKey()), 0)

@@ -156,6 +156,51 @@ class MenuScript(unittest.TestCase):
             self.assertIn("status=Special characters are off (ix_character_specials 0).", rows[index])
             self.assertEqual(clicks[index], f"click {index} exec= requests=")
 
+    def pictures(self, *options):
+        """(load commands, {row: icon line}, {row: picture}) of the CHARACTER menu."""
+        lines = self.run_harness("menu", *options)
+        loaded = lines[0].split(" ", 1)[1] if " " in lines[0] else ""
+        icons = {int(line.split(" ")[1]): line.split(" ", 2)[2] for line in lines if line.startswith("rowicon ")}
+        shown = {}
+        for line in lines:
+            if line.startswith("row "):
+                index = int(line.split(" ")[1])
+                shown[index] = line[line.index(" image=") + 1:] if " image=" in line else line[line.index(" initials=") + 1:]
+        return loaded, icons, shown
+
+    def test_picture_pack_cards_and_team_icons(self):
+        pack = "pack=ix_card_rave_sally,ix_icon_rave_sally,ix_icon_rave_andre,ix_icon_zmb_andre,ix_card_hoff,ix_icon_hoff"
+        loaded, icons, shown = self.pictures(pack, "map=cp_rave")
+        self.assertEqual(loaded, "loadzone ix_portraits;set ix_pictures_loaded 1")
+        # Team icons beside the rows (30 x 30, left of the list at 130), for the selected map.
+        self.assertEqual(icons, {1: "material:ix_icon_rave_sally 92 256 122 286",
+                                 3: "material:ix_icon_rave_andre 92 336 122 366",
+                                 5: "material:ix_icon_hoff 92 416 122 446"})
+        # The main card first, then a special's own menu picture, then the
+        # team icon, then the initials.
+        self.assertEqual(shown[1], "image=material:ix_card_rave_sally size=248x360")
+        self.assertEqual(shown[3], "image=material:ix_icon_rave_andre size=256x256")
+        self.assertEqual(shown[2], "initials=P")
+        self.assertEqual(shown[5], "image=material:ix_card_hoff size=248x360")
+        self.assertEqual(shown[7], "image=material:zm_character_select_smith size=180x360")
+        self.assertEqual(shown[0], "initials=?")
+
+    def test_picture_pack_default_map_and_settings(self):
+        pack = "pack=ix_card_zmb_aj,ix_icon_zmb_aj"
+        loaded, icons, shown = self.pictures(pack)
+        self.assertEqual(sorted(icons), [4])
+        self.assertEqual(shown[4], "image=material:ix_card_zmb_aj size=248x360")
+        # Loaded earlier this session: not again, still shown.
+        loaded, icons, shown = self.pictures(pack, "loaded=1")
+        self.assertEqual(loaded, "")
+        self.assertEqual(shown[4], "image=material:ix_card_zmb_aj size=248x360")
+        # ix_pictures 0, or a list without its zone: no pictures, nothing loaded.
+        for options in (("pictures=0",), ("zone=0",)):
+            loaded, icons, shown = self.pictures(pack, *options)
+            self.assertEqual((loaded, icons, shown[4]), ("", {}, "initials=AJ"), options)
+        # No pack at all.
+        self.assertEqual(self.pictures()[:2], ("", {}))
+
     def test_main_menu_has_no_character_button(self):
         self.assertIn("main buttons 0", self.run_harness("mainmenu"))
 

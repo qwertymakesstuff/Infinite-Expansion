@@ -28,6 +28,10 @@ CORE = INSTALLER / "IXSetup.Core.ps1"
 GUI = INSTALLER / "IXSetup.ps1"
 XAML = INSTALLER / "IXSetup.xaml"
 LAUNCHER = REPO / "Infinite Expansion Setup.cmd"
+PICTURES_CORE = INSTALLER / "IXPictures.Core.ps1"
+PICTURES = INSTALLER / "IXPictures.ps1"
+PICTURES_LAUNCHER = REPO / "Build Character Pictures.cmd"
+FAKE_ZONETOOL = Path(__file__).resolve().parent / "fake_zonetool.py"
 PACKAGE = REPO / "mods" / "infinite_expansion"
 LINT = Path(__file__).resolve().parent / "ps51_lint.ps1"
 
@@ -264,6 +268,7 @@ class ManualInstallAndSetupCopy(unittest.TestCase):
     def test_setup_copy(self):
         self.assertTrue(self.r["same"])
         for relative in ("installer/IXSetup.ps1", "installer/IXSetup.Core.ps1", "installer/IXSetup.xaml",
+                         "installer/IXPictures.ps1", "installer/IXPictures.Core.ps1",
                          "mods/infinite_expansion/custom_scripts/cp/ix_main.gsc"):
             self.assertTrue((self.copy / relative).is_file(), relative)
 
@@ -616,6 +621,374 @@ class SteamName(unittest.TestCase):
         self.assertFalse((self.game / "iw7-mod" / name_file).exists())
 
 
+SCENARIO_PICTURES = r"""
+param([string]$Core, [string]$Pictures, [string]$Game, [string]$Stage, [string]$Package, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+. $Pictures
+$r = [ordered]@{}
+$plan = Get-IXPicturePlan
+$r.plan = @($plan | ForEach-Object {
+    [ordered]@{ map = $_.Map; title = $_.Title; zones = @($_.Zones); images = @($_.Images | ForEach-Object { $_.Source + '=' + $_.Name }) }
+})
+$r.townZones = @((@(Get-IXPicturePlan $Game) | Where-Object { $_.Map -eq 'cp_town' }).Zones)
+$r.runs = @(Get-IXPictureDumpRuns $plan | ForEach-Object { [ordered]@{ map = $_.Map; commands = @($_.Commands) } })
+try {
+    New-IXPictureSource $Game $plan | Out-Null
+    $r.noTemplate = 'no error'
+}
+catch {
+    $r.noTemplate = $_.Exception.Message
+}
+
+# What x64-zt "dumped" arrives after the snapshot, like in IXPictures.ps1.
+$before = @(Get-IXZoneToolFiles $Game)
+$stageRoot = Join-Path $Stage 'dump'
+foreach ($file in [IO.Directory]::GetFiles($stageRoot, '*', [IO.SearchOption]::AllDirectories)) {
+    $target = Join-Path (Join-Path $Game 'dump') $file.Substring($stageRoot.Length).TrimStart('/', '\')
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target)) | Out-Null
+    [IO.File]::Copy($file, $target, $true)
+}
+$prepared = New-IXPictureSource $Game $plan
+$r.materials = @($prepared.Materials)
+$r.missing = @($prepared.Missing)
+$r.csv = [IO.File]::ReadAllText((Join-IXPath $Game @('zone_source', 'ix_portraits.csv')))
+$r.foundBeforeBuild = Find-IXBuiltPictureZone $Game
+[IO.File]::WriteAllText((Join-IXPath $Game @('zone', 'ix_portraits.ff')), 'built')
+$built = Find-IXBuiltPictureZone $Game
+$r.built = $built
+$r.pack = Install-IXPicturePack $Game $built $prepared.Materials
+$r.builtLeft = [IO.File]::Exists($built)
+$r.list = [IO.File]::ReadAllText((Get-IXPictureListPath $Game))
+$r.sourceFiles = @(Get-IXZoneToolFiles $Game | ForEach-Object { $_.Substring($Game.Length + 1).Replace('\', '/') })
+$r.removedWork = Remove-IXZoneToolWork $Game $before
+$r.uninstall = Uninstall-IX $Game $Package
+$r.packAfter = [IO.File]::Exists((Get-IXPicturePackPath $Game))
+$r.listAfter = [IO.File]::Exists((Get-IXPictureListPath $Game))
+ConvertTo-Json -InputObject $r -Depth 6 | Set-Content -LiteralPath $Out
+"""
+
+SCENARIO_ZONETOOL = r"""
+param([string]$Core, [string]$Pictures, [string]$Game, [string]$Exe, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+. $Pictures
+$r = [ordered]@{}
+$seen = New-Object System.Collections.ArrayList
+$log = { param([string]$Line) [void]$seen.Add($Line) }
+$result = Invoke-IXZoneTool $Game $Exe @('-dds', '-unbuffered-io') @('loadzone ui_boot', 'dumpasset material zm_character_select_hoff', 'quit') $log
+$r.exitCode = $result.ExitCode
+$r.lines = @($result.Lines)
+$r.logged = @($seen)
+[IO.File]::WriteAllText((Join-Path $Game 'fake_zonetool.json'), '{"hang": true}')
+$start = Get-Date
+try {
+    Invoke-IXZoneTool $Game $Exe @('-dds') @('quit') $null -IdleSeconds 3 | Out-Null
+    $r.hang = 'returned'
+}
+catch {
+    $r.hang = $_.Exception.Message
+}
+$r.hangSeconds = ((Get-Date) - $start).TotalSeconds
+ConvertTo-Json -InputObject $r -Depth 4 | Set-Content -LiteralPath $Out
+"""
+
+
+def picture_plan_names():
+    """(stock image, pack material) for every card, in IXPictures.Core.ps1's order."""
+    cast = ("sally", "poindexter", "andre", "aj")
+    maps = (("zmb", "zm_pc_score_main_plyr_{0}", "zm_pc_score_team_plyr_{0}", "hoff"),
+            ("rave", "zm_main_plyr_{0}_dlc1", "zm_team_plyr_{0}_dlc1", "kevin"),
+            ("disco", "zm_main_plyr_{0}_dlc2", "zm_team_plyr_{0}_dlc2", "pam"),
+            ("town", "zm_main_plyr_{0}_dlc3", "zm_team_plyr_{0}_dlc3", "elvira"),
+            ("final", "zm_main_plyr_{0}_dlc4", "zm_team_plyr_{0}_dlc4", None))
+    names = []
+    for key, main, team, special in maps:
+        for slot, who in enumerate(cast, 1):
+            names += [(main.format(slot), f"ix_card_{key}_{who}"), (team.format(slot), f"ix_icon_{key}_{who}")]
+        if special:
+            names += [(main.format(5), f"ix_card_{special}"), (team.format(5), f"ix_icon_{special}")]
+        if key == "zmb":
+            names += [("zm_main_plyr_6_dlc4", "ix_card_willard"), ("zm_team_plyr_6_dlc4", "ix_icon_willard")]
+    return names
+
+
+def write_template_dump(dump):
+    """What x64-zt dumps for the pattern material: its JSON and its techset files."""
+    material = {"name": "zm_character_select_hoff", "techniqueSet->name": "2d", "sortKey": 41,
+                "textureTable": [{"image": "zm_character_select_hoff_img", "semantic": 2}], "constantTable": []}
+    (dump / "materials").mkdir(parents=True, exist_ok=True)
+    (dump / "materials" / "zm_character_select_hoff.json").write_text(json.dumps(material, indent=4))
+    for ext in (".statebits", ".statebitsmap"):
+        (dump / "techsets" / "state" / "2d").mkdir(parents=True, exist_ok=True)
+        (dump / "techsets" / "state" / "2d" / f"zm_character_select_hoff{ext}").write_text("state" + ext)
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class CharacterPictures(unittest.TestCase):
+    """IXPictures.Core.ps1: the cards to copy, x64-zt's build input, and the pack's install and removal."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        _steam, cls.game = make_game(root)
+        (cls.game / "zone" / "english").mkdir(parents=True)
+        (cls.game / "zone" / "french").mkdir()
+        for name in ("english/eng_cp_town.ff", "french/fre_cp_town.ff", "patch_cp_town.ff", "cp_town.ff"):
+            (cls.game / "zone" / name).write_bytes(b"")
+        # The player's own x64-zt work, which must stay.
+        (cls.game / "dump" / "assets").mkdir(parents=True)
+        (cls.game / "dump" / "assets" / "mine.json").write_text("{}")
+        (cls.game / "zone_source").mkdir()
+        (cls.game / "zone_source" / "mine.csv").write_text("material,mine\n")
+        stage = root / "stage" / "dump" / "assets"
+        write_template_dump(stage)
+        names = picture_plan_names()
+        cls.present = [source for source, _ in names if not source.startswith(("zm_main_plyr_6", "zm_team_plyr_6"))]
+        streamed = "zm_team_plyr_2_dlc1"
+        for source in cls.present:
+            if source == streamed:
+                (stage / "streamed_images").mkdir(exist_ok=True)
+                (stage / "streamed_images" / f"{source}_stream0.dds").write_bytes(b"small")
+                (stage / "streamed_images" / f"{source}_stream2.dds").write_bytes(b"the biggest stream")
+                (stage / "streamed_images" / f"{source}_stream1.dds").write_bytes(b"middle stream")
+            else:
+                (stage / "images").mkdir(exist_ok=True)
+                (stage / "images" / f"{source}.dds").write_bytes(b"DDS " + source.encode())
+        out = root / "result.json"
+        run_pwsh(SCENARIO_PICTURES, CORE, PICTURES_CORE, cls.game, root / "stage", PACKAGE, out, workdir=root)
+        cls.r = json.loads(out.read_text(encoding="utf-8-sig"))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_plan_names_every_card(self):
+        plan = self.r["plan"]
+        self.assertEqual([m["map"] for m in plan], ["cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final"])
+        self.assertEqual([m["title"] for m in plan], ["Zombies in Spaceland", "Rave in the Redwoods", "Shaolin Shuffle",
+                                                      "Attack of the Radioactive Thing", "The Beast from Beyond"])
+        self.assertEqual([image for m in plan for image in m["images"]], [f"{a}={b}" for a, b in picture_plan_names()])
+        self.assertEqual(plan[0]["zones"], ["cp_zmb", "patch_cp_zmb"])
+        # Without a game folder: English; with one: the language zones it has.
+        self.assertEqual(plan[3]["zones"], ["cp_town", "eng_cp_town"])
+        self.assertEqual(self.r["townZones"][0], "cp_town")
+        self.assertEqual(sorted(self.r["townZones"][1:]), ["eng_cp_town", "fre_cp_town"])
+
+    def test_one_run_per_map_waits_for_its_zones_then_quits(self):
+        runs = self.r["runs"]
+        self.assertEqual([run["map"] for run in runs], ["cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final"])
+        self.assertEqual(runs[0]["commands"][:6], ["loadzone ui_boot", "loadzone ui_boot",
+                                                   "dumpasset material zm_character_select_hoff",
+                                                   "loadzone cp_zmb", "loadzone patch_cp_zmb", "loadzone cp_zmb"])
+        self.assertEqual(runs[3]["commands"][:3], ["loadzone cp_town", "loadzone eng_cp_town", "loadzone cp_town"])
+        plan = {m["map"]: m for m in self.r["plan"]}
+        for run in runs:
+            dumps = [c.split(" ")[2] for c in run["commands"] if c.startswith("dumpasset image ")]
+            self.assertEqual(dumps, [image.split("=")[0] for image in plan[run["map"]]["images"]])
+            self.assertEqual(run["commands"][-1], "quit")
+            self.assertEqual(run["commands"].count("quit"), 1)
+
+    def test_no_pattern_material_is_a_clear_error(self):
+        self.assertIn("did not dump the menu material zm_character_select_hoff", self.r["noTemplate"])
+
+    def test_build_input(self):
+        expected = [name for source, name in picture_plan_names() if source in self.present]
+        self.assertEqual(self.r["materials"], expected)
+        self.assertEqual(self.r["missing"], ["zm_main_plyr_6_dlc4", "zm_team_plyr_6_dlc4"])
+        rows = self.r["csv"].split("\r\n")
+        self.assertEqual(rows[1:3], ["require,ui_boot", "techset,,2d"])
+        self.assertEqual(rows[3:-1], [f"material,{name}" for name in expected])
+        files = set(self.r["sourceFiles"])
+        source = "zonetool/ix_portraits"
+        for name in expected:
+            self.assertIn(f"{source}/images/{name}.dds", files)
+            for ext in (".statebits", ".statebitsmap"):
+                self.assertIn(f"{source}/techsets/state/2d/{name}{ext}", files)
+        self.assertIn(f"{source}/techsets/state/2d/zm_character_select_hoff.statebits", files)
+
+    def test_install_and_removal(self):
+        self.assertTrue(self.r["built"].endswith("ix_portraits.ff"))
+        self.assertIsNone(self.r["foundBeforeBuild"])
+        self.assertEqual(Path(self.r["pack"]), self.game / "iw7-mod" / "zone" / "ix_portraits.ff")
+        self.assertFalse(self.r["builtLeft"])
+        expected = [name for source, name in picture_plan_names() if source in self.present]
+        self.assertEqual(self.r["list"], "\r\n".join(expected) + "\r\n")
+        self.assertEqual(self.r["uninstall"]["Removed"], 1)
+        self.assertFalse(self.r["packAfter"])
+        self.assertFalse(self.r["listAfter"])
+
+    def test_cleanup_keeps_the_players_own_files(self):
+        self.assertGreater(self.r["removedWork"], 100)
+        self.assertTrue((self.game / "dump" / "assets" / "mine.json").is_file())
+        self.assertTrue((self.game / "zone_source" / "mine.csv").is_file())
+        self.assertEqual(sorted(p.name for p in (self.game / "dump" / "assets").iterdir()), ["mine.json"])
+        self.assertEqual(sorted(p.name for p in (self.game / "zone_source").iterdir()), ["mine.csv"])
+        self.assertFalse((self.game / "zonetool").exists())
+        # The game's own zone folder is as it was.
+        self.assertEqual(sorted(p.name for p in (self.game / "zone").iterdir()),
+                         ["cp_town.ff", "english", "french", "patch_cp_town.ff"])
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class ZoneToolConsole(unittest.TestCase):
+    """Invoke-IXZoneTool with a stand-in for x64-zt (tools/tests/fake_zonetool.py)."""
+
+    def test_commands_after_the_ready_line_and_a_hang(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            game = Path(tmp) / "game"
+            game.mkdir()
+            out = Path(tmp) / "result.json"
+            run_pwsh(SCENARIO_ZONETOOL, CORE, PICTURES_CORE, game, FAKE_ZONETOOL, out, workdir=tmp)
+            r = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertEqual(r["exitCode"], 0)
+            self.assertEqual(r["lines"], ["ZoneTool is initializing...", "ZoneTool initialization complete!",
+                                          'Loading zone "ui_boot"...', "Dumped to dump/assets"])
+            self.assertEqual(r["logged"], r["lines"])
+            log = (game / "fake_zonetool.log").read_text().splitlines()
+            # Plain "\n" line ends, and standard input still open at "quit".
+            self.assertEqual(log[:4], ["args -dds -unbuffered-io", repr("loadzone ui_boot\n"),
+                                       repr("dumpasset material zm_character_select_hoff\n"), repr("quit\n")])
+            self.assertNotIn("stdin closed before quit", log)
+            self.assertNotIn("EOF before quit", log)
+            self.assertTrue((game / "dump" / "assets" / "materials" / "zm_character_select_hoff.json").is_file())
+            self.assertIn("stopped responding", r["hang"])
+            self.assertLess(r["hangSeconds"], 30)
+
+
+SCENARIO_ZONETOOL_DOWNLOAD = r"""
+param([string]$Core, [string]$Pictures, [string]$Base, [string]$Root, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+. $Pictures
+$r = [ordered]@{}
+foreach ($name in @('ok', 'baddigest', 'noasset')) {
+    $entry = [ordered]@{}
+    try {
+        $source = Get-IXZoneToolFromGitHub "$Base/$name/api"
+        $entry.url = $source.Url
+        $entry.hash = $source.Hash
+        $entry.exe = Save-IXZoneTool (Join-Path $Root $name) $source
+        $entry.ok = $true
+    }
+    catch {
+        $entry.ok = $false
+        $entry.error = $_.Exception.Message
+    }
+    $r[$name] = $entry
+}
+ConvertTo-Json -InputObject $r -Depth 4 | Set-Content -LiteralPath $Out
+"""
+
+
+class ZoneToolRelease(FakeDownloads):
+    routes = {}
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class ZoneToolDownload(unittest.TestCase):
+    """Get-IXZoneToolFromGitHub and Save-IXZoneTool against a local fake of x64-zt's GitHub release."""
+
+    def test_release_asset_checksum_and_unpacking(self):
+        import io
+        import zipfile
+        program = b"MZ zonetool " * 1000
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("Release/readme.txt", "x64-zt")
+            archive.writestr("Release/bin/zonetool.exe", program)
+        data = buffer.getvalue()
+        httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), ZoneToolRelease)
+        base = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+        def release(name, digest, asset="Release zonetool.zip"):
+            assets = [{"name": "Release zonetool.pdb", "browser_download_url": f"{base}/{name}/pdb"},
+                      {"name": asset, "browser_download_url": f"{base}/{name}/zip", "digest": digest}]
+            return json.dumps({"tag_name": "latest", "assets": assets}).encode()
+
+        sha = hashlib.sha256(data).hexdigest()
+        ZoneToolRelease.routes = {
+            "/ok/api": (200, release("ok", "sha256:" + sha)), "/ok/zip": (200, data),
+            "/baddigest/api": (200, release("baddigest", "sha256:" + "0" * 64)), "/baddigest/zip": (200, data),
+            "/noasset/api": (200, release("noasset", None, asset="Debug zonetool.zip")),
+        }
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                out = Path(tmp) / "result.json"
+                script = Path(tmp) / "scenario.ps1"
+                script.write_text(SCENARIO_ZONETOOL_DOWNLOAD)
+                env = dict(os.environ, NO_PROXY="127.0.0.1,localhost", no_proxy="127.0.0.1,localhost")
+                result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script), str(CORE),
+                                         str(PICTURES_CORE), base, tmp, str(out)], capture_output=True, text=True, env=env)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                r = json.loads(out.read_text(encoding="utf-8-sig"))
+                self.assertTrue(r["ok"]["ok"], r["ok"])
+                self.assertEqual((r["ok"]["url"], r["ok"]["hash"]), (f"{base}/ok/zip", sha))
+                self.assertEqual(Path(r["ok"]["exe"]).read_bytes(), program)
+                self.assertFalse(r["baddigest"]["ok"])
+                self.assertIn("does not match the checksum", r["baddigest"]["error"])
+                self.assertFalse((Path(tmp) / "baddigest" / "zonetool.exe").exists())
+                self.assertFalse(r["noasset"]["ok"])
+                self.assertIn("has no Release zonetool.zip", r["noasset"]["error"])
+                self.assertEqual(sorted(p.name for p in (Path(tmp) / "ok").iterdir()), ["zonetool.exe"])
+                self.assertEqual(list((Path(tmp) / "baddigest").iterdir()), [])
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class PicturesScript(unittest.TestCase):
+    """installer/IXPictures.ps1 end to end, with the stand-in for x64-zt."""
+
+    def run_pictures(self, game, config):
+        (game / "fake_zonetool.json").write_text(json.dumps(config))
+        return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(PICTURES), "-GameDir", str(game),
+                               "-ZoneTool", str(FAKE_ZONETOOL), "-NoPause"], capture_output=True, text=True, timeout=600)
+
+    def test_builds_and_installs_the_pack(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            (game / "zone").mkdir()
+            run_pwsh("param([string]$Core, [string]$Game, [string]$Package)\n. $Core\nInstall-IX $Game $Package | Out-Null\n",
+                     CORE, game, PACKAGE, workdir=tmp)
+            missing = ["zm_main_plyr_6_dlc4", "zm_team_plyr_6_dlc4"]
+            result = self.run_pictures(game, {"missing": missing, "streamed": ["zm_team_plyr_1_dlc2"], "crash_on": ["cp_rave"]})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            pack = json.loads((game / "iw7-mod" / "zone" / "ix_portraits.ff").read_text())
+            rave = {name for source, name in picture_plan_names() if "_dlc1" in source}
+            expected = [name for source, name in picture_plan_names() if source not in missing and name not in rave]
+            self.assertEqual([m["name"] for m in pack["materials"]], expected)
+            self.assertEqual(pack["rows"][1:3], ["require,ui_boot", "techset,,2d"])
+            images = {m["name"]: m["image"] for m in pack["materials"]}
+            self.assertEqual(images["ix_card_zmb_sally"], "DDS zm_pc_score_main_plyr_1")
+            self.assertEqual(images["ix_icon_disco_sally"], "the largest stream zm_team_plyr_1_dlc2")
+            listed = (game / "iw7-mod" / "zone" / "ix_portraits.txt").read_text().split()
+            self.assertEqual(listed, expected)
+            # x64-zt's work files, its copy, and the zone it built in the game folder are gone.
+            for name in ("dump", "zonetool", "zone_source", "ix-zonetool.exe", "zone/ix_portraits.ff"):
+                self.assertFalse((game / name).exists(), name)
+            log = (game / "fake_zonetool.log").read_text()
+            self.assertEqual(log.count("args -dds -unbuffered-io"), 5)
+            self.assertIn("args -buildzone ix_portraits -unbuffered-io", log)
+            self.assertNotIn("closed", log)
+            self.assertNotIn("EOF", log)
+            self.assertIn("Rave in the Redwoods: x64-zt stopped early (exit code 3)", result.stdout)
+            self.assertIn(f"{len(expected)} pictures in", result.stdout)
+            self.assertIn(f"{len(missing) + len(rave)} cards could not be copied", result.stdout)
+
+    def test_mod_not_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            result = self.run_pictures(game, {})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Install Infinite Expansion first", result.stdout)
+            self.assertFalse((game / "ix-zonetool.exe").exists())
+            self.assertFalse((game / "fake_zonetool.log").exists())
+
+
 def xaml_tree():
     return ET.parse(XAML).getroot()
 
@@ -626,18 +999,20 @@ def local(tag):
 
 class SetupFiles(unittest.TestCase):
     def test_scripts_are_ascii(self):
-        for path in (CORE, GUI, LINT, LAUNCHER):
+        for path in (CORE, GUI, LINT, LAUNCHER, PICTURES_CORE, PICTURES, PICTURES_LAUNCHER):
             data = path.read_bytes()
             self.assertTrue(all(b < 128 for b in data), f"{path.name} has non-ASCII bytes")
 
     def test_launcher_uses_crlf(self):
-        data = LAUNCHER.read_bytes()
-        self.assertEqual(data.count(b"\n"), data.count(b"\r\n"), "cmd.exe needs CRLF line endings")
-        self.assertIn(b"installer\\IXSetup.ps1", data)
+        for path, script in ((LAUNCHER, b"installer\\IXSetup.ps1"), (PICTURES_LAUNCHER, b"installer\\IXPictures.ps1")):
+            data = path.read_bytes()
+            self.assertEqual(data.count(b"\n"), data.count(b"\r\n"), f"{path.name}: cmd.exe needs CRLF line endings")
+            self.assertIn(script, data)
 
     @unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
     def test_powershell_51_compatible(self):
-        result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(LINT), str(CORE), str(GUI)],
+        result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(LINT), str(CORE), str(GUI),
+                                 str(PICTURES_CORE), str(PICTURES)],
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "")

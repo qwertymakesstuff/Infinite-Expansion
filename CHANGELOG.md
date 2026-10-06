@@ -4,6 +4,19 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Character pictures from the HUD's cards (2026-10-06)
+
+**Added**
+- **`Build Character Pictures.cmd`** (optional, experimental). It copies the character cards the HUD shows in a match out of the player's own game files into a small picture pack, `iw7-mod/zone/ix_portraits.ff`. Nothing of the game's art ships with the mod.
+  - It downloads [x64-zt](https://github.com/Joelrau/x64-zt) and runs it in the game folder once per map, so a map that is missing or fails costs only its own cards. It then builds the pack and deletes x64-zt and its work files.
+  - Each card becomes its own material (`ix_card_*` for the main card, `ix_icon_*` for the team card). The materials refer to the game's own menu shaders instead of copying them.
+  - Log: `%TEMP%\InfiniteExpansionPictures.log`. UNINSTALL removes the pack.
+- With the pack, the CHARACTER menu shows each character's main card from the map selected in the lobby. The team card (the small picture the HUD shows for teammates) appears beside each row, and in the big picture when a main card is missing. Without the pack, nothing changes. `ix_pictures 0` turns the pictures off.
+- Tests: the cards to copy and the x64-zt runs; x64-zt's build input from a fake dump; the console exchange and the whole script against a stand-in for x64-zt (`tools/tests/fake_zonetool.py`); the menu with a pack.
+
+**Source**
+- x64-zt's behaviour comes from its source (`IW_API_NOTES.md` §18). It has not been run on a real install yet (`TESTING.md` R-PK1–R-PK4, `KNOWN_LIMITATIONS.md` L37).
+
 ### Third in-game report: the pick still did not apply (2026-10-06)
 
 **Fixed**

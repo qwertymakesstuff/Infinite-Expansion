@@ -216,7 +216,7 @@ AAE has **five** user-facing control surfaces.
 | **iw7-mod** (S3) | Community client. Loads custom **GSC from source** (compiled at runtime by an embedded gsc-tool), Lua UI scripts (`ui_scripts/`), mods (`mods/<name>`, selected via `fs_game`), extra GSC built-ins, extra dvars, console | **Required** at runtime. Latest release is **v1.1.0**; `develop` is ahead (see 2.7) |
 | **gsc-tool** `iw7-more` (S4) | IW7 GSC compiler/decompiler. The same code iw7-mod embeds | Built locally at **both** iw7-mod pins and used for offline compile checks |
 | **IW7 GSC dump** (S6) | Decompiled stock scripts: the only reference for stock function names, notifies, and level fields | Many identifiers appear only as hashes (`_id_XXXX`) |
-| **x64-zt** (per S7 docs) | Read/write IW7 fastfiles (`mod.ff`) for custom assets | Needs Windows and game files; outside the script-only phases |
+| **x64-zt** (per S7 docs) | Read/write IW7 fastfiles (`mod.ff`) for custom assets | Needs Windows and game files; outside the script-only phases. Since Phase 1.5 the optional picture pack runs it on the player's PC (`IW_API_NOTES.md` §18) |
 | iw7-mod console | `~` console, `set <dvar> <value>`, `exec` | Usable to configure the mod through dvars |
 
 **There are no official Infinite Warfare mod tools**, so no Radiant or official linker exists. Everything goes through iw7-mod.
@@ -319,7 +319,7 @@ Loader facts that drive the layout:
 7. **Client-only data is not visible to server GSC.** This includes FPS, key binds, and client dvar values. Only server-side state can be displayed.
 8. **The `clearalltextafterhudelem` overflow workaround is a stub.** The HUD must minimise unique `settext` strings; whether IW7 overflows here NEEDS TESTING.
 9. **Scripts run only on the host.** In MP, the menu works only for the host's game (Synergy notes the same).
-10. **Asset additions need x64-zt and Windows.** Camos, sounds, and models are out of scope for script phases.
+10. **Asset additions need x64-zt and Windows.** Camos, sounds, and models are out of scope for script phases. The one exception so far is the optional character pictures pack, which the player's own PC builds from their own game files (`KNOWN_LIMITATIONS.md` L28, L37).
 
 ---
 

@@ -101,6 +101,16 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V54 | Character data (`test_character_data.py`) | ✅ The GSC and the menu use the same lobby values and unlock stats; Willard needs `soul_key_5` (the key The Beast from Beyond gives) and `mt_dlc4_troll2`; every other special its own map's key |
 | V55 | Character applied at the stock pick: `character.gsc` replaces `zombies_loadout::get_player_character_num` with `replacefunc` (iw7-mod v1.1.0 `script_extension.cpp`; the stock callers are `givedefaultloadout`, on every spawn, and `cp_rave`'s intro, both on the player). Superseded the `level.custom_giveloadout` wrapper after the third in-game report | ✅ Compiles with both iw7-mod compilers, `replacefunc` included (`check.py`); the in-game check is R-CH13 |
 
+### Character pictures pack
+
+| # | Check | Result |
+|---|-------|--------|
+| V56 | x64-zt's behaviour, read from its source (`github.com/Joelrau/x64-zt`, commit `3802db4d`; `IW_API_NOTES.md` §18) | ✅ The console reads standard input and passes commands on only once the game is set up; its ready line; `loadzone` waits for earlier loads; `dumpasset` writes to `dump\assets\`; `-dds` image files; `-buildzone` reads `zone_source\<zone>.csv` and `zonetool\<zone>\` and writes `zone\<zone>.ff`; a `<type>,,<name>` row is a reference (that the game calls the techset type `techset` is not in the source: if not, x64-zt skips the row and the pack carries its own copy); `require,<zone>` loads a zone first; `quit` exits with 0. Not run: x64-zt needs Windows and the game (R-PK1) |
+| V57 | Picture plan (`CharacterPictures`) | ✅ 50 cards from each map's `playercash_images` names (main and team card per character, specials on their own map, Willard in `patch_cp_zmb`); one x64-zt run per map, each loading its zones, naming the first zone again to wait for them, dumping its cards and quitting; the language zones found in the game folder (`eng_cp_town`, `fre_cp_town`; not `patch_cp_town`) |
+| V58 | Build input from a fake dump (`CharacterPictures`) | ✅ A material per card, patterned on the dumped menu material with the card as its image; `require,ui_boot` and `techset,,2d` before the materials; the pattern's state files copied under each card's name; the largest streamed size taken; missing cards listed. Installing moves the zone into `iw7-mod\zone\` with its list; UNINSTALL removes both; the cleanup removes only what the run added |
+| V59 | Download, console and runner with a stand-in for x64-zt (`ZoneToolDownload`, `ZoneToolConsole`, `PicturesScript`, `tools/tests/fake_zonetool.py`) | ✅ The release's "Release zonetool.zip" is found, checked against GitHub's SHA-256 and unpacked to `zonetool.exe` alone; a wrong checksum or a missing asset fails with nothing left behind. Commands go after the ready line, with `\n` line ends, and standard input is still open at `quit`; a run that stops answering ends after the idle time. End to end: five dump runs and a build; a map whose run crashes is named and skipped; the pack and its list are installed; x64-zt's copy and work files are gone. The stand-in only does what V56 describes |
+| V60 | CHARACTER menu with a pack (`test_menu_script.py`) | ✅ `loadzone ix_portraits` once per game session, not with `ix_pictures 0` or without the zone file; the main card from the selected map (248 × 360), else a special's own picture, else the team card (256 × 256), else the initials; a 30 × 30 team card left of each row that has one |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -215,6 +225,15 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I12 | No game installed (another PC, or a Steam account without the game) | GAME NOT FOUND; STEAM opens Steam's install dialog or the store page; after Steam installs the game, the window finds it within a few seconds | not run |
 | R-I13 | DOWNLOAD in the iw7-mod row | Only iw7-mod is downloaded; the status says to click INSTALL next | not run |
 | R-I14 | After INSTALL (status names your Steam name), start the game | The Zombies menu shows CHARACTER; your name is your Steam name instead of "Unknown Soldier". After `name Test` in the console and a restart, it stays "Test" | not run |
+
+### 4.9 Character pictures (optional)
+
+| ID | Test | Expected | Result |
+|----|------|----------|--------|
+| R-PK1 | Install the mod, close the game, double-click `Build Character Pictures.cmd` | It downloads x64-zt and shows five "Copying the character cards of …" steps with x64-zt's lines under each, then "Building ix_portraits.ff..." and "Done. N pictures in …". `<game>\iw7-mod\zone\ix_portraits.ff` and `ix_portraits.txt` exist; no `ix-zonetool.exe`, and no `dump`, `zonetool` or `zone_source` folder that was not there before. Send `%TEMP%\InfiniteExpansionPictures.log` either way | not run |
+| R-PK2 | Start the game; Solo Match → CHARACTER with SELECT SHOW on Spaceland, then on another map | Each regular character shows their card from that map, not stretched; a small team card beside each row; the specials show their cards. The console has no error about `ix_portraits` or a missing material. A screenshot helps | not run |
+| R-PK3 | Play a match, return to the menu, open CHARACTER again | The pictures are still there; no error from loading the pack a second time | not run |
+| R-PK4 | `ix_pictures 0` and restart the game; then UNINSTALL in the setup | Initials and the game's own special pictures again; UNINSTALL removes `ix_portraits.ff` and `ix_portraits.txt` | not run |
 
 ### 4.7 Compatibility matrix
 

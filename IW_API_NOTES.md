@@ -10,6 +10,7 @@ This is the working API reference for the project. **Nothing here is guessed.** 
 | `[DUMP]` | Decompiled stock IW7 scripts (`mjkzy/iw7-gsc-dump`) | `1dd48a78` |
 | `[DOCS]` | `auroramod/docs` | `236d8155` |
 | `[STOCK UI]` | The game's compiled menu scripts (`ui/frontend/cp/*.lua`, `ui/uieditor/*.lua`) in `TheUnknownCod3r/iw7-src`, read as data (§16) | `d1a226db` |
+| `[ZT]` | `Joelrau/x64-zt` (zonetool) source, for the character pictures pack (§18) | `3802db4d` |
 | `[COMPILED]` | Compiled locally with **both** compilers during Phase 0 | |
 
 If an API is not listed here, verify it the same way before using it. The rule is in section 12.
@@ -370,3 +371,42 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
 - **Steam `[STEAM]`.** `steam://install/292730` opens Steam's install dialog for the game; `steam://open/main` starts Steam. iw7-mod exits with a message when Steam is not running (`steam_proxy.cpp`).
 - **Player name.** iw7-mod registers the `name` dvar with the default "Unknown Soldier" and the saved flag, and reports it as the local player's name (`get_login_username`, `live_get_local_client_name` in `patches.cpp`, the same in v1.1.0 and develop). Its Steam stand-in answers `GetPersonaName` with "1337" (`steam/interfaces/friends.cpp`), so the Steam name is never used. `name <new name>` in the console changes it, and it is saved. Steam keeps each account's display name in `<Steam>\config\loginusers.vdf` (`"PersonaName"`, with `"MostRecent" "1"` on the last account) `[STEAM]`, and the logged-in account's 32-bit id in `HKCU\Software\Valve\Steam\ActiveProcess\ActiveUser` (SteamID64 = 76561197960265728 + id) `[STEAM]`.
 
+## 18. Character pictures pack: x64-zt `[ZT]`
+
+`installer/IXPictures.ps1` builds `iw7-mod/zone/ix_portraits.ff` with x64-zt (README "Character pictures"). These facts come from x64-zt's source; R-PK1 confirms them on a real install.
+
+- **The tool.**
+  - One `zonetool.exe` serves several games and picks the game by the executable in the current folder: `iw7_ship.exe` means IW7 (`main.cpp`). It must run in the game folder, and its README lists IW7 as supported, "no custom maps".
+  - It loads the game binary, answers Steam's API itself, and sets the game up without renderer, sound or menus. It then loads `code_pre_gfx`, `code_post_gfx` and `common`, and runs the game's command buffer every 5 ms (`component/iw7/zonetool.cpp`).
+  - Releases: the tag `latest`, asset "Release zonetool.zip" holding `zonetool.exe` (`.github/workflows/build.yml`).
+- **Console** (`component/iw7/console.cpp`).
+  - A thread reads standard input with `std::getline` and passes each non-empty line to the game's command buffer.
+  - At the end of the input, `getline` fails without clearing the line, and the loop sends the last command again, endlessly. **The input must stay open** until x64-zt exits.
+  - "ZoneTool initialization complete!" is printed once the setup is done, before the commands are registered and before the buffer runs, so commands typed after that line are not lost.
+  - Messages are `printf` on standard output; `-unbuffered-io` turns off its buffering (`main.cpp`).
+  - Fatal errors show a message box.
+- **Commands** (`zonetool/iw7/zonetool.cpp`).
+  - `loadzone <zone>` loads with `DB_ZONE_GAME | DB_ZONE_CUSTOM`, synchronously. It first waits for loads in progress (`wait_for_database`), then says `zone "<zone>" is already loaded...` for a loaded zone. That makes a repeated `loadzone` a wait for everything before it. A missing file gets `Zone "<zone>" could not be found!`, without waiting.
+  - `unloadzones` unloads them.
+  - `dumpasset <type> <name>` writes below `dump\assets\`, or prints "Asset not found".
+  - `quit` is `std::quick_exit(EXIT_SUCCESS)`.
+  - On the command line, `-buildzone <zone>` builds, then exits; `-dds` makes image dumps DDS files.
+- **Dumped files.**
+  - A material gives `materials\<name>.json` (with `"techniqueSet->name"` and `textureTable[].image`). It also gives its per-material techset files, `techsets\<kind>\<techset>\<material>.<ext>` (`material.cpp`, `techset.cpp`).
+  - An image dumped with `-dds` is `images\<name>.dds`, or `streamed_images\<name>_stream<n>.dds` for a streamed image (`gfximage.cpp`). For a streamed image, `dumpasset` reads the stream table position left over from the last zone load, so that result is unreliable. The HUD's pictures are not expected to be streamed.
+- **Building** (`zonetool.cpp` `parse_csv_file`, `material.cpp`, `gfximage.cpp`).
+  - `zone_source\<zone>.csv` holds rows of these kinds:
+    - `//` comments.
+    - `require,<zone>`: loads a zone first and waits for it.
+    - `<type>,<name>`: an asset parsed from `zonetool\<zone>\`.
+    - `<type>,,<name>`: a reference to an asset of that name, resolved when the game loads the zone.
+  - A material comes from `materials\<name>.json`. Its images come from `images\<name>.dds` or `.tga`; they are stored in the zone, not streamed, so no `.pak` file is written.
+  - The material's techset is looked up among the loaded zones and added to the new zone, unless the zone already has it or a reference to it. Missing per-material techset files fall back to any file of that kind in the techset's folder (`get_parse_path`).
+  - The zone is written to `zone\<zone>.ff` when the current folder has `zone\`, otherwise to the current folder (`zone_buffer::save`).
+- **Asset type names** come from the game's own table (`g_assetNames`, read at run time), which is not in the source. `material` and `techset` appear in x64-zt's README and the docs' zone source example (H1). That IW7 also names them `material`, `techset` and `image` is assumed, not verified:
+  - If `techset` were wrong, x64-zt would skip that row and copy the techset into the pack.
+  - If `material` or `image` were wrong, `dumpasset` gets no valid type (it does not check), and the runs would fail. The log of R-PK1 shows it.
+- **How the mod uses it.**
+  - `IXPictures.Core.ps1` runs x64-zt once per map: it loads the map's zones, names the first zone again to wait, dumps the 50 cards named in each map's `playercash_images` table (§16), then quits.
+  - Each card becomes a material patterned on the stock menu material `zm_character_select_hoff`, with `require,ui_boot` and a `techset,,<name>` reference, so the pack never replaces the game's shaders.
+  - The menu loads the pack with iw7-mod's `loadzone` (§16).

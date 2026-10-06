@@ -31,6 +31,9 @@ $IXShortcutName = 'IW7-Mod (Infinite Warfare).lnk'
 # The player's Steam name, for the mod's menu script, which sets iw7-mod's "name"
 # setting from it while that is still iw7-mod's default "Unknown Soldier".
 $IXPlayerNameFile = 'ui_scripts/InfiniteExpansion/steam-name.txt'
+# Character pictures for the CHARACTER menu, a zone built on the player's PC
+# (IXPictures.Core.ps1) and kept where iw7-mod finds custom zones.
+$IXPictureZone = 'ix_portraits'
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -478,8 +481,34 @@ function Install-IX {
     }
 }
 
+function Get-IXPicturePackPath {
+    param([string]$GameDir)
+    return Join-IXPath (Get-IXTarget $GameDir) @('zone', ($IXPictureZone + '.ff'))
+}
+
+# The list of cards in the zone, which the menu script reads.
+function Get-IXPictureListPath {
+    param([string]$GameDir)
+    return Join-IXPath (Get-IXTarget $GameDir) @('zone', ($IXPictureZone + '.txt'))
+}
+
+# Deletes the character pictures zone and its list, if built. $true if the zone was there.
+function Remove-IXPicturePack {
+    param([string]$GameDir)
+    $path = Get-IXPicturePackPath $GameDir
+    $list = Get-IXPictureListPath $GameDir
+    $found = [IO.File]::Exists($path)
+    foreach ($file in @($path, $list)) {
+        if ([IO.File]::Exists($file)) {
+            [IO.File]::Delete($file)
+            Remove-IXEmptyParents (Get-IXTarget $GameDir) $file
+        }
+    }
+    return $found
+}
+
 # Removes the recorded files (or, without a record, the package's own file list),
-# the record, and the Mods-menu copy.
+# the record, the character pictures zone, and the Mods-menu copy.
 function Uninstall-IX {
     param([string]$GameDir, [string]$PackageRoot)
     $target = Get-IXTarget $GameDir
@@ -496,6 +525,9 @@ function Uninstall-IX {
     $record = Join-Path $target $IXRecordName
     if ([IO.File]::Exists($record)) {
         [IO.File]::Delete($record)
+    }
+    if (Remove-IXPicturePack $GameDir) {
+        $removed++
     }
     $old = Remove-IXOldCopy $GameDir $files
     return [pscustomobject]@{
