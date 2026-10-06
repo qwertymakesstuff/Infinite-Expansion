@@ -112,9 +112,13 @@ if ($NoWindow) {
                 $client = Install-IXClient $dir
                 Write-Output ('Downloaded {0} ({1}, from {2}).' -f $IXClientExe, $client.Version, $client.Source)
             }
-            $result = Install-IX $dir $PackageRoot
+            $player = ConvertTo-IXPlayerName (Get-IXSteamPersonaName)
+            $result = Install-IX $dir $PackageRoot $player
             Register-IXUninstaller $dir (Get-IXPackageVersion $PackageRoot) $SetupRoot | Out-Null
             Write-Output ('Installed {0} files into {1}.' -f $result.Copied, $result.Target)
+            if ($player) {
+                Write-Output ('In-game name: {0} (from Steam).' -f $player)
+            }
         }
         exit 0
     }
@@ -386,11 +390,31 @@ function Get-IXOldCopyText {
     return $text
 }
 
+# What the status line says about the player's name.
+function Get-IXNameText {
+    param([string]$SteamName, [string]$PlayerName)
+    if ($PlayerName) {
+        return ' In game you are "' + $PlayerName + '", your Steam name, unless you already picked another name.'
+    }
+    if ($SteamName) {
+        return ' Your Steam name has letters the game cannot show: type  name <your name>  in the game console (~) instead.'
+    }
+    return ''
+}
+
 # Installs the mod. $ClientText describes an iw7-mod download that came first.
 function Invoke-IXInstall {
     param([string]$ClientText)
     try {
-        $result = Install-IX $script:GameDir $PackageRoot
+        $steamName = $null
+        try {
+            $steamName = Get-IXSteamPersonaName
+        }
+        catch {
+            Write-IXLog ('steam name: ' + $_.Exception.Message)
+        }
+        $player = ConvertTo-IXPlayerName $steamName
+        $result = Install-IX $script:GameDir $PackageRoot $player
         $registered = Register-IXUninstaller $script:GameDir (Get-IXPackageVersion $PackageRoot) $SetupRoot
         $script:RemoveCopyOnExit = $false
         Write-IXLog ('installed ' + $result.Copied + ' files into ' + $result.Target)
@@ -398,7 +422,7 @@ function Invoke-IXInstall {
         if ($result.StaleRemoved -gt 0) {
             $text = $text + ' Removed ' + $result.StaleRemoved + ' file(s) an older version left.'
         }
-        $text = $text + (Get-IXOldCopyText $result)
+        $text = $text + (Get-IXOldCopyText $result) + (Get-IXNameText $steamName $player)
         if ($registered) {
             $text = $text + ' Uninstall here or in Windows Settings > Apps.'
         }

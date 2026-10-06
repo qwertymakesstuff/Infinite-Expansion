@@ -246,37 +246,99 @@ LUI.FlowManager.RegisterStackPopBehaviour("IXCharacterMenu", function()
     WipeGlobalModelsAtPath(modelPath)
 end)
 
--- The zombies main menu's button list (iw7-mod's override, loaded before this
--- file): add CHARACTER under the last button and move the description line
--- below it.
-local CPMainMenuButtons_original = MenuBuilder.m_types["CPMainMenuButtons"]
+-- The zombies main menu's button list: add CHARACTER under the last button and
+-- move the description line below it.
+--
+-- iw7-mod replaces the stock list with its own (MainMenu/CPMainMenuButtons.lua
+-- assigns MenuBuilder.m_types["CPMainMenuButtons"]). Whether that script runs
+-- before or after this one depends on the install: iw7-mod searches
+-- <game>/iw7-mod/ before its own scripts, and a Mods-menu folder after them
+-- (filesystem.cpp). So the button is added when the list is built, whichever
+-- script registered it last, and only once.
+local function addCharacterButton(navigator, controller)
+    if not navigator or navigator.IXCharacterButton then
+        return
+    end
 
-if CPMainMenuButtons_original then
-    MenuBuilder.m_types["CPMainMenuButtons"] = function(menu, controller)
-        local navigator = CPMainMenuButtons_original(menu, controller)
+    local controllerIndex = controller and controller.controllerIndex
+    if not controllerIndex then
+        controllerIndex = navigator:getRootController()
+    end
 
-        local controllerIndex = controller and controller.controllerIndex
-        if not controllerIndex then
-            controllerIndex = navigator:getRootController()
-        end
+    local button = MenuBuilder.BuildRegisteredType("MenuButton", { controllerIndex = controllerIndex })
+    button.id = "IXCharacterButton"
+    button.buttonDescription = "Choose who you play as. Unlocked special characters also follow you into other players' matches."
+    button.Text:setText(ToUpperCase("Character"), 0)
+    button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, _1080p * 350, _1080p * 380)
+    navigator:addElement(button)
+    navigator.IXCharacterButton = button
 
-        local button = MenuBuilder.BuildRegisteredType("MenuButton", { controllerIndex = controllerIndex })
-        button.id = "IXCharacterButton"
-        button.buttonDescription = "Choose who you play as. Unlocked special characters also follow you into other players' matches."
-        button.Text:setText(ToUpperCase("Character"), 0)
-        button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, _1080p * 350, _1080p * 380)
-        navigator:addElement(button)
-        navigator.IXCharacterButton = button
+    if navigator.ButtonDescription then
+        navigator.ButtonDescription:SetAnchorsAndPosition(0, 0, 0, 1, 0, 0, _1080p * 390, _1080p * 448)
+    end
+    navigator:SetAnchorsAndPosition(0, 1, 0, 1, 0, 500 * _1080p, 0, 460 * _1080p)
 
-        if navigator.ButtonDescription then
-            navigator.ButtonDescription:SetAnchorsAndPosition(0, 0, 0, 1, 0, 0, _1080p * 390, _1080p * 448)
-        end
-        navigator:SetAnchorsAndPosition(0, 1, 0, 1, 0, 500 * _1080p, 0, 460 * _1080p)
+    button:addEventHandler("button_action", function(element, eventArgs)
+        LUI.FlowManager.RequestAddMenu("IXCharacterMenu", true, eventArgs.controller, false)
+    end)
+end
 
-        button:addEventHandler("button_action", function(element, eventArgs)
-            LUI.FlowManager.RequestAddMenu("IXCharacterMenu", true, eventArgs.controller, false)
-        end)
+-- Builders this file has wrapped, so that each is wrapped once.
+local wrappedBuilders = {}
 
+local function wrapButtonList()
+    local builder = MenuBuilder.m_types["CPMainMenuButtons"]
+    if not builder or wrappedBuilders[builder] then
+        return
+    end
+    local wrapper = function(menu, controller)
+        local navigator = builder(menu, controller)
+        addCharacterButton(navigator, controller)
         return navigator
     end
+    wrappedBuilders[wrapper] = true
+    MenuBuilder.m_types["CPMainMenuButtons"] = wrapper
 end
+
+-- Loaded after iw7-mod's scripts (Mods-menu install): its list is registered now.
+wrapButtonList()
+
+-- Loaded before them (<game>/iw7-mod/ install): every menu is built after all
+-- scripts have loaded, so wrap whatever list is registered then, and decorate a
+-- list built by name in case the stock menu builds it that way.
+local BuildRegisteredType_original = MenuBuilder.BuildRegisteredType
+MenuBuilder.BuildRegisteredType = function(typeName, controller, ...)
+    wrapButtonList()
+    local element = BuildRegisteredType_original(typeName, controller, ...)
+    if typeName == "CPMainMenuButtons" then
+        addCharacterButton(element, controller)
+    end
+    return element
+end
+
+-- iw7-mod names every player "Unknown Soldier" until the name setting is
+-- changed (component/patches.cpp). The Windows setup writes the player's Steam
+-- name next to this file (installer/IXSetup.Core.ps1); use it, but only while
+-- the name is still that default, so a name the player chose stays.
+local steamNameFile = "iw7-mod/ui_scripts/InfiniteExpansion/steam-name.txt"
+
+local function applySteamName()
+    if not io.fileexists(steamNameFile) then
+        return
+    end
+    local ok, current = pcall(Engine.GetDvarString, "name")
+    if not ok or (current ~= nil and current ~= "" and current ~= "Unknown Soldier") then
+        return
+    end
+    local name = io.readfile(steamNameFile)
+    if not name then
+        return
+    end
+    name = string.gsub(name, "[%c\"\\;%%%^]", "")
+    name = string.match(name, "^%s*(.-)%s*$")
+    if name ~= "" then
+        Engine.SetDvarString("name", name)
+    end
+end
+
+pcall(applySteamName)

@@ -29,6 +29,10 @@ What the setup does for you:
 | Installs the mod | Copies it into `<Infinite Warfare>\iw7-mod\` and records the copied files in `iw7-mod\infinite-expansion.json`. Also removes an old copy in `mods\infinite_expansion` (see below), keeping any file of your own in it |
 | Starts the game | **PLAY** starts iw7-mod from the game folder (Steam must be running; PLAY opens Steam if it is not). iw7-mod's first start downloads the rest of its own files, then pick Zombies |
 
+The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, see the CHARACTER button in the Zombies menu and the card in the corner of a match (`TESTING.md` §4).
+
+INSTALL also sets your in-game name to your Steam name. iw7-mod calls everyone "Unknown Soldier" otherwise. A name you already chose with `name <new name>` in the console stays.
+
 UNINSTALL removes exactly the recorded mod files; other mods' scripts and the iw7-mod client stay. To remove iw7-mod too, follow [its uninstall guide](https://github.com/auroramod/docs/blob/main/docs/iw7-uninstall.md).
 
 INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files, and the button then reads UPDATE.

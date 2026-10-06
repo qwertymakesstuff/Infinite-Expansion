@@ -62,7 +62,8 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| CHARACTER button in the zombies main menu (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; saves `ix_character`, and for specials the stock lobby field `characterSelect`; R-UI1–R-UI5 |
+| CHARACTER button in the zombies main menu (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; saves `ix_character`, and for specials the stock lobby field `characterSelect`. First in-game report: missing with the iw7-mod-folder install (L33), fixed; R-UI1–R-UI5 |
+| Steam name instead of "Unknown Soldier" | Player | 1.5 | TESTING | The setup copies the Steam name; the menu script sets iw7-mod's `name` while it is the default (L34); R-I14 |
 | Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied when the player connects. Host: `ix_character`. Every player: specials through `characterSelect`. Toggle `ix_character_select`; R-CH1–R-CH3 |
 | A guest's special-character pick in someone else's match | Player | 1.5 | TESTING | Travels in the guest's stats (`characterSelect`); works on the special's own map even without the mod on the host; R-CH3, R-CH8 |
 | A guest's regular-character pick in someone else's match | Player | 1.5 | BLOCKED | No verified channel (L29); the guest gets a random character; R-CH4, probe R-CH12 |

@@ -89,7 +89,7 @@ IXCC_RESULT = re.compile(r"bytecode=(\d+)")
 
 # Lua UI scripts: names the mod may use must appear in iw7-mod's own ui_scripts.
 LUA_API_ROOTS = ("Engine", "LUI", "MenuBuilder", "FONTS", "CoD", "ACTIONS", "OPTIONS", "DataSources",
-                 "SWATCHES", "Lobby", "Rank", "Loot", "MPConfig", "utils")
+                 "SWATCHES", "Lobby", "Rank", "Loot", "MPConfig", "utils", "io")
 LUA_DOTTED = re.compile(r"(?<![.\w])(?:" + "|".join(LUA_API_ROOTS) + r")(?:\.[A-Za-z_]\w*)+")
 LUA_METHOD = re.compile(r":([A-Za-z_]\w*)\s*\(")
 LUA_CALL = re.compile(r"(?<![.:\w])([A-Za-z_]\w*)\s*\(")

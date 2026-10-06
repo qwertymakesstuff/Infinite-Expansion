@@ -550,6 +550,72 @@ class BackgroundDownload(unittest.TestCase):
         self.assertIn("iw7-mod could not be downloaded", r["error"])
 
 
+SCENARIO_NAME = r"""
+param([string]$Core, [string]$Steam, [string]$Steam2, [string]$Package, [string]$Game, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$r = [ordered]@{}
+$r.mostRecent = Get-IXSteamPersonaName -SteamRoots @($Steam)
+$r.escaped = Get-IXSteamPersonaName -SteamRoots @($Steam2)
+$r.none = Get-IXSteamPersonaName -SteamRoots @((Join-Path $Steam 'missing'))
+$r.clean = @(
+    (ConvertTo-IXPlayerName 'Rankzies'),
+    (ConvertTo-IXPlayerName '  Zombie  "Slayer"; ^1x '),
+    (ConvertTo-IXPlayerName ([string][char]0x00DC + 'ber')),
+    (ConvertTo-IXPlayerName ('a' * 40)),
+    (ConvertTo-IXPlayerName '"";^')
+)
+$r.install = Install-IX $Game $Package 'Rankzies'
+$r.record = @((Read-IXRecord $Game).files)
+$r.reinstall = Install-IX $Game $Package ''
+$r.recordAfter = @((Read-IXRecord $Game).files)
+ConvertTo-Json -InputObject $r -Depth 5 | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class SteamName(unittest.TestCase):
+    """The player's Steam name: read from loginusers.vdf, made safe, handed to the menu script."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        steam, cls.game = make_game(root)
+        (steam / "config").mkdir()
+        (steam / "config" / "loginusers.vdf").write_text(
+            '"users"\n{\n\t"76561198000000001"\n\t{\n\t\t"AccountName"\t\t"old"\n\t\t"PersonaName"\t\t"Old Name"\n'
+            '\t\t"MostRecent"\t\t"0"\n\t}\n\t"76561198000000002"\n\t{\n\t\t"AccountName"\t\t"rank"\n'
+            '\t\t"PersonaName"\t\t"Rankzies"\n\t\t"MostRecent"\t\t"1"\n\t}\n}\n', encoding="utf-8")
+        steam2 = root / "Steam2"
+        (steam2 / "config").mkdir(parents=True)
+        (steam2 / "config" / "loginusers.vdf").write_text(
+            '"users"\n{\n\t"76561198000000003"\n\t{\n\t\t"personaname"\t\t"The \\"Dead\\" Guy"\n\t}\n}\n', encoding="utf-8")
+        out = root / "result.json"
+        run_pwsh(SCENARIO_NAME, CORE, steam, steam2, PACKAGE, cls.game, out, workdir=root)
+        cls.r = json.loads(out.read_text(encoding="utf-8-sig"))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_reads_the_most_recent_account(self):
+        self.assertEqual(self.r["mostRecent"], "Rankzies")
+        self.assertEqual(self.r["escaped"], 'The "Dead" Guy')
+        self.assertIsNone(self.r["none"])
+
+    def test_names_the_game_can_show(self):
+        self.assertEqual(self.r["clean"], ["Rankzies", "Zombie Slayer 1x", None, "a" * 31, None])
+
+    def test_name_file_is_recorded_and_removed_with_the_mod(self):
+        name_file = "ui_scripts/InfiniteExpansion/steam-name.txt"
+        self.assertEqual(self.r["install"]["PlayerName"], "Rankzies")
+        self.assertIn(name_file, self.r["record"])
+        self.assertEqual(self.r["reinstall"]["StaleRemoved"], 1)
+        self.assertNotIn(name_file, self.r["recordAfter"])
+        self.assertFalse((self.game / "iw7-mod" / name_file).exists())
+
+
 def xaml_tree():
     return ET.parse(XAML).getroot()
 

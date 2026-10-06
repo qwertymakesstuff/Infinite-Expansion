@@ -28,6 +28,9 @@ $IXClientUpdateServer = 'https://iw7-mod.auroramod.dev/'
 $IXSteamInstallUrl = 'steam://install/292730'
 $IXSteamStoreUrl = 'https://store.steampowered.com/app/292730/'
 $IXShortcutName = 'IW7-Mod (Infinite Warfare).lnk'
+# The player's Steam name, for the mod's menu script, which sets iw7-mod's "name"
+# setting from it while that is still iw7-mod's default "Unknown Soldier".
+$IXPlayerNameFile = 'ui_scripts/InfiniteExpansion/steam-name.txt'
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -214,6 +217,75 @@ function Find-IXGameDir {
     return $null
 }
 
+# The display name of the Steam account, from <Steam>\config\loginusers.vdf: the
+# account logged in now (HKCU ...\Valve\Steam\ActiveProcess\ActiveUser), else the one
+# marked MostRecent, else any. $null when there is none.
+function Get-IXSteamPersonaName {
+    param([string[]]$SteamRoots)
+    if ($null -eq $SteamRoots) {
+        $SteamRoots = Get-IXSteamRoots
+    }
+    $active = $null
+    try {
+        $id = (Get-ItemProperty -LiteralPath 'HKCU:\Software\Valve\Steam\ActiveProcess' -Name 'ActiveUser' -ErrorAction Stop).ActiveUser
+        if ($id) {
+            $active = ([long]76561197960265728 + [long]$id).ToString()
+        }
+    }
+    catch {
+    }
+    foreach ($root in $SteamRoots) {
+        if (-not $root) {
+            continue
+        }
+        $vdf = Join-IXPath $root @('config', 'loginusers.vdf')
+        if (-not [IO.File]::Exists($vdf)) {
+            continue
+        }
+        $best = $null
+        $bestScore = 0
+        foreach ($block in [regex]::Matches([IO.File]::ReadAllText($vdf, [Text.Encoding]::UTF8), '"(\d{17})"\s*\{([^{}]*)\}')) {
+            $persona = [regex]::Match($block.Groups[2].Value, '"(?i:PersonaName)"\s+"((?:[^"\\]|\\.)*)"')
+            if (-not $persona.Success) {
+                continue
+            }
+            $score = 1
+            if ($block.Groups[1].Value -eq $active) {
+                $score = 3
+            }
+            elseif ([regex]::IsMatch($block.Groups[2].Value, '"(?i:MostRecent)"\s+"1"')) {
+                $score = 2
+            }
+            if ($score -gt $bestScore) {
+                $bestScore = $score
+                $best = $persona.Groups[1].Value -replace '\\(.)', '$1'
+            }
+        }
+        if ($null -ne $best) {
+            return $best
+        }
+    }
+    return $null
+}
+
+# A name the game can show as it is: printable ASCII without the quote, backslash,
+# semicolon, percent and caret (colour codes), at most 31 characters. $null when the
+# Steam name has other characters, which the game would show as boxes.
+function ConvertTo-IXPlayerName {
+    param([string]$Name)
+    if (-not $Name -or $Name -match '[^\x20-\x7E]') {
+        return $null
+    }
+    $clean = (($Name -replace '["\\;%^]', '') -replace '\s+', ' ').Trim()
+    if ($clean.Length -gt 31) {
+        $clean = $clean.Substring(0, 31).Trim()
+    }
+    if ($clean.Length -eq 0) {
+        return $null
+    }
+    return $clean
+}
+
 # ---------------------------------------------------------------------------
 # State
 
@@ -354,10 +426,11 @@ function Remove-IXOldCopy {
     return $result
 }
 
-# Copies the package into <game>\iw7-mod\, removes files an older version left
-# behind, writes the record, and removes the Mods-menu copy.
+# Copies the package into <game>\iw7-mod\, writes the player's name file when
+# $PlayerName is given, removes files an older version left behind, writes the
+# record, and removes the Mods-menu copy.
 function Install-IX {
-    param([string]$GameDir, [string]$PackageRoot)
+    param([string]$GameDir, [string]$PackageRoot, [string]$PlayerName)
     if (-not (Test-IXGameDir $GameDir)) {
         throw "$IXGameExe was not found in '$GameDir'."
     }
@@ -378,6 +451,12 @@ function Install-IX {
         [IO.File]::Copy((Join-IXPath $PackageRoot @($relative)), $destination, $true)
         $copied++
     }
+    if ($PlayerName) {
+        $namePath = Resolve-IXEntry $target $IXPlayerNameFile
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($namePath)) | Out-Null
+        [IO.File]::WriteAllText($namePath, $PlayerName, (New-Object System.Text.UTF8Encoding $false))
+        $files += $IXPlayerNameFile
+    }
     $stale = 0
     foreach ($relative in $previous) {
         if ($files -notcontains $relative) {
@@ -391,6 +470,7 @@ function Install-IX {
     return [pscustomobject]@{
         Target         = $target
         Copied         = $copied
+        PlayerName     = $PlayerName
         StaleRemoved   = $stale
         OldCopyRemoved = $old.Removed
         OldCopyLeft    = $old.Left

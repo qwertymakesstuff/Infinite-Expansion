@@ -4,6 +4,25 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Fixes from the first in-game report (2026-10-06)
+
+**Fixed**
+- The CHARACTER button was missing in the zombies menu when the mod was installed into `<game>\iw7-mod\` (the setup's install).
+  - iw7-mod runs scripts from that folder before its own, and its own MainMenu script then replaced the button list, wrapper included (L33).
+  - The menu script now hooks `MenuBuilder.BuildRegisteredType` and adds the button when the list is built, in either load order and only once.
+- Docs: iw7-mod's search order is `<game>/iw7-mod`, then its client data, then the engine's paths; v1.1.0's Lua `io` table can write files, develop's cannot.
+
+**Added**
+- Your Steam name instead of "Unknown Soldier" (L34).
+  - The setup reads it from Steam's `loginusers.vdf` (the logged-in or most recent account) and writes it next to the menu script.
+  - The menu script sets iw7-mod's `name` setting from it, only while that is still "Unknown Soldier".
+  - Names with characters the game cannot show are skipped, and the status line says so.
+- `tools/tests/test_menu_script.py` and `menu_harness.lua`: the menu script in plain Lua 5.1, in both load orders. Steam-name tests in `test_installer.py`.
+- `check.py` `lua`: `io.*` names are checked against iw7-mod's own scripts too.
+
+**Notes**
+- The mod does not appear in the game's Mods menu. It loads from the iw7-mod folder by itself (README).
+
 ### Setup installs iw7-mod and starts the game (2026-10-06)
 
 **Added**
