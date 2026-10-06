@@ -14,7 +14,7 @@
 | v1.1.0 compiler mislabels/lacks many method names | Every raw `_meth_` / `_func_` id lives in **one** module (`ix\core\compat`) |
 | File I/O only with `fs_game` | Persistence layer with a dvar-only fallback |
 | Players cannot join a host whose `fs_game` is set unless the mod ships a `mod.ff` (L30) | Installed into `<game>/iw7-mod/`, without `fs_game`; settings must work from dvars alone |
-| Another player's menu choice reaches the host's match only through that player's stats (L29) | Choices made in the frontend apply on the player's first spawn, right before the stock pick (a wrapper of `level.custom_giveloadout`, L36), never mid-match |
+| Another player's menu choice reaches the host's match only through that player's stats (L29) | Choices made in the frontend apply when the stock code asks for the player's character (`replacefunc` of `zombies_loadout::get_player_character_num`, L36), never mid-match |
 | A zombies match links only the stock scripts its map and the gametype reference; 126 are common to all five maps | Stock calls target only those; map-specific code is reached through the pointers maps assign, never by path (§7) |
 | Server-side GSC; per-player HUD elements | Per-player state lives on the player entity (`self.ix`) |
 
@@ -75,7 +75,7 @@ Implemented in Phase 1 unless marked *(Phase 2+)*.
 iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
 │
 ├─ main()     [G_LoadStructs — before stock level scripts]
-│   └─ (reserved for replacefunc hooks; not defined yet)
+│   └─ (not defined: the mod's replacefunc calls run from init(), before any spawn)
 │
 └─ init()     [Scr_LoadLevel — before the map's main()]
     └─ ix\core\bootstrap::start(modules())

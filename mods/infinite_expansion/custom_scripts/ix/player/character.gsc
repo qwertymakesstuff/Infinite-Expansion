@@ -16,8 +16,9 @@
 //     givedefaultloadout() -> setmodelfromcustomization().
 // So choosing a character means setting self.player_character_num, and
 // keeping level.available_player_characters consistent, before the stock code
-// reads it inside givedefaultloadout() on the first spawn. The mod wraps that
-// function (level.custom_giveloadout) to do it right there; see hook_loadout().
+// reads it on the first spawn. The mod replaces get_player_character_num()
+// itself (iw7-mod's replacefunc), so the choice is made at the moment the
+// stock code asks for it; see character_num_for_spawn().
 //
 // Where a choice comes from:
 //   ix_character     the host's character (number or name; "random" or unset:
@@ -61,8 +62,15 @@ register()
     if ( crossmap_enabled() )
         precache_crossmap_models();
 
-    level thread hook_loadout();
-    level thread watch_connects();
+    // With selection off the stock function stays, and the game picks as usual.
+    if ( !enabled() )
+    {
+        custom_scripts\ix\core\log::info( "character selection: off (ix_character_select 0)" );
+        return;
+    }
+
+    replacefunc( scripts\cp\zombies\zombies_loadout::get_player_character_num, ::character_num_for_spawn );
+    custom_scripts\ix\core\log::info( "character selection: on" );
 }
 
 // ---------------------------------------------------------------------------
@@ -469,97 +477,61 @@ only_regular( list )
 }
 
 // ---------------------------------------------------------------------------
-// When the choice is applied: on the first spawn, before the stock pick
+// When the choice is applied: when the stock code asks for it
 //
-// The stock code picks a character inside the gametype's loadout function on
-// the player's first spawn (cp_globallogic::spawnplayer_actual calls
-// level.custom_giveloadout, which zombie.gsc's main() sets to
-// zombies_loadout::givedefaultloadout, which calls get_player_character_num).
-// A choice applied later still changes self.player_character_num, and with it
-// the player card, but the player keeps the models already put on them.
-// Waiting for "ix_player_connected" is not early enough for that: it is a
-// second notify after "connected", and in-game a pick made there arrived after
-// the first spawn (the card showed the chosen character, the player was
-// another one). So the loadout function is wrapped, and the choice is made
-// right before the stock code reads it.
+// The stock code picks a character with
+// zombies_loadout::get_player_character_num(), called on the player inside
+// givedefaultloadout() on every spawn (and once more on cp_rave after the
+// intro). It keeps the number in self.player_character_num. Two earlier ways
+// of choosing before that call did not hold in-game (KNOWN_LIMITATIONS.md L36):
+// a choice made from a notify after "connected" arrived after the first spawn,
+// and wrapping level.custom_giveloadout depends on when the gametype sets it.
+// So register() replaces the stock function with this one. iw7-mod's
+// replacefunc sends every call of the stock function here, for the whole level
+// load (gsc/script_extension.cpp); the stock function itself can no longer be
+// called, so this one also does its work for players without a choice.
 
-hook_loadout()
+character_num_for_spawn()
 {
-    if ( install_loadout_hook() )
-        return;
+    if ( !isdefined( self.player_character_num ) )
+        self choose_once();
 
-    // zombie.gsc's main() sets the function while the level loads.
-    waittillframeend;
+    if ( !isdefined( self.player_character_num ) )
+        self pick_random_character();
 
-    if ( !install_loadout_hook() )
-        custom_scripts\ix\core\log::warn( "character selection: the gametype has no loadout function to wrap; choices are made when players connect" );
+    return self.player_character_num;
 }
 
-// Wraps level.custom_giveloadout once. Returns whether it is wrapped.
-install_loadout_hook()
-{
-    if ( isdefined( level.ix.character.stock_giveloadout ) )
-        return 1;
-
-    if ( !isdefined( level.custom_giveloadout ) )
-        return 0;
-
-    level.ix.character.stock_giveloadout = level.custom_giveloadout;
-    level.custom_giveloadout = ::giveloadout_with_choice;
-    return 1;
-}
-
-// Runs on the player, on every spawn, the way the stock spawn code calls
-// level.custom_giveloadout.
-giveloadout_with_choice( faux_spawn )
-{
-    self choose_once();
-    self [[ level.ix.character.stock_giveloadout ]]( faux_spawn );
-}
-
-watch_connects()
-{
-    level endon( "game_ended" );
-
-    for (;;)
-    {
-        level waittill( "ix_player_connected", player );
-
-        // Own thread, so an error for one player cannot stop this loop.
-        player thread on_connect();
-    }
-}
-
-// The loadout hook normally makes the choice. This covers a gametype without
-// a loadout function, and does nothing once the choice has been made.
-on_connect()
-{
-    install_loadout_hook();
-    self choose_once();
-}
-
-// Makes the player's choice once per match, before the stock code has picked
-// a character. Also starts the message thread, which catches the first spawn
-// because the loadout runs before that spawn's "spawned_player".
+// Makes the player's choice once per match. Also starts the message thread,
+// which catches the first spawn: this runs inside that spawn's loadout,
+// before its "spawned_player".
 choose_once()
 {
     if ( isdefined( self.ix_character_chosen ) )
         return;
 
     self.ix_character_chosen = 1;
-    message = undefined;
+    message = apply_choice();
+    self thread announce_after_spawn( message );
+}
 
-    if ( enabled() )
+// The stock function's pick for a player without a choice: a random free
+// regular character, taken out of the pool. Needs nothing from this mod, so it
+// works even if the rest of the module did not start.
+pick_random_character()
+{
+    if ( isdefined( level.available_player_characters ) && level.available_player_characters.size > 0 )
     {
-        // Changing the number now would leave the player in the models of the
-        // stock pick, with the player card naming someone else.
-        if ( isdefined( self.player_character_num ) )
-            custom_scripts\ix\core\log::warn( "character: " + self.name + " already has a character; choice not applied" );
-        else
-            message = apply_choice();
+        num = scripts\engine\utility::random( level.available_player_characters );
+        level.available_player_characters = scripts\engine\utility::array_remove( level.available_player_characters, num );
+    }
+    else
+    {
+        // Every regular character is taken: share one, as the stock code would.
+        num = scripts\engine\utility::random( [ 1, 2, 3, 4 ] );
     }
 
-    self thread announce_after_spawn( message );
+    self.player_character_num = num;
 }
 
 // Applies the player's choice, if any. Returns a message for the player when
@@ -567,6 +539,9 @@ choose_once()
 // (and iw7-mod/logs/console.log) shows why a player got their character.
 apply_choice()
 {
+    if ( !isdefined( level.ix ) || !isdefined( level.ix.character ) || !isdefined( level.ix.character.cast ) )
+        return undefined;
+
     if ( crossmap_enabled() )
         register_crossmap();
 

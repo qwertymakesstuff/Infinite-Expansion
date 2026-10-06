@@ -4,6 +4,14 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Third in-game report: the pick still did not apply (2026-10-06)
+
+**Fixed**
+- Choosing a character in the menu still did not change the character in the match.
+  - The second attempt wrapped the gametype's loadout function from the mod's start-up. Whether that wrapper is in place in time depends on the order in which the game runs its scripts, and in-game it was not.
+  - The mod now replaces the stock function that decides a player's character (`zombies_loadout::get_player_character_num`) with its own, using iw7-mod's `replacefunc`. The stock code calls it on the player at every spawn, so the pick is made exactly when the game asks. Without a pick it hands out a random free character, as the stock function did.
+  - With `ix_character_select 0` the stock function is left alone.
+
 ### Second in-game report: the pick is applied, CHARACTER moves to the lobby (2026-10-06)
 
 **Fixed**
