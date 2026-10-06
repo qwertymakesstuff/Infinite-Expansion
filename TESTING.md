@@ -62,7 +62,8 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 3. Install the mod folder: copy `mods/infinite_expansion` into `<Infinite Warfare>/mods/`, then load it from the in-game **Mods** menu (or launch with `+set fs_game "mods/infinite_expansion"`).
 4. Launch with `+set developer_script 1`. Without it, script runtime errors are not printed at all (`KNOWN_LIMITATIONS.md` L24).
 5. Logs: the iw7-mod console (`~`) and `iw7-mod/logs/console.log`, available since iw7-mod v1.0.3. Report every line starting with `[IX]` and any `script compile error`, `script link error`, or `script runtime error` block.
-6. Mod dvars for testing:
+6. **No `[IX]` lines at all?** Check that the console's `----- FS_Startup -----` list includes `mods/infinite_expansion`. If it does not, copy the mod's `custom_scripts` folder into `<Infinite Warfare>/iw7-mod/custom_scripts`, try again, and report which install worked.
+7. Mod dvars for testing:
    - `ix_debug_log 1`: extra `[IX] DEBUG:` lines (player connect and spawn). Takes effect immediately.
    - `ix_enabled 0`: turns the whole mod off from the next map load.
    - `ix_version`: set by the mod, shows the loaded version.

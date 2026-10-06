@@ -34,7 +34,7 @@ If an API is not listed here, verify it the same way before using it. The rule i
 | Compile mode | `developer_script` (registered by iw7-mod, default off in release builds) also switches the compiler from `build::prod` to `build::dev`, which compiles `/# … #/` dev blocks (`init_compiler`, `script_loading.cpp`). |
 | Extension built-ins | `function::add` / `method::add` **replace** the handler of a name already in the table (`print`, `println`, `assert`, `assertex`, `logprint`, `setslowmotion`) and **append** new names with ids from 807 (functions) and `0x85CC` (methods) in registration order. Scripts must call them by name; their raw ids are not stable. `print` joins its arguments with tabs and writes to the console. |
 | Name resolution | An unqualified call resolves to a built-in first, then a function in the same file, then an `#include`. Defining a script function with a built-in's name is a compile error (`function name 'x' already defined as builtin`) in both compilers `[COMPILED]`. |
-| Search paths | `%LOCALAPPDATA%/…/cdata` (client data), `<game>/iw7-mod/`, then the engine's search paths, which include `<game>/<fs_game>` when a mod is loaded. `[MOD filesystem.cpp]` |
+| Search paths | `%LOCALAPPDATA%/…/cdata` (client data), `<game>/iw7-mod/`, then the engine's own search paths (`fs_searchpaths`), which should include `<game>/<fs_game>` when a mod is loaded (engine behaviour; R-S1 confirms it). Auto-loading scans them in this order, and a file in an earlier path overrides the same relative file in a later one. The console lists the paths under `----- FS_Startup -----`. `[MOD filesystem.cpp]` |
 | Auto-loaded folders (in-game) | `custom_scripts/`, `custom_scripts/<mode>/` (`mp`, `cp`, `sp`), and `custom_scripts/cp_mp/` (in MP **and** CP). |
 | Auto-loaded folders (frontend) | `custom_scripts/frontend/` only, and **only on develop** (added after v1.1.0). |
 | Scanning is non-recursive | `utils::io::list_files` uses `directory_iterator`. Subfolders of the auto-load folders are **not** auto-loaded. They load only when referenced (`#include` or a far call), which is how modules are kept out of auto-execution. |
@@ -286,3 +286,16 @@ Rules 1 and 2 are enforced by `tools/check.py` (`compile`, `parity`, `natives`, 
   - a function named after a built-in gives `function name 'x' already defined as builtin`;
   - an unknown raw id (`_meth_85CB`) compiles **without** an error;
   - a `//` comment that ends in a backslash swallows the next line, silently, on both compilers.
+
+## 14. Launching, logs, and quitting (for unattended test runs) `[MOD]` `[DOCS]`
+
+Read from the source; none of it has been run yet. Line numbers are the same at v1.1.0 and develop unless noted.
+
+- **No launcher.** The client starts the game directly (`main.cpp`). `-dedicated` is the only environment switch. `-zombies` / `-cpMode` select zombies **only on a dedicated server** (`dedicated.cpp:433-443`). The console commands `cpMode`, `mpMode`, and `spMode` set the desired mode (`command.cpp:460-478`).
+- **Command line.** It is parsed Quake3-style: split at each `+`, with text before the first `+` dropped (`command.cpp:71-110`). `+set <dvar> <value>` is applied at startup, or when the dvar is registered (`command.cpp:112-143`). `-flags` can appear anywhere, but `map` / `devmap` ignore the command unless it has exactly 2 arguments (`party.cpp:1099-1102`, `1133-1136`), so every `-flag` goes **before** the first `+`.
+- **`+map` / `+devmap cp_zmb`.** These choose the mode from the `cp_` prefix while online data is still syncing (`party.cpp:827-858`). `devmap` sets `sv_cheats 1` and exists on the client only. Whether a normal client started this way ends up in zombies **NEEDS TESTING**; the fallbacks are `+cpMode` before `+devmap`, or `-dedicated -zombies +map cp_zmb`.
+- **Unattended start.** `-nointro` skips the intro video (`intro.cpp:17-29`). `-noupdate` skips the updater, which can otherwise relaunch the exe (`iw7-update.md`). Steam must be running, or the client shows a message box and exits (`steam_proxy.cpp:187-211`).
+- **Console log.** `g_consoleLog` defaults to `iw7-mod/logs/console.log`. Each line is appended and the file closed again, so it is effectively flushed; the file is never truncated. It is registered on the first frame, so the earliest startup lines are missing. **`-noconsole` disables it entirely** (`console.cpp:131-132`, `197-218`).
+- **Quitting from GSC.** `executecommand("quit")` queues `quit` for the next frame (`script_extension.cpp:422-426`, `command.cpp:450-453`). GSC cannot set the exit code.
+- **Writing a result file.** `writefile(path, data[, append])` writes under `<game>/<fs_game>/`, rejects `..`, and throws when `fs_game` is empty (`io.cpp:24-95`).
+
