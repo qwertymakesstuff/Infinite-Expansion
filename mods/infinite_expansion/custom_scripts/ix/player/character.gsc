@@ -1,9 +1,9 @@
 // Infinite Expansion - character selection.
 //
 // Lets each player choose who they play as. The choice is made before the
-// match, in the CHARACTER menu (ui_scripts/InfiniteExpansion), and applied when
-// the player connects. It lasts the whole match: there is no switching
-// mid-match. Stock behaviour, read from the decompiled scripts:
+// match, in the CHARACTER menu of the zombies lobby (ui_scripts/InfiniteExpansion),
+// and applied on the player's first spawn. It lasts the whole match: there is
+// no switching mid-match. Stock behaviour, read from the decompiled scripts:
 //   - each map registers its cast in level.player_character_info
 //     (scripts\cp\maps\<map>\<map>_player_character_setup): slots 1-4 are the
 //     four regular characters, 5 (and 6 on cp_zmb) the special characters;
@@ -15,8 +15,9 @@
 //   - every spawn applies self.player_character_num through
 //     givedefaultloadout() -> setmodelfromcustomization().
 // So choosing a character means setting self.player_character_num, and
-// keeping level.available_player_characters consistent, before the first
-// spawn.
+// keeping level.available_player_characters consistent, before the stock code
+// reads it inside givedefaultloadout() on the first spawn. The mod wraps that
+// function (level.custom_giveloadout) to do it right there; see hook_loadout().
 //
 // Where a choice comes from:
 //   ix_character     the host's character (number or name; "random" or unset:
@@ -60,6 +61,7 @@ register()
     if ( crossmap_enabled() )
         precache_crossmap_models();
 
+    level thread hook_loadout();
     level thread watch_connects();
 }
 
@@ -150,14 +152,19 @@ build_cast( map )
 
     // Special characters, with the slot, models and photo index their home
     // map registers, the stock lobby's characterSelect value
-    // (zombies_loadout::get_player_character_num), and the stat that unlocks
-    // them (KNOWN_LIMITATIONS.md L27). The CHARACTER menu writes the same
-    // characterSelect values (ui_scripts/InfiniteExpansion).
-    cast[cast.size] = make_special( "hoff", "The Hoff", [ "hoff", "dj" ], "cp_zmb", 5, 1, "soul_key", "soul_key_1", "body_zmb_hero_dj", "viewmodel_zmb_hero_dj", "head_zmb_dj", 4 );
-    cast[cast.size] = make_special( "willard", "Willard Wyler", [ "willard", "wyler" ], "cp_zmb", 6, 5, "merit", "mt_dlc4_troll2", "body_zmb_projectionist", "zmb_projectionist_viewmodel_arms", "head_zmb_projectionist", 5 );
-    cast[cast.size] = make_special( "kevin", "Kevin Smith", [ "kevin", "smith" ], "cp_rave", 5, 2, "soul_key", "soul_key_2", "zmb_hero_k_smith", "viewmodel_zmb_hero_k_smith", undefined, 4 );
-    cast[cast.size] = make_special( "pam", "Pam Grier", [ "pam", "grier" ], "cp_disco", 5, 3, "soul_key", "soul_key_3", "cp_disco_female_boss_pam_grier_hero", "cp_disco_female_boss_pam_grier_viewmodel_arms", undefined, 4 );
-    cast[cast.size] = make_special( "elvira", "Elvira", [ "elvira" ], "cp_town", 5, 4, "soul_key", "soul_key_4", "fullbody_zmb_hero_elvira_player", "viewmodel_zmb_hero_elvira", undefined, 4 );
+    // (zombies_loadout::get_player_character_num), and the stats that unlock
+    // them. The stock lobby (ui/frontend/cp/cpprivatematchmenu.lua) sets
+    // characterSelect only with these stats: a map's soul key for its special,
+    // and for Willard soul key 5 plus the merit for beating The Beast from
+    // Beyond's final boss (it also requires Director's Cut, which this mod
+    // does not; KNOWN_LIMITATIONS.md L27). The CHARACTER menu reads the same
+    // stats and writes the same characterSelect values
+    // (ui_scripts/InfiniteExpansion).
+    cast[cast.size] = make_special( "hoff", "The Hoff", [ "hoff", "dj" ], "cp_zmb", 5, 1, "soul_key_1", undefined, "body_zmb_hero_dj", "viewmodel_zmb_hero_dj", "head_zmb_dj", 4 );
+    cast[cast.size] = make_special( "willard", "Willard Wyler", [ "willard", "wyler" ], "cp_zmb", 6, 5, "soul_key_5", "mt_dlc4_troll2", "body_zmb_projectionist", "zmb_projectionist_viewmodel_arms", "head_zmb_projectionist", 5 );
+    cast[cast.size] = make_special( "kevin", "Kevin Smith", [ "kevin", "smith" ], "cp_rave", 5, 2, "soul_key_2", undefined, "zmb_hero_k_smith", "viewmodel_zmb_hero_k_smith", undefined, 4 );
+    cast[cast.size] = make_special( "pam", "Pam Grier", [ "pam", "grier" ], "cp_disco", 5, 3, "soul_key_3", undefined, "cp_disco_female_boss_pam_grier_hero", "cp_disco_female_boss_pam_grier_viewmodel_arms", undefined, 4 );
+    cast[cast.size] = make_special( "elvira", "Elvira", [ "elvira" ], "cp_town", 5, 4, "soul_key_4", undefined, "fullbody_zmb_hero_elvira_player", "viewmodel_zmb_hero_elvira", undefined, 4 );
 
     foreach ( entry in cast )
     {
@@ -187,7 +194,7 @@ make_regular( num, key, name, role, aliases, color )
     return entry;
 }
 
-make_special( key, name, aliases, home, home_num, select_id, unlock_type, unlock_field, body, view, head, photo )
+make_special( key, name, aliases, home, home_num, select_id, soul_key, merit, body, view, head, photo )
 {
     entry = spawnstruct();
     entry.key = key;
@@ -199,8 +206,8 @@ make_special( key, name, aliases, home, home_num, select_id, unlock_type, unlock
     entry.home = home;
     entry.home_num = home_num;
     entry.select_id = select_id;
-    entry.unlock_type = unlock_type;
-    entry.unlock_field = unlock_field;
+    entry.soul_key = soul_key;
+    entry.merit = merit;
     entry.body = body;
     entry.view = view;
     entry.head = head;
@@ -340,9 +347,9 @@ register_crossmap()
 // Rules
 
 // Why the player cannot be this character, or undefined if they can. The
-// unlock is checked for every choice, also one from the stock lobby field,
-// because the CHARACTER menu cannot read the unlock stats and writes that
-// field anyway.
+// CHARACTER menu already refuses locked special characters, but the unlock is
+// checked here for every choice too: ix_character can be set in the console,
+// and the lobby field comes from each player's own game.
 unavailable_reason( entry )
 {
     if ( entry.special )
@@ -373,18 +380,21 @@ has_unlocked( entry )
     if ( isbot( self ) )
         return 0;
 
-    if ( entry.unlock_type == "soul_key" )
-        return self getrankedplayerdata( "cp", "haveSoulKeys", entry.unlock_field ) != 0;
+    if ( self getrankedplayerdata( "cp", "haveSoulKeys", entry.soul_key ) == 0 )
+        return 0;
 
-    return self getrankedplayerdata( "cp", "meritState", entry.unlock_field ) > 0;
+    if ( isdefined( entry.merit ) && self getrankedplayerdata( "cp", "meritState", entry.merit ) <= 0 )
+        return 0;
+
+    return 1;
 }
 
 unlock_hint( entry )
 {
-    if ( entry.unlock_type == "soul_key" )
-        return "earn the soul key on " + map_title( entry.home );
+    if ( isdefined( entry.merit ) )
+        return "beat the final boss of The Beast from Beyond";
 
-    return "beat the final boss of The Beast from Beyond";
+    return "earn the soul key on " + map_title( entry.home );
 }
 
 taken_by( entry )
@@ -459,7 +469,53 @@ only_regular( list )
 }
 
 // ---------------------------------------------------------------------------
-// Connect: the choice is applied before the first spawn
+// When the choice is applied: on the first spawn, before the stock pick
+//
+// The stock code picks a character inside the gametype's loadout function on
+// the player's first spawn (cp_globallogic::spawnplayer_actual calls
+// level.custom_giveloadout, which zombie.gsc's main() sets to
+// zombies_loadout::givedefaultloadout, which calls get_player_character_num).
+// A choice applied later still changes self.player_character_num, and with it
+// the player card, but the player keeps the models already put on them.
+// Waiting for "ix_player_connected" is not early enough for that: it is a
+// second notify after "connected", and in-game a pick made there arrived after
+// the first spawn (the card showed the chosen character, the player was
+// another one). So the loadout function is wrapped, and the choice is made
+// right before the stock code reads it.
+
+hook_loadout()
+{
+    if ( install_loadout_hook() )
+        return;
+
+    // zombie.gsc's main() sets the function while the level loads.
+    waittillframeend;
+
+    if ( !install_loadout_hook() )
+        custom_scripts\ix\core\log::warn( "character selection: the gametype has no loadout function to wrap; choices are made when players connect" );
+}
+
+// Wraps level.custom_giveloadout once. Returns whether it is wrapped.
+install_loadout_hook()
+{
+    if ( isdefined( level.ix.character.stock_giveloadout ) )
+        return 1;
+
+    if ( !isdefined( level.custom_giveloadout ) )
+        return 0;
+
+    level.ix.character.stock_giveloadout = level.custom_giveloadout;
+    level.custom_giveloadout = ::giveloadout_with_choice;
+    return 1;
+}
+
+// Runs on the player, on every spawn, the way the stock spawn code calls
+// level.custom_giveloadout.
+giveloadout_with_choice( faux_spawn )
+{
+    self choose_once();
+    self [[ level.ix.character.stock_giveloadout ]]( faux_spawn );
+}
 
 watch_connects()
 {
@@ -469,24 +525,46 @@ watch_connects()
     {
         level waittill( "ix_player_connected", player );
 
-        // Own thread, so an error for one player cannot stop this loop. It never
-        // waits before choosing, so it still finishes before the first spawn.
+        // Own thread, so an error for one player cannot stop this loop.
         player thread on_connect();
     }
 }
 
+// The loadout hook normally makes the choice. This covers a gametype without
+// a loadout function, and does nothing once the choice has been made.
 on_connect()
 {
+    install_loadout_hook();
+    self choose_once();
+}
+
+// Makes the player's choice once per match, before the stock code has picked
+// a character. Also starts the message thread, which catches the first spawn
+// because the loadout runs before that spawn's "spawned_player".
+choose_once()
+{
+    if ( isdefined( self.ix_character_chosen ) )
+        return;
+
+    self.ix_character_chosen = 1;
     message = undefined;
 
     if ( enabled() )
-        message = apply_choice();
+    {
+        // Changing the number now would leave the player in the models of the
+        // stock pick, with the player card naming someone else.
+        if ( isdefined( self.player_character_num ) )
+            custom_scripts\ix\core\log::warn( "character: " + self.name + " already has a character; choice not applied" );
+        else
+            message = apply_choice();
+    }
 
     self thread announce_after_spawn( message );
 }
 
 // Applies the player's choice, if any. Returns a message for the player when
-// the choice could not be honoured.
+// the choice could not be honoured. Every outcome is logged, so the console
+// (and iw7-mod/logs/console.log) shows why a player got their character.
 apply_choice()
 {
     if ( crossmap_enabled() )
@@ -496,8 +574,9 @@ apply_choice()
     message = undefined;
     entry = undefined;
     source = "lobby";
+    is_host = self ishost();
 
-    if ( self ishost() )
+    if ( is_host )
     {
         wanted = wanted_character();
 
@@ -518,19 +597,37 @@ apply_choice()
     }
 
     if ( !isdefined( entry ) )
+    {
+        custom_scripts\ix\core\log::info( "character: " + self.name + ": no choice (" + choice_sources( is_host ) + "); the game picks" );
         return message;
+    }
 
     reason = unavailable_reason( entry );
 
     if ( isdefined( reason ) )
     {
         assign_random();
+        custom_scripts\ix\core\log::info( "character: " + self.name + " can't play as " + entry.name + " (" + source + "): " + reason );
         return "Can't play as " + entry.name + ": " + reason;
     }
 
     assign( entry );
     custom_scripts\ix\core\log::info( "character: " + self.name + " -> " + entry.name + " (" + source + ")" );
     return message;
+}
+
+// What the player's choice was read from, for the log.
+choice_sources( is_host )
+{
+    text = "host " + is_host;
+
+    if ( is_host )
+        text += ", ix_character '" + getdvar( "ix_character" ) + "'";
+
+    if ( !isbot( self ) )
+        text += ", lobby characterSelect " + self getrankedplayerdata( "cp", "zombiePlayerLoadout", "characterSelect" );
+
+    return text;
 }
 
 // The special character named by the player's lobby field characterSelect,

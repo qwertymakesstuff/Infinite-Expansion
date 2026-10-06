@@ -1,8 +1,10 @@
--- Infinite Expansion - CHARACTER button in the zombies main menu.
+-- Infinite Expansion - CHARACTER button in the zombies lobby.
 --
--- Adds a base-game style button under the zombies main menu's buttons that
--- opens a character list. The choice is made here, before a match, and lasts
--- the whole match. It is saved in two places:
+-- Adds a base-game style CHARACTER button to the lobby that Solo Match and
+-- Custom Game open (CPPrivateMatchMenu), right under SELECT SHOW. It opens a
+-- character list with a picture of the highlighted character. The choice is
+-- made here, before a match, and lasts the whole match. It is saved in two
+-- places:
 --   - the archived dvar ix_character, which the mod's GSC applies when this
 --     player hosts a zombies match (custom_scripts/ix/player/character.gsc);
 --   - for a special character, also the stock lobby field characterSelect in
@@ -10,11 +12,15 @@
 --     players' matches. Regular characters have no lobby value, so in someone
 --     else's match the game picks one at random (KNOWN_LIMITATIONS.md L29).
 --
--- Everything here uses only widgets and calls that iw7-mod's own ui_scripts
--- use, and those files are the same in v1.1.0 and develop:
---   MainMenu/CPMainMenuButtons.lua   the "MenuButton" type and the button layout
---   Mods/ModSelectMenu.lua           list menus, "ModSelectButton" rows, titles
---   Stats/__init__.lua, MainMenu/CPMainMenu.lua   wrapping a registered builder
+-- Widgets and calls are the ones iw7-mod's own ui_scripts use:
+--   MainMenu/CPMainMenuButtons.lua   the "MenuButton" type and button layout
+--   Mods/ModSelectMenu.lua           list menus, "ModSelectButton" rows, text
+--   Lobby/LobbyMissionButtons.lua    adding a button to a stock button list
+--   MainMenu/MPMainMenuButtons.lua   moving stock elements (getLocalRect)
+--   Stats/__init__.lua               zombies stats (CoD.StatsGroup.Coop)
+-- The stock lobby's layout, element names and rules come from the game's own
+-- ui/frontend/cp/cpprivatematchbuttons.lua and cpprivatematchmenu.lua
+-- (IW_API_NOTES.md section 16).
 
 if not Engine.InFrontend() then
     return
@@ -23,23 +29,45 @@ end
 local modelPath = "frontEnd.IXCharacter"
 
 -- key: the value stored in ix_character ("random" lets the game pick).
--- select: the stock lobby's characterSelect value for a special character
--- (zombies_loadout::get_player_character_num in the stock scripts).
+-- color, initials: the picture for characters the game has no picture of
+-- (the player card in custom_scripts/ix/ui/player_card.gsc uses the same colors).
+-- select: the stock lobby's characterSelect value for a special character.
+-- soulKey, merit: the zombies stats the stock lobby requires before it sets
+-- characterSelect (cpprivatematchmenu.lua; KNOWN_LIMITATIONS.md L27).
+-- portrait: the stock lobby's picture of a special character; tall pictures
+-- are half as wide as they are high, The Hoff's is square.
 local characters = {
-    { key = "random", label = "Random", text = "The game picks your character, as usual." },
-    { key = "sally", label = "Sally", text = "Spaceland: Valley Girl. Rave: Gangster. Shaolin: Disco. Radioactive Thing: Schoolgirl." },
-    { key = "poindexter", label = "Poindexter", text = "Spaceland: Nerd. Rave: Raver. Shaolin: Punk. Radioactive Thing: Scientist." },
-    { key = "andre", label = "Andre", text = "Spaceland: Rapper. Rave: Grunge. Shaolin: Activist. Radioactive Thing: Soldier." },
-    { key = "aj", label = "A.J.", text = "Spaceland: Jock. Rave: Hip-Hop. Shaolin: Sleaze Bag. Radioactive Thing: Rebel." },
-    { key = "hoff", label = "The Hoff", select = 1, text = "Special character of Zombies in Spaceland. Needs that map's soul key." },
-    { key = "willard", label = "Willard Wyler", select = 5, text = "Special character of Zombies in Spaceland. Needs a win against The Beast from Beyond's final boss." },
-    { key = "kevin", label = "Kevin Smith", select = 2, text = "Special character of Rave in the Redwoods. Needs that map's soul key." },
-    { key = "pam", label = "Pam Grier", select = 3, text = "Special character of Shaolin Shuffle. Needs that map's soul key." },
-    { key = "elvira", label = "Elvira", select = 4, text = "Special character of Attack of the Radioactive Thing. Needs that map's soul key." },
+    { key = "random", label = "Random", initials = "?", color = 0xC8C8C8,
+      text = "The game picks your character, as usual." },
+    { key = "sally", label = "Sally", initials = "S", color = 0xFF73B3,
+      text = "Spaceland: Valley Girl. Rave: Gangster. Shaolin: Disco. Radioactive Thing: Schoolgirl." },
+    { key = "poindexter", label = "Poindexter", initials = "P", color = 0x59A6FF,
+      text = "Spaceland: Nerd. Rave: Raver. Shaolin: Punk. Radioactive Thing: Scientist." },
+    { key = "andre", label = "Andre", initials = "A", color = 0xFF9933,
+      text = "Spaceland: Rapper. Rave: Grunge. Shaolin: Activist. Radioactive Thing: Soldier." },
+    { key = "aj", label = "A.J.", initials = "AJ", color = 0x73E659,
+      text = "Spaceland: Jock. Rave: Hip-Hop. Shaolin: Sleaze Bag. Radioactive Thing: Rebel." },
+    { key = "hoff", label = "The Hoff", select = 1, home = "Zombies in Spaceland", soulKey = "soul_key_1",
+      portrait = "zm_character_select_hoff", square = true, initials = "H", color = 0xFFD14D,
+      text = "Special character of Zombies in Spaceland." },
+    { key = "willard", label = "Willard Wyler", select = 5, home = "Zombies in Spaceland", soulKey = "soul_key_5",
+      merit = "mt_dlc4_troll2", portrait = "zm_character_willard", initials = "W", color = 0xFFD14D,
+      text = "Special character of Zombies in Spaceland, earned in The Beast from Beyond." },
+    { key = "kevin", label = "Kevin Smith", select = 2, home = "Rave in the Redwoods", soulKey = "soul_key_2",
+      portrait = "zm_character_select_smith", initials = "K", color = 0xFFD14D,
+      text = "Special character of Rave in the Redwoods." },
+    { key = "pam", label = "Pam Grier", select = 3, home = "Shaolin Shuffle", soulKey = "soul_key_3",
+      portrait = "zm_character_select_pam", initials = "P", color = 0xFFD14D,
+      text = "Special character of Shaolin Shuffle." },
+    { key = "elvira", label = "Elvira", select = 4, home = "Attack of the Radioactive Thing", soulKey = "soul_key_4",
+      portrait = "zm_character_select_elvira", initials = "E", color = 0xFFD14D,
+      text = "Special character of Attack of the Radioactive Thing." },
 }
 
 local regularNote = " Used in matches you host. When you join someone else's match, the game picks for you."
 local specialNote = " Also used when you join someone else's match on that map. Other maps: only if the host sets ix_character_crossmap 1 (experimental)."
+
+local statusColors = { regular = 0xC8C8C8, special = 0xFFD14D, locked = 0xFF6464 }
 
 local function currentKey()
     local ok, value = pcall(Engine.GetDvarString, "ix_character")
@@ -49,13 +77,77 @@ local function currentKey()
     return string.lower(value)
 end
 
-local function labelFor(key)
+local function characterFor(key)
     for i = 1, #characters do
         if characters[i].key == key then
-            return characters[i].label
+            return characters[i]
         end
     end
-    return key
+    return nil
+end
+
+local function labelFor(key)
+    local character = characterFor(key)
+    return character and character.label or key
+end
+
+-- ix_character_specials, as the GSC reads it: unset = 1 (unlocked ones only).
+local function specialsMode()
+    local ok, value = pcall(Engine.GetDvarString, "ix_character_specials")
+    if not ok or value == nil or value == "" then
+        return 1
+    end
+    return tonumber(value) or 1
+end
+
+-- A zombies stat of this player, or nil when it cannot be read.
+local function coopStat(controllerIndex, ...)
+    local ok, value = pcall(Engine.GetPlayerDataEx, controllerIndex, CoD.StatsGroup.Coop, ...)
+    if ok then
+        return value
+    end
+    return nil
+end
+
+local function isSet(value)
+    return value == true or (type(value) == "number" and value > 0)
+end
+
+-- true or false, or nil when the stats cannot be read (the GSC still checks).
+local function isUnlocked(character, controllerIndex)
+    local soulKey = coopStat(controllerIndex, "haveSoulKeys", character.soulKey)
+    if soulKey == nil then
+        return nil
+    end
+    if not isSet(soulKey) then
+        return false
+    end
+    if character.merit then
+        local merit = coopStat(controllerIndex, "meritState", character.merit)
+        if merit == nil then
+            return nil
+        end
+        return isSet(merit)
+    end
+    return true
+end
+
+-- Why this player cannot choose the character, or nil if they can.
+local function unavailableReason(character, controllerIndex)
+    if not character.select then
+        return nil
+    end
+    local mode = specialsMode()
+    if mode == 0 then
+        return "Special characters are off (ix_character_specials 0)."
+    end
+    if mode >= 2 or isUnlocked(character, controllerIndex) ~= false then
+        return nil
+    end
+    if character.merit then
+        return "Locked: beat the final boss of The Beast from Beyond."
+    end
+    return "Locked: earn the soul key on " .. character.home .. "."
 end
 
 local function describe(character)
@@ -68,25 +160,73 @@ local function describe(character)
     return character.text .. regularNote
 end
 
-local function showInfo(element, character)
+-- The picture: a special character's own picture, or the initials on a dark
+-- panel in the character's color for the four regular characters and Random,
+-- which have no picture in the game's menus.
+local portraitLeft, portraitTop, portraitSize = 1254, 216, 360
+
+local function showPortrait(menu, character)
+    menu.IXPortraitEdge:SetRGBFromInt(character.color, 0)
+    if character.portrait then
+        local width = character.square and portraitSize or portraitSize / 2
+        local left = portraitLeft + (portraitSize - width) / 2
+        menu.IXPortrait:setImage(RegisterMaterial(character.portrait), 0)
+        menu.IXPortrait:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * (left + width),
+            _1080p * portraitTop, _1080p * (portraitTop + portraitSize))
+        menu.IXPortrait:SetAlpha(1, 0)
+        menu.IXInitials:SetAlpha(0, 0)
+    else
+        menu.IXPortrait:SetAlpha(0, 0)
+        menu.IXInitials:setText(character.initials, 0)
+        menu.IXInitials:SetRGBFromInt(character.color, 0)
+        menu.IXInitials:SetAlpha(1, 0)
+    end
+end
+
+local function showInfo(menu, character)
+    local reason = unavailableReason(character, menu.IXControllerIndex)
+    local status, color = "", statusColors.regular
+    if reason then
+        status, color = reason, statusColors.locked
+    elseif character.select then
+        status, color = "Special character", statusColors.special
+    elseif character.key ~= "random" then
+        status = "Regular character"
+    end
+    menu.IXInfoTitle:setText(ToUpperCase(character.label), 0)
+    menu.IXInfoStatus:setText(status, 0)
+    menu.IXInfoStatus:SetRGBFromInt(color, 0)
+    menu.IXInfoText:setText(describe(character), 0)
+    showPortrait(menu, character)
+end
+
+local function onHover(element, character)
     local menu = element:GetCurrentMenu()
-    if menu and menu.IXInfoTitle and menu.IXInfoText then
-        menu.IXInfoTitle:setText(ToUpperCase(character.label))
-        menu.IXInfoText:setText(describe(character))
+    if menu and menu.IXInfoTitle then
+        showInfo(menu, character)
     end
     Engine.PlaySound(CoD.SFX.SPMinimap)
 end
 
-local function chooseCharacter(element, character)
-    Engine.Exec("seta ix_character " .. character.key)
-    -- 0 clears a special picked earlier. iw7-mod's own director_cut setting
-    -- writes coop stats the same way: setCoopPlayerData, then uploadstats
-    -- (src/client/component/stats.cpp).
-    Engine.Exec("setCoopPlayerData zombiePlayerLoadout characterSelect " .. (character.select or 0))
+local function writeLobbyField(value)
+    -- iw7-mod writes coop stats the same way: setCoopPlayerData, then
+    -- uploadstats (src/client/component/stats.cpp).
+    Engine.Exec("setCoopPlayerData zombiePlayerLoadout characterSelect " .. value)
     Engine.Exec("uploadstats")
+end
+
+local function chooseCharacter(element, character)
     local menu = element:GetCurrentMenu()
+    if menu and menu.IXInfoTitle and unavailableReason(character, menu.IXControllerIndex) then
+        -- Locked: the status line already says why; stay in the list.
+        showInfo(menu, character)
+        return
+    end
+    Engine.Exec("seta ix_character " .. character.key)
+    -- 0 clears a special character chosen earlier.
+    writeLobbyField(character.select or 0)
     if menu and menu.IXSelected then
-        menu.IXSelected:setText("Selected: " .. character.label)
+        menu.IXSelected:setText("Selected: " .. character.label, 0)
     end
     LUI.FlowManager.RequestLeaveMenu(element)
 end
@@ -99,41 +239,64 @@ local function fillList(menu, controllerIndex)
     local dataSource = LUI.DataSourceFromList.new(#characters)
     dataSource.MakeDataSourceAtIndex = function(source, index, sourceControllerIndex)
         local character = characters[index + 1]
+        local label = character.label
+        if unavailableReason(character, controllerIndex) then
+            label = label .. " (locked)"
+        end
         return {
-            buttonLabel = LUI.DataSourceInGlobalModel.new(modelPath .. ".characters." .. index, character.label),
+            buttonLabel = LUI.DataSourceInGlobalModel.new(modelPath .. ".characters." .. index, label),
             buttonOnClickFunction = function(buttonElement, eventArgs)
                 chooseCharacter(buttonElement, character)
             end,
             buttonOnHoverFunction = function(buttonElement, eventArgs)
-                showInfo(buttonElement, character)
+                onHover(buttonElement, character)
             end,
         }
     end
     menu.IXCharacterList:SetGridDataSource(dataSource, controllerIndex)
 end
 
-local function focusFirstRow(menu, controllerIndex)
+-- Focuses the row of the character chosen now (the first row if none).
+local function focusChosenRow(menu, controllerIndex)
     local list = menu.IXCharacterList
     if list:getNumChildren() == 0 then
         return
     end
+    local row, key = 0, currentKey()
+    for i = 1, #characters do
+        if characters[i].key == key then
+            row = i - 1
+        end
+    end
     local offset = list:GetContentOffset(LUI.DIRECTION.vertical)
-    list:SetFocusedPosition({ x = 0, y = offset }, true)
-    local row = list:GetElementAtPosition(0, offset)
-    if row then
-        row:processEvent({ name = "gain_focus", controllerIndex = controllerIndex })
+    list:SetFocusedPosition({ x = 0, y = offset + row }, true)
+    local element = list:GetElementAtPosition(0, offset + row)
+    if element then
+        element:processEvent({ name = "gain_focus", controllerIndex = controllerIndex })
     end
 end
 
-local function newText(id, size, font, top, bottom)
+-- Text in IW7's menus is as tall as its element: top to bottom is the font
+-- size, and longer text wraps downwards below it (Mods/ModSelectMenu.lua).
+local function newText(id, size, font, left, right, top, alignment)
     local text = LUI.UIStyledText.new()
     text.id = id
     text:setText("", 0)
     text:SetFontSize(size * _1080p)
     text:SetFont(FONTS.GetFont(font))
-    text:SetAlignment(LUI.Alignment.Left)
-    text:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * 1254, _1080p * 1824, _1080p * top, _1080p * bottom)
+    text:SetAlignment(alignment or LUI.Alignment.Left)
+    text:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * right, _1080p * top, _1080p * (top + size))
     return text
+end
+
+local function newPanel(id, color, alpha, left, right, top, bottom)
+    local panel = LUI.UIImage.new()
+    panel.id = id
+    panel:setImage(RegisterMaterial("white"), 0)
+    panel:SetRGBFromInt(color, 0)
+    panel:SetAlpha(alpha, 0)
+    panel:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * right, _1080p * top, _1080p * bottom)
+    return panel
 end
 
 function IXCharacterMenu(parent, controller)
@@ -145,6 +308,7 @@ function IXCharacterMenu(parent, controller)
         controllerIndex = menu:getRootController()
     end
     assert(controllerIndex)
+    menu.IXControllerIndex = controllerIndex
 
     menu:playSound("menu_open")
 
@@ -167,14 +331,41 @@ function IXCharacterMenu(parent, controller)
     menu:addElement(title)
     menu.MenuTitle = title
 
-    local infoTitle = newText("IXInfoTitle", 30, FONTS.MainMedium.File, 216, 246)
+    -- Right side: picture, name, status line and description.
+    local right = portraitLeft + 570
+    local backdrop = newPanel("IXPortraitBackdrop", 0x000000, 0.45, portraitLeft, portraitLeft + portraitSize,
+        portraitTop, portraitTop + portraitSize)
+    menu:addElement(backdrop)
+
+    local edge = newPanel("IXPortraitEdge", 0xC8C8C8, 1, portraitLeft - 6, portraitLeft,
+        portraitTop, portraitTop + portraitSize)
+    menu:addElement(edge)
+    menu.IXPortraitEdge = edge
+
+    local initials = newText("IXInitials", 160, FONTS.MainMedium.File, portraitLeft, portraitLeft + portraitSize,
+        portraitTop + (portraitSize - 160) / 2, LUI.Alignment.Center)
+    menu:addElement(initials)
+    menu.IXInitials = initials
+
+    local portrait = LUI.UIImage.new()
+    portrait.id = "IXPortrait"
+    portrait:SetAlpha(0, 0)
+    menu:addElement(portrait)
+    menu.IXPortrait = portrait
+
+    local infoTitle = newText("IXInfoTitle", 44, FONTS.MainMedium.File, portraitLeft, right, portraitTop + portraitSize + 20)
     menu:addElement(infoTitle)
     menu.IXInfoTitle = infoTitle
 
-    local infoText = newText("IXInfoText", 20, FONTS.MainCondensed.File, 252, 352)
+    local infoStatus = newText("IXInfoStatus", 22, FONTS.MainBold.File, portraitLeft, right, portraitTop + portraitSize + 76)
+    menu:addElement(infoStatus)
+    menu.IXInfoStatus = infoStatus
+
+    local infoText = newText("IXInfoText", 22, FONTS.MainCondensed.File, portraitLeft, right, portraitTop + portraitSize + 112)
     menu:addElement(infoText)
     menu.IXInfoText = infoText
 
+    -- Left side: the list.
     local list = LUI.UIDataSourceGrid.new(nil, {
         maxVisibleColumns = 1,
         maxVisibleRows = #characters,
@@ -202,13 +393,8 @@ function IXCharacterMenu(parent, controller)
     menu:addElement(list)
     menu.IXCharacterList = list
 
-    local selected = LUI.UIText.new()
-    selected.id = "IXSelected"
+    local selected = newText("IXSelected", 24, FONTS.MainBold.File, 130, 630, 640)
     selected:setText("Selected: " .. labelFor(currentKey()), 0)
-    selected:SetFontSize(20 * _1080p)
-    selected:SetFont(FONTS.GetFont(FONTS.MainBold.File))
-    selected:SetAlignment(LUI.Alignment.Left)
-    selected:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * 130, _1080p * 630, _1080p * 942, _1080p * 966)
     menu:addElement(selected)
     menu.IXSelected = selected
 
@@ -228,9 +414,10 @@ function IXCharacterMenu(parent, controller)
     menu.bindButton = bindButton
     bindButton:addEventHandler("button_secondary", leaveMenu)
 
+    showInfo(menu, characterFor(currentKey()) or characters[1])
     fillList(menu, controllerIndex)
     menu:addEventHandler("gain_focus", function(element, eventControllerIndex)
-        focusFirstRow(element, controllerIndex)
+        focusChosenRow(element, controllerIndex)
     end)
 
     local blur = LUI.UIElement.new({ worldBlur = 5 })
@@ -246,17 +433,38 @@ LUI.FlowManager.RegisterStackPopBehaviour("IXCharacterMenu", function()
     WipeGlobalModelsAtPath(modelPath)
 end)
 
--- The zombies main menu's button list: add CHARACTER under the last button and
--- move the description line below it.
---
--- iw7-mod replaces the stock list with its own (MainMenu/CPMainMenuButtons.lua
--- assigns MenuBuilder.m_types["CPMainMenuButtons"]). Whether that script runs
--- before or after this one depends on the install: iw7-mod searches
--- <game>/iw7-mod/ before its own scripts, and a Mods-menu folder after them
--- (filesystem.cpp). So the button is added when the list is built, whichever
--- script registered it last, and only once.
-local function addCharacterButton(navigator, controller)
-    if not navigator or navigator.IXCharacterButton then
+-- The lobby that Solo Match and Custom Game open (CPPrivateMatchMenu, see
+-- iw7-mod's MainMenu/CPMainMenuButtons.lua) builds its buttons as
+-- CPPrivateMatchButtons, a vertical navigator of MenuButtons 40 pixels apart:
+-- START GAME 0-30, LOADOUT 40-70, BARRACKS 80-110, SELECT SHOW (ChooseMap)
+-- 120-150, then BOSS BATTLE (only when boss battles are on), TUTORIAL (Tips),
+-- SURVIVAL DEPOT (Armory), a spacer, the CONTRACTS widget and the description
+-- line. CHARACTER goes under SELECT SHOW and everything below it moves down one
+-- step. The stock list places those elements again when it switches between
+-- its "boss battle on/off" layouts, so each of them keeps the offset for every
+-- later placement too.
+local lobbyStep = 40
+local lobbyElementsBelow = { "BossBattle", "Tips", "Armory", "ForSpacing", "ContractsButton", "ButtonDescription" }
+
+local function moveDown(element, offset)
+    if not element or element.IXMovedDown then
+        return
+    end
+    element.IXMovedDown = offset
+    local setAnchorsAndPosition = element.SetAnchorsAndPosition
+    element.SetAnchorsAndPosition = function(self, leftAnchor, rightAnchor, topAnchor, bottomAnchor, left, right, top, bottom, ...)
+        if top and bottom then
+            top, bottom = top + offset, bottom + offset
+        end
+        return setAnchorsAndPosition(self, leftAnchor, rightAnchor, topAnchor, bottomAnchor, left, right, top, bottom, ...)
+    end
+    local _, top, _, bottom = element:getLocalRect()
+    element:SetTop(top + offset, 0)
+    element:SetBottom(bottom + offset, 0)
+end
+
+local function addLobbyCharacterButton(navigator, controller)
+    if not navigator or navigator.IXCharacterButton or not navigator.ChooseMap then
         return
     end
 
@@ -269,49 +477,106 @@ local function addCharacterButton(navigator, controller)
     button.id = "IXCharacterButton"
     button.buttonDescription = "Choose who you play as. Unlocked special characters also follow you into other players' matches."
     button.Text:setText(ToUpperCase("Character"), 0)
-    button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, _1080p * 350, _1080p * 380)
-    navigator:addElement(button)
     navigator.IXCharacterButton = button
 
-    if navigator.ButtonDescription then
-        navigator.ButtonDescription:SetAnchorsAndPosition(0, 0, 0, 1, 0, 0, _1080p * 390, _1080p * 448)
+    local _, _, _, showBottom = navigator.ChooseMap:getLocalRect()
+    for _, id in ipairs(lobbyElementsBelow) do
+        moveDown(navigator[id], lobbyStep * _1080p)
     end
-    navigator:SetAnchorsAndPosition(0, 1, 0, 1, 0, 500 * _1080p, 0, 460 * _1080p)
+    button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, showBottom + 10 * _1080p, showBottom + lobbyStep * _1080p)
+
+    -- Right after SELECT SHOW in the list's own order too.
+    local nextButton = navigator.BossBattle or navigator.Tips
+    if nextButton then
+        LUI.UIElement.addElementBefore(button, nextButton)
+    else
+        navigator:addElement(button)
+    end
 
     button:addEventHandler("button_action", function(element, eventArgs)
         LUI.FlowManager.RequestAddMenu("IXCharacterMenu", true, eventArgs.controller, false)
     end)
 end
 
--- Builders this file has wrapped, so that each is wrapped once.
-local wrappedBuilders = {}
-
-local function wrapButtonList()
-    local builder = MenuBuilder.m_types["CPMainMenuButtons"]
-    if not builder or wrappedBuilders[builder] then
-        return
+-- The stock lobby sets characterSelect to 0 every time it opens
+-- (cpprivatematchmenu.lua). Put back the special character chosen here, while
+-- it is still available, so it follows the player into the match.
+local function restoreLobbyField(controllerIndex)
+    local character = characterFor(currentKey())
+    if character and character.select and not unavailableReason(character, controllerIndex) then
+        writeLobbyField(character.select)
     end
-    local wrapper = function(menu, controller)
-        local navigator = builder(menu, controller)
-        addCharacterButton(navigator, controller)
-        return navigator
-    end
-    wrappedBuilders[wrapper] = true
-    MenuBuilder.m_types["CPMainMenuButtons"] = wrapper
 end
 
--- Loaded after iw7-mod's scripts (Mods-menu install): its list is registered now.
-wrapButtonList()
+local function onLobbyBuilt(menu, controller)
+    if not menu or menu.IXLobbyFieldRestored then
+        return
+    end
+    menu.IXLobbyFieldRestored = true
+    local controllerIndex = controller and controller.controllerIndex
+    if not controllerIndex then
+        controllerIndex = menu:getRootController()
+    end
+    restoreLobbyField(controllerIndex)
+    -- Again once the menu is up, in case the stock reset runs then.
+    menu:addEventHandler("menu_create", function(element, eventArgs)
+        restoreLobbyField(controllerIndex)
+    end)
+end
 
--- Loaded before them (<game>/iw7-mod/ install): every menu is built after all
--- scripts have loaded, so wrap whatever list is registered then, and decorate a
--- list built by name in case the stock menu builds it that way.
+local lobbyDecorators = {
+    CPPrivateMatchButtons = addLobbyCharacterButton,
+    CPPrivateMatchMenu = onLobbyBuilt,
+}
+
+-- Never let this file break the stock lobby: if the lobby is not built the way
+-- it is expected to be, it is left as it is.
+local function decorate(typeName, element, controller)
+    pcall(lobbyDecorators[typeName], element, controller)
+end
+
+-- The stock lobby types may be registered before or after this file runs, and
+-- built by name or through MenuBuilder.m_types, so both are covered, once.
+local wrappedBuilders = {}
+
+local function wrapBuilder(typeName, builder)
+    if not builder or wrappedBuilders[builder] then
+        return builder
+    end
+    local wrapper = function(menu, controller, ...)
+        local element = builder(menu, controller, ...)
+        decorate(typeName, element, controller)
+        return element
+    end
+    wrappedBuilders[wrapper] = true
+    return wrapper
+end
+
+local function wrapRegistered()
+    for typeName in pairs(lobbyDecorators) do
+        local builder = MenuBuilder.m_types[typeName]
+        if builder and not wrappedBuilders[builder] then
+            MenuBuilder.m_types[typeName] = wrapBuilder(typeName, builder)
+        end
+    end
+end
+
+wrapRegistered()
+
+local registerType_original = MenuBuilder.registerType
+MenuBuilder.registerType = function(typeName, builder, ...)
+    if lobbyDecorators[typeName] then
+        builder = wrapBuilder(typeName, builder)
+    end
+    return registerType_original(typeName, builder, ...)
+end
+
 local BuildRegisteredType_original = MenuBuilder.BuildRegisteredType
 MenuBuilder.BuildRegisteredType = function(typeName, controller, ...)
-    wrapButtonList()
+    wrapRegistered()
     local element = BuildRegisteredType_original(typeName, controller, ...)
-    if typeName == "CPMainMenuButtons" then
-        addCharacterButton(element, controller)
+    if lobbyDecorators[typeName] then
+        decorate(typeName, element, controller)
     end
     return element
 end

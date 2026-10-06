@@ -14,7 +14,7 @@
 | v1.1.0 compiler mislabels/lacks many method names | Every raw `_meth_` / `_func_` id lives in **one** module (`ix\core\compat`) |
 | File I/O only with `fs_game` | Persistence layer with a dvar-only fallback |
 | Players cannot join a host whose `fs_game` is set unless the mod ships a `mod.ff` (L30) | Installed into `<game>/iw7-mod/`, without `fs_game`; settings must work from dvars alone |
-| Another player's menu choice reaches the host's match only through that player's stats (L29) | Choices made in the frontend apply when the player connects, never mid-match |
+| Another player's menu choice reaches the host's match only through that player's stats (L29) | Choices made in the frontend apply on the player's first spawn, right before the stock pick (a wrapper of `level.custom_giveloadout`, L36), never mid-match |
 | A zombies match links only the stock scripts its map and the gametype reference; 126 are common to all five maps | Stock calls target only those; map-specific code is reached through the pointers maps assign, never by path (§7) |
 | Server-side GSC; per-player HUD elements | Per-player state lives on the player entity (`self.ix`) |
 
@@ -27,7 +27,7 @@ Infinite-Expansion/                          (repository)
 ├── mods/
 │   └── infinite_expansion/                  contents → <Infinite Warfare>/iw7-mod/
 │       ├── desc.txt                         Mods-menu description (solo install only)     (Phase 1)
-│       ├── ui_scripts/InfiniteExpansion/    client Lua: CHARACTER button + list           (Phase 1.5)
+│       ├── ui_scripts/InfiniteExpansion/    client Lua: lobby CHARACTER button + list     (Phase 1.5)
 │       └── custom_scripts/
 │           ├── cp/ix_main.gsc               ENTRY (zombies only)  — auto-loaded          (Phase 1)
 │           └── ix/                          MODULES               — loaded by reference only
@@ -65,7 +65,7 @@ Infinite-Expansion/                          (repository)
 
 Phase 1 also created one placeholder per feature area (`ui/ui.gsc`, `player/player.gsc`, `weapons/weapons.gsc`, `zombies/zombies.gsc`, `debug/debug.gsc`). Each only registers its name, so the init log shows the load order.
 
-`/assets/` from the original brief maps to `mods/infinite_expansion/ui_scripts/` (client Lua; the zombies main menu's CHARACTER button since Phase 1.5) and an optional `mod.ff` (x64-zt, deferred).
+`/assets/` from the original brief maps to `mods/infinite_expansion/ui_scripts/` (client Lua; the CHARACTER button in the zombies lobby since Phase 1.5) and an optional `mod.ff` (x64-zt, deferred).
 
 ## 3. Initialization flow
 

@@ -4,6 +4,28 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Second in-game report: the pick is applied, CHARACTER moves to the lobby (2026-10-06)
+
+**Fixed**
+- The chosen character was not applied. The card in the corner named the pick, but the player was someone else.
+  - The game picks a character inside its loadout function, on the first spawn. The mod's pick ran from a second notify after "connected" and arrived after that spawn.
+  - The mod now wraps that function (`level.custom_giveloadout`) and makes the pick right before the stock code reads it. A pick that would come too late is not applied halfway, and the console says so.
+  - Every outcome is logged as `[IX] INFO: character: …` in the console and in `iw7-mod/logs/console.log`.
+- CHARACTER menu text: the name is now large (44) and the description normal (22). IW7 sizes text by the height of its element, and the description's element was 100 tall.
+
+**Changed**
+- The CHARACTER button moved from the zombies main menu into the lobby that Solo Match and Custom Game open, right under SELECT SHOW. The buttons under it move down one step, in both of the lobby's layouts (with and without BOSS BATTLE).
+- The stock lobby clears the special-character field `characterSelect` every time it opens. The mod puts back a special character chosen in the CHARACTER menu while it is still unlocked.
+- Willard Wyler needs The Beast from Beyond's soul key and its merit, as in the stock lobby. The stock lobby also requires Director's Cut; the mod does not (L27).
+
+**Added**
+- A picture of the highlighted character: the game's own pictures of the five special characters, and colored initials for the four regular characters and Random, which have no picture in the game's menus (L28).
+- Locked special characters are marked "(locked)", say how to unlock them, and cannot be chosen. `ix_character_specials 2` allows them, `0` turns specials off.
+- Tests: the lobby list in every load order and both layouts, the lobby field after the stock reset, and the CHARACTER menu's text sizes, pictures and locks.
+
+**Source**
+- The lobby's layout, element names and rules come from the game's compiled menu scripts in a public dump, read as data and never run (`IW_API_NOTES.md` §16).
+
 ### Fixes from the first in-game report (2026-10-06)
 
 **Fixed**

@@ -62,19 +62,22 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| CHARACTER button in the zombies main menu (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; saves `ix_character`, and for specials the stock lobby field `characterSelect`. First in-game report: missing with the iw7-mod-folder install (L33), fixed; R-UI1–R-UI5 |
+| CHARACTER button in the zombies lobby, under SELECT SHOW (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; in the lobby of Solo Match and Custom Game (moved there from the main menu after the second in-game report); saves `ix_character`, and for specials the stock lobby field `characterSelect`. Layout from the stock lobby (L35); R-UI1–R-UI6 |
+| Picture of the highlighted character in the CHARACTER menu | UI | 1.5 | TESTING | The game's own pictures of the five specials; colored initials for the regular characters (L28); R-UI2 |
+| Locked special characters shown and refused in the menu | UI | 1.5 | TESTING | Reads the same zombies stats as the stock lobby (L27); `ix_character_specials`; R-UI4 |
+| A chosen special survives the stock lobby's reset | UI | 1.5 | TESTING | The stock lobby clears `characterSelect` when it opens; the menu script writes the choice back; R-UI5 |
 | Steam name instead of "Unknown Soldier" | Player | 1.5 | TESTING | The setup copies the Steam name; the menu script sets iw7-mod's `name` while it is the default (L34); R-I14 |
-| Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied when the player connects. Host: `ix_character`. Every player: specials through `characterSelect`. Toggle `ix_character_select`; R-CH1–R-CH3 |
+| Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied on the first spawn, right before the stock pick, by wrapping the gametype's loadout function. Second in-game report: the pick came after the spawn (card right, character wrong), fixed (L36). Host: `ix_character`. Every player: specials through `characterSelect`. Toggle `ix_character_select`; every outcome logged; R-CH1–R-CH3, R-CH13 |
 | A guest's special-character pick in someone else's match | Player | 1.5 | TESTING | Travels in the guest's stats (`characterSelect`); works on the special's own map even without the mod on the host; R-CH3, R-CH8 |
 | A guest's regular-character pick in someone else's match | Player | 1.5 | BLOCKED | No verified channel (L29); the guest gets a random character; R-CH4, probe R-CH12 |
 | "<player> is playing as <character>" line after the intro | HUD | 1.5 | TESTING | Off by default; `ix_character_announce 1` shows it to everyone, once per player; R-CH10 |
 | Per-map cast names | Player | 1.5 | TESTING | Actor names verified from stock VO code; outfit labels made from each map's model names |
 | One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; also stops two players getting the same special, which the stock game allows; R-CH5 |
-| Special characters gated by unlocks | Player | 1.5 | TESTING | Soul keys / merit stats, checked for every pick (L27); `ix_character_specials` 0/1/2; R-CH6 |
+| Special characters gated by unlocks | Player | 1.5 | TESTING | The stock lobby's stats: soul keys, and for Willard also the merit (L27); checked in the menu and for every pick in the match; `ix_character_specials` 0/1/2; R-CH6 |
 | Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in `ix_character_crossmap 1`; their models may not exist on other maps (L26); R-CH7 |
 | Stock HUD portrait follows the chosen character | HUD | 1.5 | TESTING | Stock `setmodelfromcustomization` → `zm_player_character` |
 | Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: name and outfit; `ix_player_card`, `_x`, `_y`; R-CH9 |
-| Player card picture | HUD | 1.5 | BLOCKED | L28 |
+| Player card picture (in a match) | HUD | 1.5 | BLOCKED | L28 |
 
 ## UI (Phase 3) / HUD (Phase 8)
 

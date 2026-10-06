@@ -86,9 +86,20 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V44 | `IXSetup.xaml`: well formed; no `x:Class` or event attributes (so `XamlReader.Load` accepts it); every control the script uses, resource key and storyboard target exists; only known WPF element types; each element/attribute pair reviewed against WPF | ✅ All checks pass. The window itself has not been opened (E5) |
 | V46 | `Install-IXClient` against a local fake of GitHub's release API and iw7-mod's update server (`ClientDownload`, 6 tests) | ✅ The latest release with a matching SHA-256 digest is installed. A wrong digest, or GitHub answering 500, falls back to the update server's SHA-1. When every source fails (bad checksums, an HTML page instead of a program), nothing is left in the game folder. A release without a digest is accepted unverified. An old `iw7-mod.exe` is replaced |
 | V47 | The window's background download (`BackgroundDownload`): the exact script text `IXSetup.ps1` builds, run in a second runspace the same way | ✅ Exactly one result object comes back through `EndInvoke`; progress written on the download thread is visible; a failure arrives with its own message |
-| V48 | Menu script load order (`tools/tests/test_menu_script.py`, Lua 5.1 with stand-ins for IW7's UI) | ✅ Reproduces the first in-game report: the previous script lost the CHARACTER button when it ran before iw7-mod's own MainMenu script (0 buttons). The fixed script has exactly 1 button in both orders, whether the list is built by name or through `m_types` |
+| V48 | Menu script load order (`tools/tests/test_menu_script.py`, Lua 5.1 with stand-ins for IW7's UI; superseded by V51 when the button moved to the lobby) | ✅ Reproduces the first in-game report: the previous script lost the CHARACTER button when it ran before iw7-mod's own MainMenu script (0 buttons). The fixed script has exactly 1 button in both orders, whether the list is built by name or through `m_types` |
 | V49 | Steam name (`SteamName`, `MenuScript`) | ✅ `loginusers.vdf`: the MostRecent account is chosen and VDF escapes are undone. Names keep printable ASCII without `" \ ; % ^`, at most 31 characters; non-ASCII names are not copied. The name file is recorded, and removed when a later install has no name. The menu script replaces only "Unknown Soldier" |
 | V45 | Launcher line endings | ✅ `*.cmd text eol=crlf`: `git archive` (GitHub's zip downloads) and checkouts both give CRLF |
+
+### Second in-game report: lobby button, pictures, character applied
+
+| # | Check | Result |
+|---|-------|--------|
+| V50 | The stock lobby's layout, read from the game's compiled UI scripts (`IW_API_NOTES.md` §16; HavokScript constant tables parsed as data, to the last byte of each file) | ✅ `CPPrivateMatchButtons`: ids, 40-pixel steps, both boss battle layouts; `CPPrivateMatchMenu`: list position, special pictures and sizes, the reset of `characterSelect`; `actions.lua` / `conditions.lua`: what `CharacterSelect`, `SecretCharacterSelection` and `HasBeatenMeph` read and write; the unlock rules of all five specials |
+| V51 | Lobby button (`test_menu_script.py`): stock lobby stand-ins built from V50, every load order (types registered before or after the script, or assigned to `m_types`) × built by name or directly × boss battles on or off | ✅ Exactly one CHARACTER button, right after SELECT SHOW in the list order, at 160–190; every element below one step lower, also after the stock list switches layouts again and on a second visit; pressing it opens the CHARACTER menu. The zombies main menu has no button |
+| V52 | Lobby field after the stock reset | ✅ A chosen special is written back when it is unlocked (The Hoff 1, Elvira 4, Willard 5 with soul key 5 and the merit), with `ix_character_specials 2` also when locked; not with specials off, a locked special, Willard without the merit, or a regular character. If the game bypassed both registered builders, from the second visit |
+| V53 | CHARACTER menu (`test_menu_script.py`) | ✅ Every text element is as tall as its font (name 44, status and description 22). Specials show their own picture (The Hoff 360 × 360, the others 180 × 360); regular characters and Random show colored initials. Locked specials read "(locked)" with the unlock hint and are not saved; unlocked ones save `ix_character` and `characterSelect`; regular characters save `characterSelect 0` |
+| V54 | Character data (`test_character_data.py`) | ✅ The GSC and the menu use the same lobby values and unlock stats; Willard needs `soul_key_5` (the key The Beast from Beyond gives) and `mt_dlc4_troll2`; every other special its own map's key |
+| V55 | Character applied before the stock pick: `character.gsc` wraps `level.custom_giveloadout` (the only assignment is `zombie.gsc:24`; the only call is `spawnplayer_actual`, before `spawned_player`) | ✅ Compiles with both iw7-mod compilers (`check.py`); the in-game check is R-CH13 |
 
 ## 3. Runtime test environment (for testers)
 
@@ -171,16 +182,18 @@ Characters are chosen in the CHARACTER menu before a match (§4.6) and kept for 
 | R-CH10 | A match with default settings; then `set ix_character_announce 1` and a new match (co-op if possible); then `set ix_character_select 0` and a new match | First no "is playing as" lines. With the setting on, after the intro, everyone sees one line per player, such as "<guest> is playing as The Hoff". With selection off, the game picks characters as usual | not run | not run |
 | R-CH11 | Die or bleed out, then respawn | Same character and knife as before | not run | not run |
 | R-CH12 | Probe for L29, in the zombies main menu console: `setCoopPlayerData zombiePlayerLoadout characterSelect 14`, then `getCoopPlayerData zombiePlayerLoadout characterSelect` | Report the printed value (14, another number, or an error). Afterwards pick any character in the CHARACTER menu, which writes the field again | not run | not run |
+| R-CH13 | The second in-game report: pick Andre, start a Solo Match on any map | Your arms, voice and the stock portrait (bottom left) are Andre's, and the card (bottom right) says Andre. The console and `iw7-mod\logs\console.log` show `[IX] INFO: character: <you> -> Andre (ix_character)` and no "already has a character" warning | not run | not run |
 
-### 4.6 Zombies main menu (Lua UI)
+### 4.6 Zombies lobby (Lua UI)
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-UI1 | Load the mod, open Zombies | A CHARACTER button under the other buttons, styled like them; its description shows on hover and does not overlap the button | not run | not run |
-| R-UI2 | Press CHARACTER | A list: Random, Sally, Poindexter, Andre, A.J., then the five specials; hovering shows the outfits per map; Back returns | not run | not run |
-| R-UI3 | Pick Andre, then start a solo match | You play as Andre; the console shows `(ix_character)`; after restarting the game the menu still says "Selected: Andre" | not run | not run |
-| R-UI4 | Pick a special you have not unlocked, then start a match | A random character, and after the intro "Can't play as ...: ... is locked: ..." | not run | not run |
-| R-UI5 | Pick The Hoff, then run `getCoopPlayerData zombiePlayerLoadout characterSelect`; pick Sally and run it again | `1`, then `0`; no console error from `setCoopPlayerData` or `uploadstats` | not run | not run |
+| R-UI1 | Open Zombies, then Solo Match; repeat with Custom Game, and on a map with BOSS BATTLE | The main menu has no CHARACTER button. In the lobby, CHARACTER is right under SELECT SHOW, styled like the others; nothing overlaps (TUTORIAL, SURVIVAL DEPOT, CONTRACTS and the description line moved down one step); arrow keys and the mouse reach every button; its description shows when highlighted. A screenshot helps | not run | not run |
+| R-UI2 | Press CHARACTER and move through the list | Random, Sally, Poindexter, Andre, A.J., then the five specials. The right side shows a picture: the special characters' own pictures, undistorted (The Hoff square, the others twice as tall as wide), colored initials for the others; then the name in large letters, a status line, and a normal-size description. Back returns to the lobby. A screenshot helps | not run | not run |
+| R-UI3 | Pick Andre, then start the match | As R-CH13; after restarting the game the menu still says "Selected: Andre" and opens on Andre | not run | not run |
+| R-UI4 | Without the Spaceland soul key, highlight and press The Hoff; then `unlockallEE` and reopen | First "The Hoff (locked)", the status line "Locked: earn the soul key on Zombies in Spaceland.", and pressing it does nothing; afterwards it can be chosen | not run | not run |
+| R-UI5 | Pick The Hoff, back out to the main menu, open Solo Match again, run `getCoopPlayerData zombiePlayerLoadout characterSelect`; pick Sally and run it again | `1` (the stock lobby's reset was undone), then `0`; no console error from `setCoopPlayerData` or `uploadstats` | not run | not run |
+| R-UI6 | Co-op: the guest opens CHARACTER in the host's lobby | The button is there for the guest too; an unlocked special picked there reaches the match (R-CH3) | not run | not run |
 
 ### 4.8 One-click Windows setup
 

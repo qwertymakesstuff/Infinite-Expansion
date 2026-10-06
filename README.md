@@ -29,7 +29,7 @@ What the setup does for you:
 | Installs the mod | Copies it into `<Infinite Warfare>\iw7-mod\` and records the copied files in `iw7-mod\infinite-expansion.json`. Also removes an old copy in `mods\infinite_expansion` (see below), keeping any file of your own in it |
 | Starts the game | **PLAY** starts iw7-mod from the game folder (Steam must be running; PLAY opens Steam if it is not). iw7-mod's first start downloads the rest of its own files, then pick Zombies |
 
-The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, see the CHARACTER button in the Zombies menu and the card in the corner of a match (`TESTING.md` §4).
+The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, look for the CHARACTER button in the lobby after **Solo Match** or **Custom Game**, and the card in the corner of a match (`TESTING.md` §4).
 
 INSTALL also sets your in-game name to your Steam name. iw7-mod calls everyone "Unknown Soldier" otherwise. A name you already chose with `name <new name>` in the console stays.
 
@@ -72,7 +72,9 @@ Only the Mods-menu install lets scripts write files (L9). Nothing uses that yet;
 
 ## Choosing your character
 
-In the **Zombies** menu, press **CHARACTER** (under the other buttons) and pick a character before you start or join a match. You keep that character for the whole match. There is no switching mid-match.
+In the **Zombies** menu, choose **Solo Match** or **Custom Game**. In the lobby, press **CHARACTER** (under SELECT SHOW) and pick a character before you start the match. The menu shows a picture of the highlighted character, and locked special characters say how to unlock them. You keep that character for the whole match. There is no switching mid-match.
+
+To see what happened to your pick, open the console (`~`) in the match, or read `iw7-mod\logs\console.log` afterwards. The mod writes one line per player, for example `[IX] INFO: character: Alex -> Andre (ix_character)`, or the reason it gave you a random character.
 
 | Your pick | In a match you host | When you join someone else's match |
 |-----------|---------------------|------------------------------------|
@@ -86,7 +88,7 @@ The rules are enforced by the host's copy of the mod. A host without the mod run
 
 | Dvar | Default | Effect |
 |------|---------|--------|
-| `ix_character <name>` | – | Set by the CHARACTER menu: your character in matches you host, read when the match starts |
+| `ix_character <name>` | – | Set by the CHARACTER menu: your character in matches you host, applied on your first spawn |
 | `ix_character_select 0` | 1 | Host: turns character selection off |
 | `ix_character_specials` | 1 | Host: 0 = no special characters, 1 = the ones each player has unlocked, 2 = all of them |
 | `ix_character_crossmap 1` | 0 | Host, **experimental:** special characters on other maps (The Hoff on any map, for example). Set it before the map loads; their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26) |
