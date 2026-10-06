@@ -2,7 +2,9 @@
 
 The special characters' models, slots, lobby ids and unlock stats are copied
 from the decompiled stock scripts; this test re-reads those scripts so a typo
-cannot ship. Needs the stock dump from tools/setup_compilers.sh.
+cannot ship. The CHARACTER menu (ui_scripts/InfiniteExpansion) writes the same
+lobby ids, so its table is checked too. Needs the stock dump from
+tools/setup_compilers.sh.
 
 Run: python3 -m unittest discover -s tools/tests -v
 """
@@ -12,10 +14,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 CHARACTER_GSC = REPO / "mods" / "infinite_expansion" / "custom_scripts" / "ix" / "player" / "character.gsc"
+MENU_LUA = REPO / "mods" / "infinite_expansion" / "ui_scripts" / "InfiniteExpansion" / "__init__.lua"
 DUMP = REPO / ".toolchain" / "src" / "iw7-gsc-dump" / "decompiled" / "scripts"
 MAPS = ("cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final")
 
 REGISTER = re.compile(r'register_player_character\(\s*(\d+),\s*"(yes|no)",\s*("[^"]*"|undefined|var_\d+),\s*("[^"]*"|undefined),\s*("[^"]*"|undefined),\s*("[^"]*"|undefined),\s*"(p\d_)",\s*"[^"]*",\s*[^,]+,\s*[^,]+,\s*(\d+)')
+MENU_ROW = re.compile(r'^\s*\{ key = "(\w+)", label = "[^"]*",(?: select = (\d+),)? text = ', re.M)
+MAKE_REGULAR = re.compile(r'make_regular\(\s*\d+,\s*"(\w+)"')
 MAKE_SPECIAL = re.compile(r'make_special\(\s*"(\w+)",\s*"[^"]+",\s*\[[^\]]*\],\s*"(\w+)",\s*(\d+),\s*(\d+),\s*"(\w+)",\s*"(\w+)",\s*"([^"]+)",\s*"([^"]+)",\s*("[^"]+"|undefined),\s*(\d+)\s*\)')
 
 
@@ -88,6 +93,16 @@ class CharacterData(unittest.TestCase):
         stock = lobby_values()
         for key, (_, home, slot, select, *_rest) in self.specials.items():
             self.assertEqual(stock[home].get(int(select)), int(slot), f"{key}: characterSelect {select} on {home}")
+
+    def test_menu_matches_the_cast(self):
+        rows = dict(MENU_ROW.findall(MENU_LUA.read_text()))
+        regular = MAKE_REGULAR.findall(CHARACTER_GSC.read_text())
+        self.assertEqual(len(regular), 4)
+        self.assertEqual(set(rows), {"random", *regular, *self.specials})
+        for key in ("random", *regular):
+            self.assertEqual(rows[key], "", f"{key} must not write a lobby value")
+        for key, (_, _home, _slot, select, *_rest) in self.specials.items():
+            self.assertEqual(rows[key], select, f"{key}: the menu's lobby value")
 
     def test_soul_keys_match_home_maps(self):
         keys = soul_keys()

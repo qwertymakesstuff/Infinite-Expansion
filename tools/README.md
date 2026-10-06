@@ -43,7 +43,7 @@ Options: `--mod DIR`, `--toolchain DIR`, `--stock DIR`, `--budget BYTES`, and `-
 
 Both compilers already reject a script function named after a built-in (`function name 'clamp' already defined as builtin`), so that rule needs no separate check.
 
-`tools/tests/fixtures/bad_mod` breaks every rule once (each file's first comment says which), and `good_mod` follows them all. `tools/tests/test_check.py` asserts the exact findings for both. `tools/tests/test_character_data.py` checks the character table in `ix/player/character.gsc` against the stock scripts: models, slots, lobby ids, and soul keys.
+`tools/tests/fixtures/bad_mod` breaks every rule once (each file's first comment says which), and `good_mod` follows them all. `tools/tests/test_check.py` asserts the exact findings for both. `tools/tests/test_character_data.py` checks the character table in `ix/player/character.gsc` against the stock scripts (models, slots, lobby ids, and soul keys) and against the lobby values the CHARACTER menu writes.
 
 ## ixcc
 

@@ -4,6 +4,30 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Phase 1.5 — Characters chosen before the match; guests (2026-10-06)
+
+**Changed**
+- Characters are chosen only before a match, in the CHARACTER menu. The choice is applied when the player connects and kept for the whole match.
+- The menu also writes a special-character pick into the stock lobby field `zombiePlayerLoadout.characterSelect` (`setCoopPlayerData`, then `uploadstats`, like iw7-mod's own Director's Cut setting).
+  - Each player's stats reach the host's match, so a guest's special pick follows them into other players' matches.
+  - On the special's own map it works even when the host does not have the mod.
+- Every special pick is checked against the unlock stats, including picks from the stock lobby (L27). A refused pick gets a random character, as in the stock game, and a message says why.
+- No two players can get the same special any more; the stock game allowed it.
+- Installation: copy the mod into `<game>/iw7-mod/` (README). A host who loaded the mod from the Mods menu cannot be joined (L30).
+
+**Added**
+- After the intro, everyone sees "<player> is playing as <character>" for each player (`ix_character_announce`).
+- `test_character_data.py`: the menu's lobby values must match the cast table.
+
+**Removed**
+- The `!char` chat commands, and applying `ix_character` changes mid-match. The knife swap that went with switching is gone too.
+
+**Blocked**
+- A guest's pick of a regular character (Sally, Poindexter, Andre, A.J.) cannot reach the host, because no stats field is known to hold it (L29). The guest gets a random character. R-CH12 is a console probe that could unblock it.
+
+**Findings**
+- iw7-mod v1.1.0 and develop do not let players join a host whose `fs_game` is set when it has no `mod.ff`: "Server 'mod_hash' is empty" (`party.cpp`, L30).
+
 ### Phase 1.5 — CHARACTER button in the zombies menu (2026-10-06)
 
 **Added**

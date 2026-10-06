@@ -14,20 +14,28 @@ The BO3 mod serves only as a reference. Nothing is copied from it, and every fea
 
 ## Installation
 
+Copy the two folders inside `mods/infinite_expansion` into the `iw7-mod` folder of your game. Every player who wants the CHARACTER menu installs it the same way:
+
 ```text
-copy  mods/infinite_expansion   →   <Infinite Warfare>/mods/infinite_expansion
-in game: Mods menu → infinite_expansion   (or launch with +set fs_game "mods/infinite_expansion")
+copy  mods/infinite_expansion/custom_scripts   →   <Infinite Warfare>/iw7-mod/custom_scripts
+copy  mods/infinite_expansion/ui_scripts       →   <Infinite Warfare>/iw7-mod/ui_scripts
 ```
+
+The mod then runs in every zombies match you host, and friends can join you.
+
+**Solo only:** you can instead copy `mods/infinite_expansion` to `<Infinite Warfare>/mods/` and load it from the **Mods** menu (or launch with `+set fs_game "mods/infinite_expansion"`). Nobody can join a game started that way. iw7-mod asks joining players to download the host's `mod.ff`, and this mod has none, so they get "Server 'mod_hash' is empty" (`KNOWN_LIMITATIONS.md` L30).
 
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
 [IX] INFO: init 0.1.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
-[IX] INFO: client fs_game=1 omnimovement=… sprint_unlimited=… air_control=…
+[IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: ready
 ```
 
-Installing as a mod folder will let later phases save settings to disk. Copying `custom_scripts` into `iw7-mod/custom_scripts` also loads the mod, but settings will then last only for the session.
+`fs_game=1` instead means the mod was loaded from the Mods menu.
+
+Only the Mods-menu install lets scripts write files (L9). Nothing uses that yet; a later phase that saves settings to disk will have to handle both installs.
 
 | Dvar | Effect |
 |------|--------|
@@ -37,23 +45,26 @@ Installing as a mod folder will let later phases save settings to disk. Copying 
 
 ## Choosing your character
 
-In the **Zombies** menu, press **CHARACTER** (under the other buttons) and pick a character. This works for matches you host, solo or private. Or type in chat:
+In the **Zombies** menu, press **CHARACTER** (under the other buttons) and pick a character before you start or join a match. You keep that character for the whole match. There is no switching mid-match.
 
-| Chat | Effect |
-|------|--------|
-| `!char` | Lists this map's characters, with their outfit names on this map |
-| `!char 2` or `!char poindexter` | Switch now; if you are downed, from your next spawn |
-| `!char hoff` | A special character, if you have unlocked it (its map's soul key) |
+| Your pick | In a match you host | When you join someone else's match |
+|-----------|---------------------|------------------------------------|
+| Sally, Poindexter, Andre or A.J. | You play as them | The game picks a random character. The host's game cannot see this pick (`KNOWN_LIMITATIONS.md` L29) |
+| A special character you have unlocked | You play as them on their own map. On other maps only with `ix_character_crossmap 1` | The same. The pick travels with you in the stock lobby setting, so on the character's own map it works even if the host does not have this mod |
+| Random | The game picks | The game picks |
 
-Every player in your match can use it, and no two players can be the same character. A card in the bottom-right corner shows who you are playing.
+No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. After the intro, everyone sees a line such as "Alex is playing as Andre (Rapper)" for each player. The card in the bottom-right corner shows your own character.
+
+The rules are enforced by the host's copy of the mod. A host without the mod runs the stock game, which hands out a special character on its own map without checking the unlock.
 
 | Dvar | Default | Effect |
 |------|---------|--------|
-| `ix_character <name>` | – | The host's character, set before the match or changed during it |
-| `ix_character_select 0` | 1 | Turns character selection off |
-| `ix_character_specials` | 1 | 0 = no special characters, 1 = the ones you have unlocked, 2 = all of them |
-| `ix_character_crossmap 1` | 0 | **Experimental:** special characters from other maps (The Hoff on any map, for example). Set it before the map loads; their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26) |
-| `ix_player_card 0` | 1 | Hides the card; `ix_player_card_x` / `ix_player_card_y` move it |
+| `ix_character <name>` | – | Set by the CHARACTER menu: your character in matches you host, read when the match starts |
+| `ix_character_select 0` | 1 | Host: turns character selection off |
+| `ix_character_specials` | 1 | Host: 0 = no special characters, 1 = the ones each player has unlocked, 2 = all of them |
+| `ix_character_crossmap 1` | 0 | Host, **experimental:** special characters on other maps (The Hoff on any map, for example). Set it before the map loads; their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26) |
+| `ix_character_announce 0` | 1 | Host: no "is playing as" lines |
+| `ix_player_card 0` | 1 | Host: hides the card; `ix_player_card_x` / `ix_player_card_y` move it |
 
 ## Documentation
 

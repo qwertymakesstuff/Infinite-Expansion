@@ -1,37 +1,47 @@
 // Infinite Expansion - character selection.
 //
-// Lets each player choose who they play as. Stock behaviour, read from the
-// decompiled scripts:
+// Lets each player choose who they play as. The choice is made before the
+// match, in the CHARACTER menu (ui_scripts/InfiniteExpansion), and applied when
+// the player connects. It lasts the whole match: there is no switching
+// mid-match. Stock behaviour, read from the decompiled scripts:
 //   - each map registers its cast in level.player_character_info
 //     (scripts\cp\maps\<map>\<map>_player_character_setup): slots 1-4 are the
 //     four regular characters, 5 (and 6 on cp_zmb) the special characters;
 //   - scripts\cp\zombies\zombies_loadout::get_player_character_num() keeps
-//     self.player_character_num if it is set, and otherwise takes a random free
-//     slot from level.available_player_characters;
-//   - every spawn re-applies self.player_character_num through
+//     self.player_character_num if it is set. Otherwise it gives the special
+//     character named by the player's lobby field characterSelect, on that
+//     character's own map, or a random free slot from
+//     level.available_player_characters;
+//   - every spawn applies self.player_character_num through
 //     givedefaultloadout() -> setmodelfromcustomization().
-// So choosing a character means keeping level.available_player_characters
-// consistent, setting self.player_character_num, and re-running
-// setmodelfromcustomization() for a player who is already in the game.
+// So choosing a character means setting self.player_character_num, and
+// keeping level.available_player_characters consistent, before the first
+// spawn.
 //
-// Ways to choose:
-//   chat    "!char" lists this map's cast; "!char <number or name>" picks one
-//   dvar    ix_character <number or name>: the host's character, applied on
-//           connect and whenever the dvar changes ("random" or unset: the game
-//           picks). The CHARACTER button in the zombies main menu sets it
-//           (ui_scripts/InfiniteExpansion).
-//   lobby   a special character picked in the stock lobby is also honoured on
-//           other maps while ix_character_crossmap is 1
+// Where a choice comes from:
+//   ix_character     the host's character (number or name; "random" or unset:
+//                    none). The menu sets this dvar on the player's own PC, so
+//                    the server sees it only for the player hosting the match.
+//   characterSelect  the stock lobby field. It is part of each player's own
+//                    stats, which reach the host's match. The menu writes it
+//                    for special characters, so those follow a player into
+//                    other players' matches. Regular characters have no lobby
+//                    value (KNOWN_LIMITATIONS.md L29): a player who joins
+//                    someone else's match gets a random one.
+// A choice the rules below refuse gets a random character, as in the stock
+// game, and a message after the first spawn says why.
 //
 // Settings (unset = default):
 //   ix_character_select    1   0 = off: the game picks characters as usual
 //   ix_character           ""  the host's character
-//   ix_character_specials  1   0 = never offer special characters,
+//   ix_character_specials  1   0 = no special characters,
 //                              1 = specials the player has unlocked, 2 = all
-//   ix_character_crossmap  0   1 = special characters from other maps
+//   ix_character_crossmap  0   1 = special characters on other maps too
 //                              (experimental: KNOWN_LIMITATIONS.md L26). Read once,
 //                              while the map loads, because their models can only
 //                              be precached then.
+//   ix_character_announce  1   0 = no "<player> is playing as <character>" line
+//                              for everyone after a player's first spawn
 
 register()
 {
@@ -51,9 +61,6 @@ register()
         precache_crossmap_models();
 
     level thread watch_connects();
-    level thread watch_chat( "say" );
-    level thread watch_chat( "say_team" );
-    level thread watch_host_setting();
 }
 
 // ---------------------------------------------------------------------------
@@ -61,7 +68,7 @@ register()
 
 enabled()
 {
-    return isdefined( level.ix.character.cast ) && custom_scripts\ix\core\util::dvar_int( "ix_character_select", 1 ) != 0;
+    return custom_scripts\ix\core\util::dvar_int( "ix_character_select", 1 ) != 0;
 }
 
 specials_mode()
@@ -72,6 +79,11 @@ specials_mode()
 crossmap_enabled()
 {
     return level.ix.character.crossmap;
+}
+
+announce_enabled()
+{
+    return custom_scripts\ix\core\util::dvar_int( "ix_character_announce", 1 ) != 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +151,8 @@ build_cast( map )
     // Special characters, with the slot, models and photo index their home
     // map registers, the stock lobby's characterSelect value
     // (zombies_loadout::get_player_character_num), and the stat that unlocks
-    // them (KNOWN_LIMITATIONS.md L27).
+    // them (KNOWN_LIMITATIONS.md L27). The CHARACTER menu writes the same
+    // characterSelect values (ui_scripts/InfiniteExpansion).
     cast[cast.size] = make_special( "hoff", "The Hoff", [ "hoff", "dj" ], "cp_zmb", 5, 1, "soul_key", "soul_key_1", "body_zmb_hero_dj", "viewmodel_zmb_hero_dj", "head_zmb_dj", 4 );
     cast[cast.size] = make_special( "willard", "Willard Wyler", [ "willard", "wyler" ], "cp_zmb", 6, 5, "merit", "mt_dlc4_troll2", "body_zmb_projectionist", "zmb_projectionist_viewmodel_arms", "head_zmb_projectionist", 5 );
     cast[cast.size] = make_special( "kevin", "Kevin Smith", [ "kevin", "smith" ], "cp_rave", 5, 2, "soul_key", "soul_key_2", "zmb_hero_k_smith", "viewmodel_zmb_hero_k_smith", undefined, 4 );
@@ -193,6 +206,15 @@ make_special( key, name, aliases, home, home_num, select_id, unlock_type, unlock
     entry.head = head;
     entry.photo = photo;
     return entry;
+}
+
+// "Sally (Valley Girl)", or only the name where there is no outfit name.
+describe( entry )
+{
+    if ( entry.special || entry.role == "" )
+        return entry.name;
+
+    return entry.name + " (" + entry.role + ")";
 }
 
 // The host's ix_character, or "" when the game should pick.
@@ -317,9 +339,11 @@ register_crossmap()
 // ---------------------------------------------------------------------------
 // Rules
 
-// Why the player cannot take this character now, or undefined if they can.
-// from_lobby: the stock lobby already checked the unlock.
-unavailable_reason( entry, from_lobby )
+// Why the player cannot be this character, or undefined if they can. The
+// unlock is checked for every choice, also one from the stock lobby field,
+// because the CHARACTER menu cannot read the unlock stats and writes that
+// field anyway.
+unavailable_reason( entry )
 {
     if ( entry.special )
     {
@@ -327,12 +351,12 @@ unavailable_reason( entry, from_lobby )
             return "special characters are off (ix_character_specials 0)";
 
         if ( !entry.native && !crossmap_enabled() )
-            return entry.name + " belongs to " + map_title( entry.home ) + " (set ix_character_crossmap 1, then reload the map)";
+            return entry.name + " belongs to " + map_title( entry.home ) + " (the host can allow it with ix_character_crossmap 1)";
 
         if ( !entry.native && !isdefined( entry.num ) )
             return entry.name + " could not be set up on this map";
 
-        if ( !from_lobby && specials_mode() == 1 && !has_unlocked( entry ) )
+        if ( specials_mode() == 1 && !has_unlocked( entry ) )
             return entry.name + " is locked: " + unlock_hint( entry );
     }
 
@@ -380,14 +404,14 @@ taken_by( entry )
 // ---------------------------------------------------------------------------
 // Applying a choice
 
-// Makes entry the player's character. Returns 1 if it changed.
+// Makes entry the player's character.
 assign( entry )
 {
     num = entry.num;
     old = self.player_character_num;
 
     if ( isdefined( old ) && old == num )
-        return 0;
+        return;
 
     available = level.available_player_characters;
 
@@ -402,7 +426,21 @@ assign( entry )
 
     level.available_player_characters = only_regular( available );
     self.player_character_num = num;
-    return 1;
+}
+
+// What the stock code does for a player without a choice: a random free
+// regular character. Used when a choice was refused, because the stock code
+// would otherwise still hand out a special character named in the lobby
+// field, without checking the unlock or whether someone else has it.
+assign_random()
+{
+    if ( !isdefined( level.available_player_characters ) || level.available_player_characters.size == 0 )
+        return;
+
+    entry = entry_for_num( scripts\engine\utility::random( level.available_player_characters ) );
+
+    if ( isdefined( entry ) )
+        assign( entry );
 }
 
 // The stock disconnect handler returns every slot except 5 and 6 to the
@@ -420,80 +458,8 @@ only_regular( list )
     return result;
 }
 
-// Re-applies the character to a player who is already in the game, the way
-// the stock loadout does on spawn, and swaps the character knife.
-apply_now()
-{
-    num = self.player_character_num;
-    old_melee = self.melee_weapon;
-    new_melee = level.player_character_info[num].melee_weapon;
-
-    self detachall();
-    self.headmodel = undefined;
-    self.hairmodel = undefined;
-    self thread scripts\cp\zombies\zombies_loadout::setmodelfromcustomization( num );
-
-    if ( !isdefined( old_melee ) || !isdefined( new_melee ) || old_melee == new_melee )
-        return;
-
-    if ( self hasweapon( old_melee ) )
-    {
-        holding = self getcurrentweapon() == old_melee;
-        self takeweapon( old_melee );
-        self giveweapon( new_melee );
-
-        if ( holding )
-            self switchtoweaponimmediate( new_melee );
-
-        if ( isdefined( self.currentmeleeweapon ) && self.currentmeleeweapon == old_melee )
-            self.currentmeleeweapon = new_melee;
-    }
-
-    // givedefaultloadout() hands out this knife on every later spawn.
-    if ( isdefined( self.default_starting_melee_weapon ) && self.default_starting_melee_weapon == old_melee )
-        self.default_starting_melee_weapon = new_melee;
-}
-
-// Not while downed or in the afterlife arcade (cp_zmb); the next spawn applies it.
-can_apply_now()
-{
-    if ( !isdefined( self.vo_prefix ) || !isalive( self ) || self.sessionstate != "playing" )
-        return 0;
-
-    return !scripts\engine\utility::is_true( self.inlaststand ) && !scripts\engine\utility::is_true( self.in_afterlife_arcade );
-}
-
-// Validates and applies a choice. Returns a message for the player.
-choose( entry, source )
-{
-    if ( entry.special && !entry.native && crossmap_enabled() )
-        register_crossmap();
-
-    reason = unavailable_reason( entry, 0 );
-
-    if ( isdefined( reason ) )
-        return "Can't pick " + entry.name + ": " + reason;
-
-    if ( isdefined( self.ix.character_next_switch ) && gettime() < self.ix.character_next_switch )
-        return "Wait a moment before switching again";
-
-    if ( !assign( entry ) )
-        return "You are already " + entry.name;
-
-    self.ix.character_next_switch = gettime() + 2000;
-    custom_scripts\ix\core\log::info( "character: " + self.name + " -> " + entry.name + " (" + source + ")" );
-
-    if ( can_apply_now() )
-    {
-        apply_now();
-        return "You are now " + entry.name;
-    }
-
-    return "You will be " + entry.name + " from your next spawn";
-}
-
 // ---------------------------------------------------------------------------
-// Connect: host setting and lobby choice, before the first spawn
+// Connect: the choice is applied before the first spawn
 
 watch_connects()
 {
@@ -504,67 +470,80 @@ watch_connects()
         level waittill( "ix_player_connected", player );
 
         // Own thread, so an error for one player cannot stop this loop. It never
-        // waits, so it still finishes before the player's first spawn.
+        // waits before choosing, so it still finishes before the first spawn.
         player thread on_connect();
     }
 }
 
 on_connect()
 {
-    if ( !enabled() )
-        return;
+    message = undefined;
 
+    if ( enabled() )
+        message = apply_choice();
+
+    self thread announce_after_spawn( message );
+}
+
+// Applies the player's choice, if any. Returns a message for the player when
+// the choice could not be honoured.
+apply_choice()
+{
     if ( crossmap_enabled() )
         register_crossmap();
 
     self thread watch_disconnect();
-    notice = "Type !char in chat to choose your character";
+    message = undefined;
+    entry = undefined;
+    source = "lobby";
 
     if ( self ishost() )
     {
         wanted = wanted_character();
-        entry = find_entry( wanted );
 
-        if ( wanted != "" && !isdefined( entry ) )
+        if ( wanted != "" )
         {
-            notice = "ix_character: unknown character '" + wanted + "'";
-        }
-        else if ( isdefined( entry ) )
-        {
-            reason = unavailable_reason( entry, 0 );
+            entry = find_entry( wanted );
+            source = "ix_character";
 
-            if ( isdefined( reason ) )
-            {
-                notice = "ix_character: can't pick " + entry.name + ": " + reason;
-            }
-            else if ( assign( entry ) )
-            {
-                custom_scripts\ix\core\log::info( "character: " + self.name + " -> " + entry.name + " (ix_character)" );
-                self thread notice_after_spawn( notice );
-                return;
-            }
+            if ( !isdefined( entry ) )
+                message = "ix_character: unknown character '" + wanted + "'";
         }
     }
 
-    self thread notice_after_spawn( notice );
-
-    // A special character picked in the stock lobby. On its home map the stock
-    // code applies it, so only other maps need this.
-    entry = lobby_special();
-
-    if ( isdefined( entry ) && !entry.native && !isdefined( unavailable_reason( entry, 1 ) ) && assign( entry ) )
+    if ( !isdefined( entry ) )
     {
-        self setplayerdata( "cp", "zombiePlayerLoadout", "characterSelect", 0 );
-        custom_scripts\ix\core\log::info( "character: " + self.name + " -> " + entry.name + " (lobby)" );
+        entry = lobby_choice();
+        source = "lobby";
     }
+
+    if ( !isdefined( entry ) )
+        return message;
+
+    reason = unavailable_reason( entry );
+
+    if ( isdefined( reason ) )
+    {
+        assign_random();
+        return "Can't play as " + entry.name + ": " + reason;
+    }
+
+    assign( entry );
+    custom_scripts\ix\core\log::info( "character: " + self.name + " -> " + entry.name + " (" + source + ")" );
+    return message;
 }
 
-lobby_special()
+// The special character named by the player's lobby field characterSelect,
+// or undefined. Set by the stock lobby and by the CHARACTER menu.
+lobby_choice()
 {
     if ( isbot( self ) )
         return undefined;
 
     value = self getrankedplayerdata( "cp", "zombiePlayerLoadout", "characterSelect" );
+
+    if ( !isdefined( value ) )
+        return undefined;
 
     foreach ( entry in level.ix.character.cast )
     {
@@ -575,12 +554,35 @@ lobby_special()
     return undefined;
 }
 
-notice_after_spawn( message )
+// After the first spawn and the intro: the player's own message, if any, then
+// a line for everyone saying who this player is playing as.
+announce_after_spawn( message )
 {
     self endon( "disconnect" );
     self waittill( "spawned_player" );
+
+    // The zombies gametype sets this flag when the intro ends; the stock
+    // loadout waits for it the same way (zombies_loadout::givedefaultloadout).
+    if ( scripts\engine\utility::flag_exist( "introscreen_over" ) )
+        scripts\engine\utility::flag_wait( "introscreen_over" );
+
     wait 2;
-    self iprintln( message );
+
+    if ( isdefined( message ) )
+        self iprintln( message );
+
+    if ( !announce_enabled() )
+        return;
+
+    entry = entry_for_num( self.player_character_num );
+
+    if ( !isdefined( entry ) )
+        return;
+
+    text = self.name + " is playing as " + describe( entry );
+
+    foreach ( player in level.players )
+        player iprintln( text );
 }
 
 watch_disconnect()
@@ -596,157 +598,4 @@ clean_pool_after_disconnect()
 
     if ( isdefined( level.available_player_characters ) )
         level.available_player_characters = only_regular( level.available_player_characters );
-}
-
-// ---------------------------------------------------------------------------
-// Host setting: ix_character, applied whenever it changes
-
-watch_host_setting()
-{
-    level endon( "game_ended" );
-    last = wanted_character();
-
-    for (;;)
-    {
-        wait 1;
-        value = wanted_character();
-
-        if ( value == last )
-            continue;
-
-        last = value;
-        host = find_host();
-
-        if ( !isdefined( host ) || value == "" || !enabled() )
-            continue;
-
-        entry = find_entry( value );
-
-        if ( !isdefined( entry ) )
-        {
-            host iprintln( "ix_character: unknown character '" + value + "'" );
-            continue;
-        }
-
-        host iprintln( host choose( entry, "ix_character" ) );
-    }
-}
-
-find_host()
-{
-    foreach ( player in level.players )
-    {
-        if ( player ishost() )
-            return player;
-    }
-
-    return undefined;
-}
-
-// ---------------------------------------------------------------------------
-// Chat: !char / !character
-
-watch_chat( message_type )
-{
-    level endon( "game_ended" );
-
-    for (;;)
-    {
-        level waittill( message_type, player, message );
-
-        if ( custom_scripts\ix\core\util::is_human( player ) )
-            player thread on_chat( message );
-    }
-}
-
-on_chat( message )
-{
-    words = strtok( tolower( message ), " " );
-
-    if ( words.size == 0 || ( words[0] != "!char" && words[0] != "!character" ) )
-        return;
-
-    if ( !enabled() )
-    {
-        self tell( "Character selection is off (ix_character_select 0)" );
-        return;
-    }
-
-    if ( words.size == 1 )
-    {
-        list_cast();
-        return;
-    }
-
-    entry = find_entry( words[1] );
-
-    if ( !isdefined( entry ) )
-    {
-        self tell( "Unknown character '" + words[1] + "'. Type !char for the list." );
-        return;
-    }
-
-    self tell( choose( entry, "chat" ) );
-}
-
-list_cast()
-{
-    if ( crossmap_enabled() )
-        register_crossmap();
-
-    regulars = [];
-    specials = [];
-
-    foreach ( entry in level.ix.character.cast )
-    {
-        label = entry.name;
-
-        if ( entry.special )
-            label = entry.key + " " + label;
-        else
-            label = entry.num + " " + label;
-
-        if ( entry.role != "" && !entry.special )
-            label = label + " (" + entry.role + ")";
-
-        status = list_status( entry );
-
-        if ( status != "" )
-            label = label + " [" + status + "]";
-
-        if ( entry.special )
-        {
-            if ( entry.native || crossmap_enabled() )
-                specials[specials.size] = label;
-        }
-        else
-        {
-            regulars[regulars.size] = label;
-        }
-    }
-
-    self tell( "Characters on " + map_title( level.ix.map ) + " - type !char <number or name>:" );
-    self tell( custom_scripts\ix\core\util::join( regulars, ", " ) );
-
-    if ( specials.size > 0 && specials_mode() != 0 )
-        self tell( "Specials: " + custom_scripts\ix\core\util::join( specials, ", " ) );
-}
-
-list_status( entry )
-{
-    if ( isdefined( entry.num ) && isdefined( self.player_character_num ) && self.player_character_num == entry.num )
-        return "you";
-
-    other = taken_by( entry );
-
-    if ( isdefined( other ) )
-        return other.name;
-
-    if ( entry.special && specials_mode() == 1 && !has_unlocked( entry ) )
-        return "locked";
-
-    if ( entry.special && !entry.native )
-        return map_title( entry.home );
-
-    return "";
 }

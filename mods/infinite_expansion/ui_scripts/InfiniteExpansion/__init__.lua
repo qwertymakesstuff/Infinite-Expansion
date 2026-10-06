@@ -1,10 +1,14 @@
 -- Infinite Expansion - CHARACTER button in the zombies main menu.
 --
 -- Adds a base-game style button under the zombies main menu's buttons that
--- opens a character list. The choice is saved in the archived dvar
--- ix_character, which the mod's GSC applies to the host when a zombies match
--- starts (custom_scripts/ix/player/character.gsc). Players in someone else's
--- match choose in-game with !char.
+-- opens a character list. The choice is made here, before a match, and lasts
+-- the whole match. It is saved in two places:
+--   - the archived dvar ix_character, which the mod's GSC applies when this
+--     player hosts a zombies match (custom_scripts/ix/player/character.gsc);
+--   - for a special character, also the stock lobby field characterSelect in
+--     the player's own stats, which travel with the player into other
+--     players' matches. Regular characters have no lobby value, so in someone
+--     else's match the game picks one at random (KNOWN_LIMITATIONS.md L29).
 --
 -- Everything here uses only widgets and calls that iw7-mod's own ui_scripts
 -- use, and those files are the same in v1.1.0 and develop:
@@ -19,20 +23,23 @@ end
 local modelPath = "frontEnd.IXCharacter"
 
 -- key: the value stored in ix_character ("random" lets the game pick).
+-- select: the stock lobby's characterSelect value for a special character
+-- (zombies_loadout::get_player_character_num in the stock scripts).
 local characters = {
     { key = "random", label = "Random", text = "The game picks your character, as usual." },
     { key = "sally", label = "Sally", text = "Spaceland: Valley Girl. Rave: Gangster. Shaolin: Disco. Radioactive Thing: Schoolgirl." },
     { key = "poindexter", label = "Poindexter", text = "Spaceland: Nerd. Rave: Raver. Shaolin: Punk. Radioactive Thing: Scientist." },
     { key = "andre", label = "Andre", text = "Spaceland: Rapper. Rave: Grunge. Shaolin: Activist. Radioactive Thing: Soldier." },
     { key = "aj", label = "A.J.", text = "Spaceland: Jock. Rave: Hip-Hop. Shaolin: Sleaze Bag. Radioactive Thing: Rebel." },
-    { key = "hoff", label = "The Hoff", text = "Special character of Zombies in Spaceland. Needs that map's soul key." },
-    { key = "willard", label = "Willard Wyler", text = "Special character of Zombies in Spaceland. Needs a win against The Beast from Beyond's final boss." },
-    { key = "kevin", label = "Kevin Smith", text = "Special character of Rave in the Redwoods. Needs that map's soul key." },
-    { key = "pam", label = "Pam Grier", text = "Special character of Shaolin Shuffle. Needs that map's soul key." },
-    { key = "elvira", label = "Elvira", text = "Special character of Attack of the Radioactive Thing. Needs that map's soul key." },
+    { key = "hoff", label = "The Hoff", select = 1, text = "Special character of Zombies in Spaceland. Needs that map's soul key." },
+    { key = "willard", label = "Willard Wyler", select = 5, text = "Special character of Zombies in Spaceland. Needs a win against The Beast from Beyond's final boss." },
+    { key = "kevin", label = "Kevin Smith", select = 2, text = "Special character of Rave in the Redwoods. Needs that map's soul key." },
+    { key = "pam", label = "Pam Grier", select = 3, text = "Special character of Shaolin Shuffle. Needs that map's soul key." },
+    { key = "elvira", label = "Elvira", select = 4, text = "Special character of Attack of the Radioactive Thing. Needs that map's soul key." },
 }
 
-local specialNote = " On other maps only with ix_character_crossmap 1 (experimental)."
+local regularNote = " Used in matches you host. When you join someone else's match, the game picks for you."
+local specialNote = " Also used when you join someone else's match on that map. Other maps: only if the host sets ix_character_crossmap 1 (experimental)."
 
 local function currentKey()
     local ok, value = pcall(Engine.GetDvarString, "ix_character")
@@ -52,11 +59,13 @@ local function labelFor(key)
 end
 
 local function describe(character)
-    if character.key == "random" or character.key == "sally" or character.key == "poindexter"
-        or character.key == "andre" or character.key == "aj" then
+    if character.key == "random" then
         return character.text
     end
-    return character.text .. specialNote
+    if character.select then
+        return character.text .. specialNote
+    end
+    return character.text .. regularNote
 end
 
 local function showInfo(element, character)
@@ -70,6 +79,11 @@ end
 
 local function chooseCharacter(element, character)
     Engine.Exec("seta ix_character " .. character.key)
+    -- 0 clears a special picked earlier. iw7-mod's own director_cut setting
+    -- writes coop stats the same way: setCoopPlayerData, then uploadstats
+    -- (src/client/component/stats.cpp).
+    Engine.Exec("setCoopPlayerData zombiePlayerLoadout characterSelect " .. (character.select or 0))
+    Engine.Exec("uploadstats")
     local menu = element:GetCurrentMenu()
     if menu and menu.IXSelected then
         menu.IXSelected:setText("Selected: " .. character.label)
@@ -248,7 +262,7 @@ if CPMainMenuButtons_original then
 
         local button = MenuBuilder.BuildRegisteredType("MenuButton", { controllerIndex = controllerIndex })
         button.id = "IXCharacterButton"
-        button.buttonDescription = "Choose who you play as in zombies matches you host."
+        button.buttonDescription = "Choose who you play as. Unlocked special characters also follow you into other players' matches."
         button.Text:setText(ToUpperCase("Character"), 0)
         button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, _1080p * 350, _1080p * 380)
         navigator:addElement(button)

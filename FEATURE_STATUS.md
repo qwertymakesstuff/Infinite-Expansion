@@ -20,8 +20,8 @@
 | Stub-native / unknown raw-id check | Tooling | 1 | COMPLETE | `natives`, `raw ids` (fixture-tested) |
 | Far-call / layout lint, bytecode budget | Tooling | 1 | COMPLETE | `calls`, `layout`, `source`, `budget` (fixture-tested) |
 | Stock scripts loaded on every zombies map (link-error guard) | Tooling | 1 | COMPLETE | `calls`: per-map link closure from the dump; 126 scripts common to all five maps |
-| Checker test suite | Tooling | 1 | COMPLETE | `tools/tests` (11 tests; `bad_mod` / `good_mod` fixtures) |
-| Cast data test (character table vs. stock scripts) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (5 tests; mutation-checked) |
+| Checker test suite | Tooling | 1 | COMPLETE | `tools/tests/test_check.py` (12 tests; `bad_mod` / `good_mod` fixtures) |
+| Cast data test (character table vs. stock scripts and the menu) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (6 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
 
 ## Core (Phases 1–2)
@@ -29,6 +29,7 @@
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | Entry script (zombies) | Core | 1 | TESTING | `custom_scripts/cp/ix_main.gsc`; R-S1, R-S2, R-S6 |
+| Install that friends can join (`<game>/iw7-mod/`) | Core | 1.5 | TESTING | The Mods-menu install cannot be joined without a `mod.ff` (L30); R-S10 |
 | Multiplayer support | Core | – | NOT PLANNED | Dropped 2026-10-06 by the project owner; the mod loads in zombies only |
 | Bootstrap + duplicate-init guard + module order | Core | 1 | TESTING | Replaces BO3's `system::register` ordering (AAE §1.5); R-S1, R-S5 |
 | Master switch (`ix_enabled 0`) | Core | 1 | TESTING | Whole mod off at the next map load; R-S7 |
@@ -37,7 +38,7 @@
 | Logging (`[IX]` console lines, `ix_debug_log`, ring buffer) | Core | 1 | TESTING | R-S1, R-S9 |
 | Feature manager | Core | 2 | PLANNED | |
 | Configuration manager (flat keys, like AAE's `tfoption_*`) | Core | 2 | PLANNED | `ix_*` dvars; live apply |
-| Settings file + schema version (AAE: save data + `tfoption_master_ver`) | Core | 2 | PLANNED | `ix_settings.cfg`; needs mod-folder install (L9) |
+| Settings file + schema version (AAE: save data + `tfoption_master_ver`) | Core | 2 | PLANNED | `ix_settings.cfg`; needs the Mods-menu install (L9), which cannot be joined (L30), so dvars stay the main store |
 | Live console overrides (`set ix_x v`) | Core | 2 | PLANNED | Replaces AAE `modvar` / `/d` (L3) |
 | Event bus | Core | 2 | PLANNED | Real IW7 notifies only |
 | Utility library | Core | 2 | IN PROGRESS | `util.gsc` so far: `is_valid_player`, `is_human`, `join` |
@@ -47,12 +48,15 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| CHARACTER button in the zombies main menu (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; saves `ix_character` for matches you host (L29); R-UI1–R-UI4 |
-| Choose your character (`!char` in chat, `ix_character` for the host) | Player | 1.5 | TESTING | `ix/player/character.gsc`; immediate switch, knife swapped; toggle `ix_character_select`; R-CH1–R-CH4 |
+| CHARACTER button in the zombies main menu (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; saves `ix_character`, and for specials the stock lobby field `characterSelect`; R-UI1–R-UI5 |
+| Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied when the player connects. Host: `ix_character`. Every player: specials through `characterSelect`. Toggle `ix_character_select`; R-CH1–R-CH3 |
+| A guest's special-character pick in someone else's match | Player | 1.5 | TESTING | Travels in the guest's stats (`characterSelect`); works on the special's own map even without the mod on the host; R-CH3, R-CH8 |
+| A guest's regular-character pick in someone else's match | Player | 1.5 | BLOCKED | No verified channel (L29); the guest gets a random character; R-CH4, probe R-CH12 |
+| "<player> is playing as <character>" line after the intro | HUD | 1.5 | TESTING | Shown to everyone, once per player; `ix_character_announce`; R-CH1, R-CH10 |
 | Per-map cast names | Player | 1.5 | TESTING | Actor names verified from stock VO code; outfit labels made from each map's model names |
-| One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; R-CH4 |
-| Special characters gated by unlocks | Player | 1.5 | TESTING | Soul keys / merit stats (L27); `ix_character_specials` 0/1/2; R-CH5 |
-| Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in `ix_character_crossmap 1`; their models may not exist on other maps (L26); R-CH6, R-CH7 |
+| One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; also stops two players getting the same special, which the stock game allows; R-CH5 |
+| Special characters gated by unlocks | Player | 1.5 | TESTING | Soul keys / merit stats, checked for every pick (L27); `ix_character_specials` 0/1/2; R-CH6 |
+| Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in `ix_character_crossmap 1`; their models may not exist on other maps (L26); R-CH7 |
 | Stock HUD portrait follows the chosen character | HUD | 1.5 | TESTING | Stock `setmodelfromcustomization` → `zm_player_character` |
 | Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: name and outfit; `ix_player_card`, `_x`, `_y`; R-CH9 |
 | Player card picture | HUD | 1.5 | BLOCKED | L28 |

@@ -13,18 +13,20 @@
 | An unresolved reference in any loaded script is a `script link error` that drops the match (L23) | Every script must pass `tools/check.py` (compile, calls) before a release |
 | v1.1.0 compiler mislabels/lacks many method names | Every raw `_meth_` / `_func_` id lives in **one** module (`ix\core\compat`) |
 | File I/O only with `fs_game` | Persistence layer with a dvar-only fallback |
+| Players cannot join a host whose `fs_game` is set unless the mod ships a `mod.ff` (L30) | Installed into `<game>/iw7-mod/`, without `fs_game`; settings must work from dvars alone |
+| Another player's menu choice reaches the host's match only through that player's stats (L29) | Choices made in the frontend apply when the player connects, never mid-match |
 | A zombies match links only the stock scripts its map and the gametype reference; 126 are common to all five maps | Stock calls target only those; map-specific code is reached through the pointers maps assign, never by path (§7) |
 | Server-side GSC; per-player HUD elements | Per-player state lives on the player entity (`self.ix`) |
 
 ## 2. Layout
 
-The repository mirrors the game folder, so installing is a straight copy of `mods/` into the Infinite Warfare directory.
+`mods/infinite_expansion/` holds what a player installs: its `custom_scripts/` and `ui_scripts/` go into `<Infinite Warfare>/iw7-mod/` (README). Copying the whole folder into `<Infinite Warfare>/mods/` also works, for solo play only (L30).
 
 ```text
 Infinite-Expansion/                          (repository)
 ├── mods/
-│   └── infinite_expansion/                  → <Infinite Warfare>/mods/infinite_expansion/
-│       ├── desc.txt                         Mods-menu description                         (Phase 1)
+│   └── infinite_expansion/                  contents → <Infinite Warfare>/iw7-mod/
+│       ├── desc.txt                         Mods-menu description (solo install only)     (Phase 1)
 │       ├── ui_scripts/InfiniteExpansion/    client Lua: CHARACTER button + list           (Phase 1.5)
 │       └── custom_scripts/
 │           ├── cp/ix_main.gsc               ENTRY (zombies only)  — auto-loaded          (Phase 1)

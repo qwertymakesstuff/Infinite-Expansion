@@ -2,7 +2,8 @@
 //
 // A small card in the bottom-right corner naming the character the player is
 // playing as: a dark panel with a coloured edge, the character's name and
-// their outfit on this map. It follows character changes within half a second.
+// their outfit on this map. It appears after the first spawn and follows its
+// settings within half a second.
 // The stock HUD's character portrait is drawn by the client UI from image
 // names scripts cannot see, so the card has no picture (KNOWN_LIMITATIONS.md
 // L28); the stock portrait itself does follow the chosen character.

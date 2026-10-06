@@ -67,14 +67,23 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V36 | Checker tests with Lua fixtures | ✅ 17 tests OK. `bad_mod` adds a syntax error, three invented names (`Engine.SetPlayerData`, `:SetMagicColor()`, `MakeMagicHappen()`), a folder named like iw7-mod's `MainMenu`, and a folder without `__init__.lua`: all six reported. Comments, strings, real API names and local functions are not flagged |
 | V33 | Disassembly spot check | ✅ `OP_ScriptFarMethodThreadCall scripts/cp/zombies/zombies_loadout setmodelfromcustomization 1`; waittill on a variable notify name; built-ins identical on both compilers |
 
+### Phase 1.5 (characters chosen before the match; guests)
+
+| # | Check | Result |
+|---|-------|--------|
+| V37 | iw7-mod's join code read at v1.1.0 (`1b76f04e`) and develop (`c0a1c6da`): `party.cpp` `check_download_mod` and the `getInfo` handler, `utils/hash.cpp` | ✅ A host with `fs_game` set and no `mod.ff` sends an empty `mod_hash`, and a joining client stops with "Server 'mod_hash' is empty" (L30). Not yet seen in-game: R-S10 |
+| V38 | iw7-mod writes coop stats from the frontend with `setCoopPlayerData <path> <value>` and then `uploadstats` (`stats.cpp`: `director_cut`, `unlockstatsEE`) | ✅ The CHARACTER menu writes `zombiePlayerLoadout characterSelect` the same way |
+| V39 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 24/24 compiled, 12/12 identical, 125 built-in calls, 43 far references (6 into stock scripts, all loaded on every zombies map), 12 scripts load, 6,204 bytes; `lua`: 94 API names |
+| V40 | `tools/tests/test_character_data.py` | ✅ 6 tests OK. The new menu test compares the menu's lobby values with the GSC cast table. A wrong value, a lobby value on a regular character, and a commented-out row are all caught |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
 2. iw7-mod installed (`auroramod/docs` → *iw7-install*). Record the client version: **v1.1.0** or a develop build.
-3. Install the mod folder: copy `mods/infinite_expansion` into `<Infinite Warfare>/mods/`, then load it from the in-game **Mods** menu (or launch with `+set fs_game "mods/infinite_expansion"`).
+3. Install the mod: copy `mods/infinite_expansion/custom_scripts` and `mods/infinite_expansion/ui_scripts` into `<Infinite Warfare>/iw7-mod/`. Every player in a co-op test installs it the same way. The Mods-menu install (`mods/infinite_expansion` in `<Infinite Warfare>/mods/`) works for solo tests only (L30, R-S10).
 4. Launch with `+set developer_script 1`. Without it, script runtime errors are not printed at all (`KNOWN_LIMITATIONS.md` L24).
 5. Logs: the iw7-mod console (`~`) and `iw7-mod/logs/console.log`, available since iw7-mod v1.0.3. Report every line starting with `[IX]` and any `script compile error`, `script link error`, or `script runtime error` block.
-6. **No `[IX]` lines at all?** Check that the console's `----- FS_Startup -----` list includes `mods/infinite_expansion`. If it does not, copy the mod's `custom_scripts` folder into `<Infinite Warfare>/iw7-mod/custom_scripts`, try again, and report which install worked.
+6. **No `[IX]` lines at all?** Check that `<Infinite Warfare>/iw7-mod/custom_scripts/cp/ix_main.gsc` exists. Then try the Mods-menu install, check that the console's `----- FS_Startup -----` list includes `mods/infinite_expansion`, and report which install worked.
 7. Mod dvars for testing:
    - `ix_debug_log 1`: extra `[IX] DEBUG:` lines (player connect and spawn). Takes effect immediately.
    - `ix_enabled 0`: turns the whole mod off from the next map load.
@@ -97,6 +106,7 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 | R-S7 | `set ix_enabled 0`, then load a map | Only `[IX] INFO: disabled by dvar ix_enabled 0`; no other `[IX]` lines | not run | not run |
 | R-S8 | Client feature line from R-S1 | v1.1.0: `omnimovement=0 sprint_unlimited=0 air_control=0`; develop: all `1`. `fs_game=1` when loaded from the Mods menu, `0` for a loose `iw7-mod/custom_scripts` install | not run | not run |
 | R-S9 | `set ix_debug_log 1`, spawn; in co-op, also bleed out and respawn at the next round | `[IX] DEBUG: player connected: <name>` once; `[IX] DEBUG: player spawned: <name> (spawn N)` once per spawn, N rising by 1 | not run | not run |
+| R-S10 | Co-op join with each install: the host loads the mod (a) into `iw7-mod/`, (b) from the Mods menu; a friend joins | (a) the friend joins. (b) the friend gets "Server 'mod_hash' is empty" (L30). Report both | not run | not run |
 
 ### 4.2 Player
 
@@ -131,20 +141,22 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 ### 4.5 Characters (Phase 1.5)
 
-For testing locked characters, iw7-mod's console command `unlockallEE` unlocks every special character (it sets the soul keys and the Beast merit).
+Characters are chosen in the CHARACTER menu before a match (§4.6) and kept for the whole match. For testing locked characters, iw7-mod's console command `unlockallEE` unlocks every special character (it sets the soul keys and the Beast merit). Co-op tests need a second PC (or a second account) with the mod installed the same way. `getCoopPlayerData` is expected to mirror iw7-mod's `setCoopPlayerData` and print the value (iw7-mod restores that printing: `Com_DDL_PrintState` in `stats.cpp`); if the command does not exist, report that.
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-CH1 | Type `!char` in chat on each map | That map's four characters with its outfit names, then the specials line; `[you]` marks your character | not run | not run |
-| R-CH2 | `!char 3` during a round | Body, arms and knife change at once; the knife works; the character's voice lines are the new character's; the HUD portrait updates within about 5 s; the card updates | not run | not run |
-| R-CH3 | `set ix_character andre` before loading a map (host) | You spawn as Andre; the console shows `[IX] INFO: character: <you> -> Andre (ix_character)` | not run | not run |
-| R-CH4 | Co-op: two players pick the same character | The second gets "... is taken by <name>"; random picks for new players never duplicate a chosen character | not run | not run |
-| R-CH5 | `!char hoff` on `cp_zmb` without and then with the Spaceland soul key (`unlockallEE`) | First "locked: earn the soul key on Zombies in Spaceland", then you become The Hoff | not run | not run |
-| R-CH6 | `set ix_character_crossmap 1`, load `cp_town`, `!char hoff` | **Experimental:** report whether the map loads, what the body and arms look like, and any console error | not run | not run |
-| R-CH7 | Pick The Hoff in the stock lobby, then play `cp_town` with `ix_character_crossmap 1` | You start as The Hoff (`(lobby)` in the console); with the setting off, the stock random pick and the lobby choice is kept for Spaceland | not run | not run |
-| R-CH8 | `!char 1` while downed, or in the afterlife arcade | "You will be Sally from your next spawn"; applied on respawn | not run | not run |
+| R-CH1 | Host: pick Andre in the menu, start `cp_zmb` | You spawn as Andre; the console shows `[IX] INFO: character: <you> -> Andre (ix_character)`; after the intro, "<you> is playing as Andre (Rapper)" | not run | not run |
+| R-CH2 | During a match, type `!char 1` in chat, then `set ix_character sally` in the console | Nothing changes until the next match, and the mod does not reply | not run | not run |
+| R-CH3 | Co-op: the guest picks a special they have unlocked (The Hoff), then joins the host's `cp_zmb` | The guest is The Hoff; the host's console shows `(lobby)`; everyone sees "<guest> is playing as The Hoff" | not run | not run |
+| R-CH4 | Co-op: the guest picks Poindexter, then joins | The guest gets a random character, and the line names it | not run | not run |
+| R-CH5 | Co-op: host and guest both pick The Hoff | The second to connect gets a random character and "Can't play as The Hoff: The Hoff is taken by <name>" | not run | not run |
+| R-CH6 | Pick The Hoff without the Spaceland soul key, host `cp_zmb`; repeat after `unlockallEE` | First a random character and "Can't play as The Hoff: The Hoff is locked: earn the soul key on Zombies in Spaceland"; then The Hoff | not run | not run |
+| R-CH7 | `set ix_character_crossmap 1`, pick The Hoff, load `cp_town` | **Experimental:** report whether the map loads, what the body and arms look like, and any console error. With the setting off: a random character and "... belongs to Zombies in Spaceland ..." | not run | not run |
+| R-CH8 | Co-op: the guest picks an unlocked special, then joins a host **without** this mod on that special's map | The guest is that special (the stock lobby rule) | not run | not run |
 | R-CH9 | Player card | Bottom right, not covering the ammo counter; `ix_player_card 0` hides it; `ix_player_card_y 140` moves it up | not run | not run |
-| R-CH10 | Switch, then die and respawn | You keep the new character and the new knife | not run | not run |
+| R-CH10 | `set ix_character_announce 0`, then a new match; `set ix_character_select 0`, then a new match | No "is playing as" lines; with selection off, the game picks characters as usual | not run | not run |
+| R-CH11 | Die or bleed out, then respawn | Same character and knife as before | not run | not run |
+| R-CH12 | Probe for L29, in the zombies main menu console: `setCoopPlayerData zombiePlayerLoadout characterSelect 14`, then `getCoopPlayerData zombiePlayerLoadout characterSelect` | Report the printed value (14, another number, or an error). Afterwards pick any character in the CHARACTER menu, which writes the field again | not run | not run |
 
 ### 4.6 Zombies main menu (Lua UI)
 
@@ -153,7 +165,8 @@ For testing locked characters, iw7-mod's console command `unlockallEE` unlocks e
 | R-UI1 | Load the mod, open Zombies | A CHARACTER button under the other buttons, styled like them; its description shows on hover and does not overlap the button | not run | not run |
 | R-UI2 | Press CHARACTER | A list: Random, Sally, Poindexter, Andre, A.J., then the five specials; hovering shows the outfits per map; Back returns | not run | not run |
 | R-UI3 | Pick Andre, then start a solo match | You play as Andre; the console shows `(ix_character)`; after restarting the game the menu still says "Selected: Andre" | not run | not run |
-| R-UI4 | Pick a special you have not unlocked, then start a match | A random character, and on spawn "ix_character: can't pick ...: ... is locked" | not run | not run |
+| R-UI4 | Pick a special you have not unlocked, then start a match | A random character, and after the intro "Can't play as ...: ... is locked: ..." | not run | not run |
+| R-UI5 | Pick The Hoff, then run `getCoopPlayerData zombiePlayerLoadout characterSelect`; pick Sally and run it again | `1`, then `0`; no console error from `setCoopPlayerData` or `uploadstats` | not run | not run |
 
 ### 4.7 Compatibility matrix
 
