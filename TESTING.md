@@ -62,6 +62,9 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V30 | Stock character system read from the dump: registration, assignment, release, portrait omnvar, unlock stats, VO prefixes | ✅ recorded in `IW_API_NOTES.md` §15 |
 | V31 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 24/24 compiled, 12/12 identical, 158 built-in calls, 49 far references (6 into stock scripts, all loaded on every zombies map), 12 scripts load, 7,453 bytes |
 | V32 | `tools/tests/test_character_data.py`: the cast table vs. each map's registration, the lobby ids, and the soul key each map awards | ✅ 5 tests OK. A planted wrong head model and a wrong lobby id are both caught |
+| V34 | `luac5.1 -p` on iw7-mod's own 31 ui_scripts | ✅ all parse, so Lua 5.1 syntax checking is meaningful for IW7's Lua |
+| V35 | `check.py` `lua` on `ui_scripts/InfiniteExpansion/__init__.lua` | ✅ syntax OK; all 92 API names occur in iw7-mod's ui_scripts at `c0a1c6da`; the scripts it builds on are identical at v1.1.0 |
+| V36 | Checker tests with Lua fixtures | ✅ 17 tests OK. `bad_mod` adds a syntax error, three invented names (`Engine.SetPlayerData`, `:SetMagicColor()`, `MakeMagicHappen()`), a folder named like iw7-mod's `MainMenu`, and a folder without `__init__.lua`: all six reported. Comments, strings, real API names and local functions are not flagged |
 | V33 | Disassembly spot check | ✅ `OP_ScriptFarMethodThreadCall scripts/cp/zombies/zombies_loadout setmodelfromcustomization 1`; waittill on a variable notify name; built-ins identical on both compilers |
 
 ## 3. Runtime test environment (for testers)
@@ -143,7 +146,16 @@ For testing locked characters, iw7-mod's console command `unlockallEE` unlocks e
 | R-CH9 | Player card | Bottom right, not covering the ammo counter; `ix_player_card 0` hides it; `ix_player_card_y 140` moves it up | not run | not run |
 | R-CH10 | Switch, then die and respawn | You keep the new character and the new knife | not run | not run |
 
-### 4.6 Compatibility matrix
+### 4.6 Zombies main menu (Lua UI)
+
+| ID | Test | Expected | v1.1.0 | develop |
+|----|------|----------|--------|---------|
+| R-UI1 | Load the mod, open Zombies | A CHARACTER button under the other buttons, styled like them; its description shows on hover and does not overlap the button | not run | not run |
+| R-UI2 | Press CHARACTER | A list: Random, Sally, Poindexter, Andre, A.J., then the five specials; hovering shows the outfits per map; Back returns | not run | not run |
+| R-UI3 | Pick Andre, then start a solo match | You play as Andre; the console shows `(ix_character)`; after restarting the game the menu still says "Selected: Andre" | not run | not run |
+| R-UI4 | Pick a special you have not unlocked, then start a match | A random character, and on spawn "ix_character: can't pick ...: ... is locked" | not run | not run |
+
+### 4.7 Compatibility matrix
 
 The mod claims support **only** for cells marked pass.
 

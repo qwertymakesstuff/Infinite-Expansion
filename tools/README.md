@@ -14,8 +14,9 @@ tools/setup_compilers.sh            # builds into .toolchain/ (git-ignored)
 | `.toolchain/bin/gsc-tool-iw7-develop` | auroramod/gsc-tool `0be361a4` | the compiler in iw7-mod **develop** (`c0a1c6da`); also the disassembler |
 | `.toolchain/bin/ixcc-release`, `ixcc-develop` | `tools/ixcc/ixcc.cpp` linked against each pin | compile **exactly as iw7-mod's in-game loader does** (see below) |
 | `.toolchain/src/iw7-gsc-dump/decompiled/` | mjkzy/iw7-gsc-dump `1dd48a78` | decompiled stock scripts; reference for far-call checks, never shipped |
+| `.toolchain/src/iw7-mod-ui/data/cdata/ui_scripts/` | auroramod/iw7-mod develop `c0a1c6da` (sparse) | iw7-mod's own Lua UI scripts; reference for the `lua` check |
 
-Requirements: `git`, `curl`, `tar`, `make`, `clang`/`clang++` (C++20), and Python 3.9+ for `check.py` (standard library only). The script downloads premake 5.0.0-beta2 and 5.0.0-beta8 from the premake GitHub releases, because each pin needs the premake version its own CI used. A run from an empty directory takes about 8 minutes.
+Requirements: `git`, `curl`, `tar`, `make`, `clang`/`clang++` (C++20), and Python 3.9+ for `check.py` (standard library only). Optional: `luac5.1` (package `lua5.1`) for the Lua syntax check. The script downloads premake 5.0.0-beta2 and 5.0.0-beta8 from the premake GitHub releases, because each pin needs the premake version its own CI used. A run from an empty directory takes about 8 minutes.
 
 ## Checking the mod
 
@@ -35,6 +36,7 @@ python3 -m unittest discover -s tools/tests -v           # tests for check.py it
 | `layout` | Zombies-only layout (`ARCHITECTURE.md` §7): the entry script in `custom_scripts/cp/`, modules in `custom_scripts/ix/<area>/`, `init()` only in the entry script, every module reachable from it |
 | `raw ids` | `_meth_XXXX` / `_func_XXX` only in `ix/core/compat.gsc`, and never in iw7-mod's extension id range (those ids depend on registration order) |
 | `source` | No `#include`, no `/# #/` dev blocks (iw7-mod compiles dev blocks only with `developer_script 1`, so the checked code would differ from what runs), and no `//` comment ending in a backslash (both compilers silently drop the next line) |
+| `lua` | Lua UI scripts: `luac5.1` syntax; every `Engine.`/`LUI.`/`MenuBuilder.`… path, method and bare function call must occur in iw7-mod's own ui_scripts or be defined in the file; folders need `__init__.lua` and must not be named like iw7-mod's (its copy would win) |
 | `budget` | Custom-script memory (bytecode + 1 byte per loaded script) against a 512 KiB limit; iw7-mod's hard limit is 1 MiB, fatal if exceeded |
 
 Options: `--mod DIR`, `--toolchain DIR`, `--stock DIR`, `--budget BYTES`, and `--work DIR` (keeps the `.gscbin` and `.gscasm` output).

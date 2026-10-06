@@ -37,7 +37,7 @@ Installing as a mod folder will let later phases save settings to disk. Copying 
 
 ## Choosing your character
 
-Type in chat:
+In the **Zombies** menu, press **CHARACTER** (under the other buttons) and pick a character. This works for matches you host, solo or private. Or type in chat:
 
 | Chat | Effect |
 |------|--------|

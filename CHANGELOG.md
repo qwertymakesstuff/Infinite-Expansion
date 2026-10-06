@@ -4,6 +4,15 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Phase 1.5 — CHARACTER button in the zombies menu (2026-10-06)
+
+**Added**
+- `ui_scripts/InfiniteExpansion/__init__.lua`: a base-game style CHARACTER button under the zombies main menu's buttons.
+  - It opens a list (Random, the four regular characters, the five specials). Hovering shows each character's outfit on every map.
+  - Picking one saves the archived dvar `ix_character`, which the GSC applies to the host at match start (L29). `random` lets the game pick.
+  - It is built only from widgets and calls that iw7-mod's own ui_scripts use.
+- `check.py` `lua`: `luac5.1` syntax, plus API names checked against iw7-mod's ui_scripts (pinned and fetched by `setup_compilers.sh`), plus folder rules. Lua fixtures in `tools/tests`.
+
 ### Phase 1.5 — Characters (2026-10-06)
 
 **Added**

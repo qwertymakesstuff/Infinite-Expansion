@@ -315,3 +315,20 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
 - **Player state.** `self.inlaststand`, `self.in_afterlife_arcade` (`cp_zmb`), and `self.sessionstate`.
 - **HUD space.** `horzalign` / `vertalign` `"fullscreen"` uses a 640 × 480 virtual screen (stock full-screen overlays use `setshader("black", 640, 480)` at 0, 0). Stock zombies scripts use the materials `"black"` and `"white"`, the fonts `"default"` and `"objective"`, and `fontscale` 1.
 - **Chat.** iw7-mod sends `level notify("say", player, text)` and `player notify("say", text)`, plus `"say_team"`, with the leading control character removed (`logprint.cpp`).
+
+## 16. Lua UI scripts (menus) `[MOD ui_scripting.cpp, data/cdata/ui_scripts]`
+
+- **Loading.**
+  - When the Lua VM starts (frontend and in-game), iw7-mod lists `ui_scripts/` across the search paths: client data folder, `<game>/iw7-mod/`, then the engine's paths, which include the mod folder.
+  - It runs `ui_scripts/<Folder>/__init__.lua` for each folder. A folder name already found in an earlier path is **skipped**, so a mod folder named like one of iw7-mod's never loads (`list_files(..., true)` in `load_scripts`).
+  - Scripts test `Engine.InFrontend()` themselves.
+  - iw7-mod's own scripts load first, so a mod script can wrap their menu builders.
+- **Wrapping a menu.** Save `MenuBuilder.m_types["X"]`, assign a function that calls it and adds elements, and return the result (iw7-mod: `CPMainMenu`, `HeadquartersCustomizationButtons`, `ModeButton`). `MenuBuilder.registerType(name, fn)` adds a new menu or widget type.
+- **Zombies main menu.** iw7-mod rebuilds its button list as `CPMainMenuButtons` (`MainMenu/CPMainMenuButtons.lua`, identical at v1.1.0 and develop). Each button is `MenuBuilder.BuildRegisteredType("MenuButton", {controllerIndex})` with `.Text:setText(...)` and `.buttonDescription`, placed with `SetAnchorsAndPosition(0, 1, 0, 1, 0, 340*_1080p, top, bottom)` at 40-pixel steps. Mods sits at 240–270, Contracts at 280–340, and the description line at 336–394.
+- **List menus.** `Mods/ModSelectMenu.lua` builds a list menu: `CPMenuTitle`, a `LUI.UIDataSourceGrid` whose rows are the registered `"ModSelectButton"` type fed by `LUI.DataSourceFromList` items (`buttonLabel`, `buttonOnClickFunction`, `buttonOnHoverFunction`), plus `ButtonHelperBar` and `LUI.UIBindButton` for back.
+- **Talking to the game.**
+  - `Engine.Exec("set …" / "seta …")` sets dvars (`seta` also saves them in the config).
+  - `Engine.GetDvarString/Int/Bool` reads them.
+  - `Engine.NotifyServer(name, int)` (in-game; `EndGame/__init__.lua`) arrives in GSC as `player waittill("luinotifyserver", name, value)` (stock: `end_game`, `splash_shown`, `arcade_off`, `reset_weapon_player_data`).
+- **Not available.** iw7-mod's `io` table has no write. Adding localized strings is commented out in iw7-mod, so labels are plain text, as iw7-mod's own "Server Browser" button does. The in-game pause menu's type name appears in no script.
+- **Checking.** `tools/check.py` `lua` runs `luac5.1 -p` (it parses all 31 of iw7-mod's own scripts) and allows only API names that iw7-mod's ui_scripts at `c0a1c6da` use.

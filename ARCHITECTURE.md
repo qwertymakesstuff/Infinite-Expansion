@@ -25,6 +25,7 @@ Infinite-Expansion/                          (repository)
 ├── mods/
 │   └── infinite_expansion/                  → <Infinite Warfare>/mods/infinite_expansion/
 │       ├── desc.txt                         Mods-menu description                         (Phase 1)
+│       ├── ui_scripts/InfiniteExpansion/    client Lua: CHARACTER button + list           (Phase 1.5)
 │       └── custom_scripts/
 │           ├── cp/ix_main.gsc               ENTRY (zombies only)  — auto-loaded          (Phase 1)
 │           └── ix/                          MODULES               — loaded by reference only
@@ -59,7 +60,7 @@ Infinite-Expansion/                          (repository)
 
 Phase 1 also created one placeholder per feature area (`ui/ui.gsc`, `player/player.gsc`, `weapons/weapons.gsc`, `zombies/zombies.gsc`, `debug/debug.gsc`). Each only registers its name, so the init log shows the load order.
 
-`/assets/` from the original brief maps to `mods/infinite_expansion/ui_scripts/` (client Lua, later) and an optional `mod.ff` (x64-zt, deferred). Neither is used in the script phases.
+`/assets/` from the original brief maps to `mods/infinite_expansion/ui_scripts/` (client Lua; the zombies main menu's CHARACTER button since Phase 1.5) and an optional `mod.ff` (x64-zt, deferred).
 
 ## 3. Initialization flow
 

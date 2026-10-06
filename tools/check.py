@@ -21,12 +21,17 @@ without it, using the compilers iw7-mod embeds (tools/setup_compilers.sh):
            blocks (iw7-mod compiles those only with developer_script 1, so the
            checked code would differ from what runs), and no // comment ending in
            a backslash (both compilers then drop the next line without an error)
+  lua      Lua UI scripts (ui_scripts/<Folder>/__init__.lua): luac5.1 syntax, and
+           every Engine./LUI./MenuBuilder./... path, method and bare function call
+           must appear in iw7-mod's own ui_scripts (pinned in setup_compilers.sh) or
+           be defined in the file, so no UI API is invented; folder names must not
+           clash with iw7-mod's (its loader would skip ours)
   budget   custom-script memory (bytecode + 1 per loaded script) against a
            512 KiB limit; iw7-mod has 1 MiB and running out is fatal
 
 Usage:
-  python3 tools/check.py [--toolchain DIR] [--mod DIR] [--stock DIR] [--work DIR]
-                         [--budget BYTES]
+  python3 tools/check.py [--toolchain DIR] [--mod DIR] [--stock DIR] [--iw7mod-ui DIR]
+                         [--work DIR] [--budget BYTES]
 
 Both compilers already reject a script function named after a built-in
 ("already defined as builtin"), and ixcc registers iw7-mod's extension names,
@@ -40,6 +45,7 @@ import concurrent.futures
 import difflib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -80,6 +86,18 @@ BUILTIN_REF = re.compile(
     r"^\s*OP_(CallBuiltin[0-5]?|CallBuiltinMethod[0-5]?|GetBuiltinFunction|GetBuiltinMethod)\s+(\S+)"
 )
 IXCC_RESULT = re.compile(r"bytecode=(\d+)")
+
+# Lua UI scripts: names the mod may use must appear in iw7-mod's own ui_scripts.
+LUA_API_ROOTS = ("Engine", "LUI", "MenuBuilder", "FONTS", "CoD", "ACTIONS", "OPTIONS", "DataSources",
+                 "SWATCHES", "Lobby", "Rank", "Loot", "MPConfig", "utils")
+LUA_DOTTED = re.compile(r"(?<![.\w])(?:" + "|".join(LUA_API_ROOTS) + r")(?:\.[A-Za-z_]\w*)+")
+LUA_METHOD = re.compile(r":([A-Za-z_]\w*)\s*\(")
+LUA_CALL = re.compile(r"(?<![.:\w])([A-Za-z_]\w*)\s*\(")
+LUA_DECLARED = re.compile(r"\bfunction\s+([A-Za-z_]\w*)|\blocal\s+function\s+([A-Za-z_]\w*)|\blocal\s+([A-Za-z_]\w*)")
+LUA_KEYWORDS = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in",
+                "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while"}
+LUA_STANDARD = {"assert", "error", "getmetatable", "ipairs", "next", "pairs", "pcall", "print", "rawget",
+                "rawset", "require", "select", "setmetatable", "tonumber", "tostring", "type", "unpack", "xpcall"}
 
 
 class Report:
@@ -177,6 +195,56 @@ def comment_continuations(text):
                 break
             i += 1
     return lines
+
+
+def strip_lua(text):
+    """Blank out Lua comments and string contents, keeping line structure."""
+    out = []
+    i, n = 0, len(text)
+    long_bracket = re.compile(r"\[(=*)\[")
+
+    def blank(chunk):
+        return "".join(ch if ch == "\n" else " " for ch in chunk)
+
+    while i < n:
+        if text.startswith("--", i):
+            opener = long_bracket.match(text, i + 2)
+            if opener:
+                close = text.find("]" + opener.group(1) + "]", opener.end())
+                end = n if close == -1 else close + len(opener.group(1)) + 2
+            else:
+                end = text.find("\n", i)
+                end = n if end == -1 else end
+            out.append(blank(text[i:end]))
+            i = end
+        elif text[i] in "\"'":
+            quote = text[i]
+            j = i + 1
+            while j < n and text[j] != quote and text[j] != "\n":
+                j += 2 if text[j] == "\\" else 1
+            out.append(quote + blank(text[i + 1:min(j, n)]) + quote)
+            i = j + 1
+        elif long_bracket.match(text, i):
+            opener = long_bracket.match(text, i)
+            close = text.find("]" + opener.group(1) + "]", opener.end())
+            end = n if close == -1 else close + len(opener.group(1)) + 2
+            out.append('""' + blank(text[i + 2:end]))
+            i = end
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
+def lua_vocabulary(root):
+    """Dotted API paths, method names and bare calls used by the Lua files under root."""
+    dotted, methods, calls = set(), set(), set()
+    for path in sorted(root.rglob("*.lua")):
+        code = strip_lua(path.read_text(encoding="utf-8", errors="replace"))
+        dotted.update(LUA_DOTTED.findall(code))
+        methods.update(LUA_METHOD.findall(code))
+        calls.update(LUA_CALL.findall(code))
+    return dotted, methods, calls
 
 
 def location(rel):
@@ -296,6 +364,7 @@ def main():
     parser.add_argument("--toolchain", type=Path, default=REPO / ".toolchain")
     parser.add_argument("--mod", type=Path, default=REPO / "mods" / "infinite_expansion")
     parser.add_argument("--stock", type=Path, help="decompiled stock scripts (default: <toolchain>/src/iw7-gsc-dump/decompiled)")
+    parser.add_argument("--iw7mod-ui", type=Path, help="iw7-mod's ui_scripts (default: <toolchain>/src/iw7-mod-ui/data/cdata/ui_scripts)")
     parser.add_argument("--work", type=Path, help="keep compiled and disassembled output here (default: temporary)")
     parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help=f"bytecode limit per mode (default {DEFAULT_BUDGET})")
     args = parser.parse_args()
@@ -303,6 +372,7 @@ def main():
     toolchain = args.toolchain.resolve()
     mod_root = args.mod.resolve()
     stock_root = (args.stock or toolchain / "src" / "iw7-gsc-dump" / "decompiled").resolve()
+    ui_root = (args.iw7mod_ui or toolchain / "src" / "iw7-mod-ui" / "data" / "cdata" / "ui_scripts").resolve()
     extensions_file = REPO / "tools" / "ixcc" / "iw7mod_extensions.txt"
 
     tools = {name: toolchain / "bin" / name for name in ("ixcc-release", "ixcc-develop", "gsc-tool-iw7-develop")}
@@ -484,6 +554,9 @@ def main():
                     report.error("source", f"{rel}:{line}", message)
         print(f"[source]   {source_issues} #include / dev-block / comment issues")
 
+        # lua
+        check_lua(mod_root, ui_root, report)
+
         # budget
         sizes = {}
         for rel in scripts:
@@ -503,6 +576,74 @@ def main():
     verdict = "FAIL" if report.errors else "PASS"
     print(f"RESULT: {verdict} ({plural(len(report.errors), 'error')}, {plural(len(report.warnings), 'warning')})")
     return 1 if report.errors else 0
+
+
+def check_lua(mod_root, ui_root, report):
+    ui_dir = mod_root / "ui_scripts"
+    files = sorted(ui_dir.rglob("*.lua")) if ui_dir.is_dir() else []
+    if not files:
+        print("[lua]      no ui_scripts")
+        return
+
+    luac = shutil.which("luac5.1")
+    have_reference = ui_root.is_dir()
+    reference = lua_vocabulary(ui_root) if have_reference else (set(), set(), set())
+    reference_folders = {path.name.lower() for path in ui_root.iterdir() if path.is_dir()} if have_reference else set()
+    if not luac:
+        report.warn("lua", display(ui_dir), "luac5.1 not found (package lua5.1); Lua syntax not checked")
+    if not have_reference:
+        report.warn("lua", display(ui_dir), "iw7-mod ui_scripts not found (run tools/setup_compilers.sh); Lua API names not checked")
+
+    for folder in sorted(path for path in ui_dir.iterdir() if path.is_dir()):
+        where = folder.relative_to(mod_root).as_posix()
+        if not (folder / "__init__.lua").is_file():
+            report.error("lua", where, "no __init__.lua; iw7-mod loads only ui_scripts/<Folder>/__init__.lua")
+        if folder.name.lower() in reference_folders:
+            report.error("lua", where, "iw7-mod has a ui_scripts folder with this name and its copy wins; rename the folder")
+
+    names_checked = 0
+    for path in files:
+        rel = path.relative_to(mod_root).as_posix()
+        if path.parent.parent != ui_dir:
+            report.error("lua", rel, "Lua files belong in ui_scripts/<Folder>/")
+        if luac:
+            result = subprocess.run([luac, "-p", str(path)], capture_output=True, text=True)
+            if result.returncode != 0:
+                message = (result.stderr or result.stdout).strip()
+                located = re.search(r":(\d+): (.*)$", message)
+                if located:
+                    report.error("lua", f"{rel}:{located.group(1)}", "syntax: " + located.group(2))
+                else:
+                    report.error("lua", rel, "syntax: " + message)
+                continue
+        if not have_reference:
+            continue
+
+        code = strip_lua(path.read_text(encoding="utf-8"))
+        declared = {name for match in LUA_DECLARED.findall(code) for name in match if name}
+        ref_dotted, ref_methods, ref_calls = reference
+
+        def line_of(match):
+            return code.count("\n", 0, match.start()) + 1
+
+        for match in LUA_DOTTED.finditer(code):
+            names_checked += 1
+            if match.group(0) not in ref_dotted:
+                report.error("lua", f"{rel}:{line_of(match)}", f"{match.group(0)} is not used by any iw7-mod ui_script; unverified API")
+        for match in LUA_METHOD.finditer(code):
+            names_checked += 1
+            if match.group(1) not in ref_methods:
+                report.error("lua", f"{rel}:{line_of(match)}", f":{match.group(1)}() is not used by any iw7-mod ui_script; unverified API")
+        for match in LUA_CALL.finditer(code):
+            name = match.group(1)
+            if name in LUA_KEYWORDS or name in LUA_STANDARD or name in declared:
+                continue
+            names_checked += 1
+            if name not in ref_calls:
+                report.error("lua", f"{rel}:{line_of(match)}", f"{name}() is not used by any iw7-mod ui_script; unverified API")
+
+    syntax_note = "syntax checked" if luac else "syntax not checked"
+    print(f"[lua]      {plural(len(files), 'script')}: {syntax_note}, {names_checked} API names checked against iw7-mod's ui_scripts")
 
 
 def plural(count, noun):

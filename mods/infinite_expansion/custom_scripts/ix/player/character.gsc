@@ -17,7 +17,9 @@
 // Ways to choose:
 //   chat    "!char" lists this map's cast; "!char <number or name>" picks one
 //   dvar    ix_character <number or name>: the host's character, applied on
-//           connect and whenever the dvar changes
+//           connect and whenever the dvar changes ("random" or unset: the game
+//           picks). The CHARACTER button in the zombies main menu sets it
+//           (ui_scripts/InfiniteExpansion).
 //   lobby   a special character picked in the stock lobby is also honoured on
 //           other maps while ix_character_crossmap is 1
 //
@@ -191,6 +193,17 @@ make_special( key, name, aliases, home, home_num, select_id, unlock_type, unlock
     entry.head = head;
     entry.photo = photo;
     return entry;
+}
+
+// The host's ix_character, or "" when the game should pick.
+wanted_character()
+{
+    value = custom_scripts\ix\core\util::dvar_string( "ix_character", "" );
+
+    if ( value == "random" )
+        return "";
+
+    return value;
 }
 
 find_entry( text )
@@ -509,7 +522,7 @@ on_connect()
 
     if ( self ishost() )
     {
-        wanted = custom_scripts\ix\core\util::dvar_string( "ix_character", "" );
+        wanted = wanted_character();
         entry = find_entry( wanted );
 
         if ( wanted != "" && !isdefined( entry ) )
@@ -591,12 +604,12 @@ clean_pool_after_disconnect()
 watch_host_setting()
 {
     level endon( "game_ended" );
-    last = custom_scripts\ix\core\util::dvar_string( "ix_character", "" );
+    last = wanted_character();
 
     for (;;)
     {
         wait 1;
-        value = custom_scripts\ix\core\util::dvar_string( "ix_character", "" );
+        value = wanted_character();
 
         if ( value == last )
             continue;

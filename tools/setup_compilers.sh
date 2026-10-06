@@ -14,6 +14,10 @@
 #         <toolchain-dir>/src/iw7-gsc-dump/          decompiled stock IW7 scripts (mjkzy/iw7-gsc-dump
 #                                                    @ 1dd48a78); check.py verifies stock far calls
 #                                                    against it. Reference only, never shipped.
+#         <toolchain-dir>/src/iw7-mod-ui/            iw7-mod's own Lua UI scripts (auroramod/iw7-mod
+#                                                    develop @ c0a1c6da, sparse); check.py only lets the
+#                                                    mod's Lua use API names these scripts use.
+# Optional: luac5.1 (Debian/Ubuntu package lua5.1) for the Lua syntax check.
 # Needs:  Linux x86_64, git, curl, tar, make, clang/clang++ with C++20 support.
 #
 # The older commit's premake5.lua uses a flag that premake beta8 rejects, so
@@ -27,6 +31,8 @@ DEVELOP_COMMIT="0be361a4b22be0d0997b92ad94506ee5a5f99fc9"
 PREMAKE_URL_BASE="https://github.com/premake/premake-core/releases/download"
 STOCK_DUMP_REPO="https://github.com/mjkzy/iw7-gsc-dump"
 STOCK_DUMP_COMMIT="1dd48a78e55ef9c99519fc5221a206168ce2e98a"
+IW7MOD_REPO="https://github.com/auroramod/iw7-mod"
+IW7MOD_COMMIT="c0a1c6dacd33c86320b308656d9ba895291c2198"
 IXCC_SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ixcc/ixcc.cpp"
 
 mkdir -p "$TOOLCHAIN_DIR/src" "$TOOLCHAIN_DIR/bin" "$TOOLCHAIN_DIR/premake"
@@ -88,8 +94,22 @@ fetch_stock_dump() {
     echo "    -> $dir/decompiled"
 }
 
+fetch_iw7mod_ui() {
+    local dir="$TOOLCHAIN_DIR/src/iw7-mod-ui"
+    echo "==> iw7-mod ui_scripts @ ${IW7MOD_COMMIT:0:8}"
+    if [ ! -d "$dir/.git" ]; then
+        git init -q "$dir"
+        git -C "$dir" remote add origin "$IW7MOD_REPO"
+        git -C "$dir" sparse-checkout set data/cdata/ui_scripts
+    fi
+    git -C "$dir" fetch -q --depth 1 --filter=blob:none origin "$IW7MOD_COMMIT"
+    git -C "$dir" checkout -q --detach FETCH_HEAD
+    echo "    -> $dir/data/cdata/ui_scripts"
+}
+
 build release "$RELEASE_COMMIT" 5.0.0-beta2 gmake2
 build develop "$DEVELOP_COMMIT" 5.0.0-beta8 gmake
 fetch_stock_dump
+fetch_iw7mod_ui
 
 echo "Done. Check the mod with: python3 tools/check.py"

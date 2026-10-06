@@ -6,6 +6,7 @@ good_mod follows every rule. Needs the toolchain from tools/setup_compilers.sh.
 Run: python3 -m unittest discover -s tools/tests -v
 """
 import re
+import shutil
 import subprocess
 import sys
 import unittest
@@ -15,6 +16,7 @@ REPO = Path(__file__).resolve().parents[2]
 CHECK = REPO / "tools" / "check.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 TOOLCHAIN = REPO / ".toolchain"
+HAVE_LUAC = shutil.which("luac5.1") is not None
 HAVE_TOOLCHAIN = all((TOOLCHAIN / "bin" / name).is_file() for name in ("ixcc-release", "ixcc-develop", "gsc-tool-iw7-develop"))
 
 
@@ -84,13 +86,26 @@ class BadMod(unittest.TestCase):
         self.assert_reported("[source]", "include_user.gsc:6", "dev blocks")
         self.assert_reported("[source]", "swallow.gsc:4", "ends in a backslash")
 
+    def test_lua(self):
+        self.assert_reported("[lua]", "ui_scripts/Invented/__init__.lua:11", "Engine.SetPlayerData")
+        self.assert_reported("[lua]", "ui_scripts/Invented/__init__.lua:12", ":SetMagicColor()")
+        self.assert_reported("[lua]", "ui_scripts/Invented/__init__.lua:13", "MakeMagicHappen()")
+        self.assert_reported("[lua]", "ui_scripts/MainMenu", "iw7-mod has a ui_scripts folder with this name")
+        self.assert_reported("[lua]", "ui_scripts/NoInit", "no __init__.lua")
+        if HAVE_LUAC:
+            self.assert_reported("[lua]", "ui_scripts/Broken/__init__.lua:3", "syntax")
+        for line in self.errors:
+            # comments, strings, real iw7-mod API names and local functions are fine
+            self.assertNotIn("Fake", line)
+            self.assertIsNone(re.search(r"\b(Exec|RequestAddMenu|helper|lower)\b", line), line)
+
     def test_no_false_positives(self):
         # Comments and strings, iw7-mod extensions (logprint is a stub in the
         # table but iw7-mod implements it) and valid stock calls are fine.
         for name in ("_meth_80A1", "va", "logprint", "tell", "fileexists", "waittill_any", "isreallyalive", "swallow.gsc:6"):
             for line in self.errors:
                 self.assertIsNone(re.search(rf"\b{re.escape(name)}\b", line), line)
-        self.assertEqual(len(self.errors), 24, "\n".join(self.errors))
+        self.assertEqual(len(self.errors), 30 if HAVE_LUAC else 29, "\n".join(self.errors))
 
 
 @unittest.skipUnless(HAVE_TOOLCHAIN, "run tools/setup_compilers.sh first")

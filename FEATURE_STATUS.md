@@ -22,6 +22,7 @@
 | Stock scripts loaded on every zombies map (link-error guard) | Tooling | 1 | COMPLETE | `calls`: per-map link closure from the dump; 126 scripts common to all five maps |
 | Checker test suite | Tooling | 1 | COMPLETE | `tools/tests` (11 tests; `bad_mod` / `good_mod` fixtures) |
 | Cast data test (character table vs. stock scripts) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (5 tests; mutation-checked) |
+| Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
 
 ## Core (Phases 1–2)
 
@@ -46,6 +47,7 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
+| CHARACTER button in the zombies main menu (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; saves `ix_character` for matches you host (L29); R-UI1–R-UI4 |
 | Choose your character (`!char` in chat, `ix_character` for the host) | Player | 1.5 | TESTING | `ix/player/character.gsc`; immediate switch, knife swapped; toggle `ix_character_select`; R-CH1–R-CH4 |
 | Per-map cast names | Player | 1.5 | TESTING | Actor names verified from stock VO code; outfit labels made from each map's model names |
 | One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; R-CH4 |
