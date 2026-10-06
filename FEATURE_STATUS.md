@@ -21,6 +21,7 @@
 | Far-call / layout lint, bytecode budget | Tooling | 1 | COMPLETE | `calls`, `layout`, `source`, `budget` (fixture-tested) |
 | Stock scripts loaded on every zombies map (link-error guard) | Tooling | 1 | COMPLETE | `calls`: per-map link closure from the dump; 126 scripts common to all five maps |
 | Checker test suite | Tooling | 1 | COMPLETE | `tools/tests` (11 tests; `bad_mod` / `good_mod` fixtures) |
+| Cast data test (character table vs. stock scripts) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (5 tests; mutation-checked) |
 
 ## Core (Phases 1–2)
 
@@ -40,6 +41,19 @@
 | Event bus | Core | 2 | PLANNED | Real IW7 notifies only |
 | Utility library | Core | 2 | IN PROGRESS | `util.gsc` so far: `is_valid_player`, `is_human`, `join` |
 | Chat-command router (`say` notify) | Core | 2 | PLANNED | AAE `chatnotify.gsc` equivalent |
+
+## Characters (Phase 1.5)
+
+| Feature | Category | Phase | Status | Notes |
+|---------|----------|-------|--------|-------|
+| Choose your character (`!char` in chat, `ix_character` for the host) | Player | 1.5 | TESTING | `ix/player/character.gsc`; immediate switch, knife swapped; toggle `ix_character_select`; R-CH1–R-CH4 |
+| Per-map cast names | Player | 1.5 | TESTING | Actor names verified from stock VO code; outfit labels made from each map's model names |
+| One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; R-CH4 |
+| Special characters gated by unlocks | Player | 1.5 | TESTING | Soul keys / merit stats (L27); `ix_character_specials` 0/1/2; R-CH5 |
+| Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in `ix_character_crossmap 1`; their models may not exist on other maps (L26); R-CH6, R-CH7 |
+| Stock HUD portrait follows the chosen character | HUD | 1.5 | TESTING | Stock `setmodelfromcustomization` → `zm_player_character` |
+| Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: name and outfit; `ix_player_card`, `_x`, `_y`; R-CH9 |
+| Player card picture | HUD | 1.5 | BLOCKED | L28 |
 
 ## UI (Phase 3) / HUD (Phase 8)
 

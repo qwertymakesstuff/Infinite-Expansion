@@ -55,6 +55,15 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V28 | `python3 -m unittest discover -s tools/tests` after the change | ✅ 11 tests OK; `bad_mod` gives exactly its 24 planted errors and 1 planted warning, including the map-specific and never-loaded stock calls and the backslash comment |
 | V29 | `python3 tools/check.py` on the zombies-only mod | ✅ PASS, 0 errors, 0 warnings: 20/20 compiled, 10/10 identical, 23 far references, 10 scripts load, 1,430 bytes of custom-script memory |
 
+### Phase 1.5 (characters)
+
+| # | Check | Result |
+|---|-------|--------|
+| V30 | Stock character system read from the dump: registration, assignment, release, portrait omnvar, unlock stats, VO prefixes | ✅ recorded in `IW_API_NOTES.md` §15 |
+| V31 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 24/24 compiled, 12/12 identical, 158 built-in calls, 49 far references (6 into stock scripts, all loaded on every zombies map), 12 scripts load, 7,453 bytes |
+| V32 | `tools/tests/test_character_data.py`: the cast table vs. each map's registration, the lobby ids, and the soul key each map awards | ✅ 5 tests OK. A planted wrong head model and a wrong lobby id are both caught |
+| V33 | Disassembly spot check | ✅ `OP_ScriptFarMethodThreadCall scripts/cp/zombies/zombies_loadout setmodelfromcustomization 1`; waittill on a variable notify name; built-ins identical on both compilers |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -117,7 +126,24 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 | R-C5 | Persistence (mod-folder install) | `ix_settings.cfg` written; values restored next load | not run | not run |
 | R-C6 | Persistence without fs_game (loose install) | No script error; menu reports session-only | not run | not run |
 
-### 4.5 Compatibility matrix
+### 4.5 Characters (Phase 1.5)
+
+For testing locked characters, iw7-mod's console command `unlockallEE` unlocks every special character (it sets the soul keys and the Beast merit).
+
+| ID | Test | Expected | v1.1.0 | develop |
+|----|------|----------|--------|---------|
+| R-CH1 | Type `!char` in chat on each map | That map's four characters with its outfit names, then the specials line; `[you]` marks your character | not run | not run |
+| R-CH2 | `!char 3` during a round | Body, arms and knife change at once; the knife works; the character's voice lines are the new character's; the HUD portrait updates within about 5 s; the card updates | not run | not run |
+| R-CH3 | `set ix_character andre` before loading a map (host) | You spawn as Andre; the console shows `[IX] INFO: character: <you> -> Andre (ix_character)` | not run | not run |
+| R-CH4 | Co-op: two players pick the same character | The second gets "... is taken by <name>"; random picks for new players never duplicate a chosen character | not run | not run |
+| R-CH5 | `!char hoff` on `cp_zmb` without and then with the Spaceland soul key (`unlockallEE`) | First "locked: earn the soul key on Zombies in Spaceland", then you become The Hoff | not run | not run |
+| R-CH6 | `set ix_character_crossmap 1`, load `cp_town`, `!char hoff` | **Experimental:** report whether the map loads, what the body and arms look like, and any console error | not run | not run |
+| R-CH7 | Pick The Hoff in the stock lobby, then play `cp_town` with `ix_character_crossmap 1` | You start as The Hoff (`(lobby)` in the console); with the setting off, the stock random pick and the lobby choice is kept for Spaceland | not run | not run |
+| R-CH8 | `!char 1` while downed, or in the afterlife arcade | "You will be Sally from your next spawn"; applied on respawn | not run | not run |
+| R-CH9 | Player card | Bottom right, not covering the ammo counter; `ix_player_card 0` hides it; `ix_player_card_y 140` moves it up | not run | not run |
+| R-CH10 | Switch, then die and respawn | You keep the new character and the new knife | not run | not run |
+
+### 4.6 Compatibility matrix
 
 The mod claims support **only** for cells marked pass.
 

@@ -40,9 +40,11 @@ Infinite-Expansion/                          (repository)
 │               ├── ui/                      ≙ /scripts/ui/
 │               │   ├── menu.gsc             menu engine (pages, items, rendering, input)
 │               │   ├── menu_tree.gsc        menu definition (data only)
-│               │   └── hud.gsc              info HUD (create-once/update)
+│               │   ├── hud.gsc              info HUD (create-once/update)
+│               │   └── player_card.gsc      bottom-right character card              (Phase 1.5)
 │               ├── player/                  ≙ /scripts/player/
 │               │   ├── player.gsc           health, god mode, third person, utilities
+│               │   ├── character.gsc        character selection, specials, per-map cast (Phase 1.5)
 │               │   └── movement.gsc         speed, gravity, sprint/slide/mantle options
 │               ├── weapons/                 ≙ /scripts/weapons/
 │               │   └── weapons.gsc          ammo, fire-rate, recoil, spread, give/take, info

@@ -14,6 +14,26 @@ is_human( player )
     return is_valid_player( player ) && !isbot( player );
 }
 
+// Integer setting: the dvar's value, or fallback while the dvar is unset.
+dvar_int( name, fallback )
+{
+    if ( getdvar( name ) == "" )
+        return fallback;
+
+    return getdvarint( name );
+}
+
+// Lower-case string setting: the dvar's value, or fallback while it is unset.
+dvar_string( name, fallback )
+{
+    value = getdvar( name );
+
+    if ( value == "" )
+        return fallback;
+
+    return tolower( value );
+}
+
 // Joins array values into one string: join( [ "a", "b" ], "," ) returns "a,b".
 join( items, separator )
 {

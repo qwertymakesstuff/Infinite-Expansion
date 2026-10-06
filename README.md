@@ -4,8 +4,8 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phase 1 (foundation) complete — loads, but has no gameplay options yet.**
-> The mod skeleton (entry scripts, bootstrap, logging, compatibility layer) passes every offline check with both iw7-mod compilers. It has **not been run in-game yet**: see `TESTING.md` §4 for the first checks a tester can do.
+> **Status: Phase 1.5 (characters) complete — not yet run in-game.**
+> The mod skeleton and the character features pass every offline check with both iw7-mod compilers. Nothing has been confirmed in a real match yet: `TESTING.md` §4 lists the first checks a tester can do.
 
 ## Requirements
 
@@ -35,6 +35,26 @@ Installing as a mod folder will let later phases save settings to disk. Copying 
 | `ix_debug_log 1` | Prints extra `[IX] DEBUG:` lines |
 | `ix_version` | Set by the mod: the loaded version |
 
+## Choosing your character
+
+Type in chat:
+
+| Chat | Effect |
+|------|--------|
+| `!char` | Lists this map's characters, with their outfit names on this map |
+| `!char 2` or `!char poindexter` | Switch now; if you are downed, from your next spawn |
+| `!char hoff` | A special character, if you have unlocked it (its map's soul key) |
+
+Every player in your match can use it, and no two players can be the same character. A card in the bottom-right corner shows who you are playing.
+
+| Dvar | Default | Effect |
+|------|---------|--------|
+| `ix_character <name>` | – | The host's character, set before the match or changed during it |
+| `ix_character_select 0` | 1 | Turns character selection off |
+| `ix_character_specials` | 1 | 0 = no special characters, 1 = the ones you have unlocked, 2 = all of them |
+| `ix_character_crossmap 1` | 0 | **Experimental:** special characters from other maps (The Hoff on any map, for example). Set it before the map loads; their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26) |
+| `ix_player_card 0` | 1 | Hides the card; `ix_player_card_x` / `ix_player_card_y` move it |
+
 ## Documentation
 
 | File | Contents |
@@ -54,6 +74,7 @@ Installing as a mod folder will let later phases save settings to disk. Copying 
 |-------|-------|--------|
 | 0 | Project forensics | **Complete** |
 | 1 | Foundation (entry scripts, bootstrap, compat, check tooling) | **Complete** (in-game test pending) |
+| 1.5 | Characters: choose who you play as, per-map names, special characters, player card | **Complete** (in-game test pending) |
 | 2 | Core systems (features, config, events, utilities) | Next |
 | 3 | Main menu | Planned |
 | 4 | Player features | Planned |

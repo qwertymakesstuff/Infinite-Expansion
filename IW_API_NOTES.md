@@ -299,3 +299,19 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
 - **Quitting from GSC.** `executecommand("quit")` queues `quit` for the next frame (`script_extension.cpp:422-426`, `command.cpp:450-453`). GSC cannot set the exit code.
 - **Writing a result file.** `writefile(path, data[, append])` writes under `<game>/<fs_game>/`, rejects `..`, and throws when `fs_game` is empty (`io.cpp:24-95`).
 
+## 15. Zombies characters `[DUMP]` `[MOD stats.cpp]`
+
+- **Registration.** Each map's `scripts\cp\maps\<map>\<map>_player_character_setup::init_player_characters()` runs synchronously from the map's `main()`. It fills `level.player_character_info[slot]` with a struct holding `body_model`, `view_model`, `head_model`, `hair_model`, `vo_prefix`, `vo_suffix`, gestures, `photo_index`, `fate_card_weapon`, `intro_music`, `intro_gesture`, `melee_weapon`, `starting_weapon` and `post_setup_func`. Slots registered `"yes"` go into `level.available_player_characters`.
+  - Slots 1–4 (`"yes"`) are the regular characters on every map. The slot-to-actor mapping is the same everywhere: `p1_` Sally, `p2_` Poindexter ("pdex"), `p3_` Andre, `p4_` A.J. (VO switch in `cp_disco_vo.gsc` and `cp_town_vo.gsc`; `cp_final` model names `sally` / `dexter` / `andre` / `aj`).
+  - Special characters (`"no"`): `cp_zmb` 5 The Hoff and 6 Willard Wyler; `cp_rave` 5 Kevin Smith; `cp_disco` 5 Pam Grier; `cp_town` 5 Elvira; `cp_final` none. Each special's models are referenced only by its own map's script.
+- **Assignment.** `zombies_loadout::get_player_character_num()` returns `self.player_character_num` if it is set. Otherwise it uses the lobby's `getrankedplayerdata("cp", "zombiePlayerLoadout", "characterSelect")` on the special's own map (`cp_zmb`: 1 The Hoff, 5 Willard; `cp_rave` 2; `cp_disco` 3; `cp_town` 4; reset to 0 after use), or a random free slot.
+- **Applying.** `spawnplayer()` runs `level.custom_giveloadout` (`givedefaultloadout`) on **every** spawn. That function calls `detachall`, then `setmodelfromcustomization(num)`, which sets the fields, models and photo and runs `post_setup_func`. After the first spawn, the knife comes from `self.default_starting_melee_weapon`.
+- **Release.** On disconnect, `release_character_number()` returns every slot except 5 and 6 to the pool.
+- **HUD portrait.** `setplayerinside()` writes `photo_index` into omnvar `zm_player_character` (3 bits per entity number 0–3); `zm_player_status` holds healthy, damaged, laststand or afterlife. The client UI draws the picture, and its image names are not visible to scripts.
+- **Unlocks.**
+  - Each map's final Easter-egg boss sets `setplayerdata("cp", "haveSoulKeys", "soul_key_N", 1)`, with N = 1 `cp_zmb`, 2 `cp_rave`, 3 `cp_disco`, 4 `cp_town`, 5 `cp_final` (`cp_zmb_ufo.gsc:1062`, `cp_rave_super_slasher_fight.gsc`, `rat_king_fight.gsc`, `cp_town_crab_boss_bomb.gsc`, `cp_final_rhino_boss.gsc`; `directors_cut::get_num_of_newbs_in_game`).
+  - iw7-mod's `unlockallEE` sets the soul keys ("secret characters") and `meritState mt_dlc4_troll2` ("secret character 5 on cp_zmb", `Conditions.HasBeatenMeph`).
+  - Which key unlocks which character is inferred from the matching numbers, not read from the lobby UI (`KNOWN_LIMITATIONS.md` L27).
+- **Player state.** `self.inlaststand`, `self.in_afterlife_arcade` (`cp_zmb`), and `self.sessionstate`.
+- **HUD space.** `horzalign` / `vertalign` `"fullscreen"` uses a 640 × 480 virtual screen (stock full-screen overlays use `setshader("black", 640, 480)` at 0, 0). Stock zombies scripts use the materials `"black"` and `"white"`, the fonts `"default"` and `"objective"`, and `fontscale` 1.
+- **Chat.** iw7-mod sends `level notify("say", player, text)` and `player notify("say", text)`, plus `"say_team"`, with the leading control character removed (`logprint.cpp`).

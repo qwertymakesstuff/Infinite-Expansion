@@ -4,6 +4,24 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Phase 1.5 — Characters (2026-10-06)
+
+**Added**
+- `ix/player/character.gsc`: choose who you play as.
+  - In chat, `!char` lists the map's cast and `!char <number or name>` switches. The host can also set the `ix_character` dvar.
+  - The switch is immediate: body, arms, voice and knife change, and the stock HUD portrait follows. A downed player switches on the next spawn.
+  - Characters are unique per match, and the stock random pool stays consistent.
+  - Each map has its own cast list. The actor names come from the stock VO code; the outfit labels come from each map's model names.
+  - Special characters (The Hoff, Willard Wyler, Kevin Smith, Pam Grier, Elvira) are available to players who have unlocked them through soul keys or, for Willard, the Beast merit (`ix_character_specials`).
+  - Experimental and opt-in: special characters on maps other than their own (`ix_character_crossmap 1`, L26). A special picked in the stock lobby is then honoured on any map.
+- `ix/ui/player_card.gsc`: a bottom-right card with the character's name and outfit (`ix_player_card`, `_x`, `_y`). There is no picture yet (L28).
+- `ix/core/util.gsc`: `dvar_int` and `dvar_string` for settings with defaults.
+- `tools/tests/test_character_data.py`: checks the character table against the stock scripts.
+
+**Findings**
+- The stock character system, the HUD portrait omnvar and the unlock stats (`IW_API_NOTES.md` §15).
+- Each special character's models are referenced only by its own map, so they are probably missing elsewhere (L26).
+
 ### Scope: zombies only (2026-10-06)
 
 Multiplayer support was dropped at the project owner's request.
