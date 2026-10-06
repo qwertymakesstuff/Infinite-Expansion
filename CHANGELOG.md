@@ -4,6 +4,22 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Setup installs iw7-mod and starts the game (2026-10-06)
+
+**Added**
+- INSTALL now also sets up the iw7-mod client when the game folder has none.
+  - It downloads `iw7-mod.exe` from the latest GitHub release, or from iw7-mod's own update server if that fails, and checks it against the listed checksum (SHA-256 / SHA-1).
+  - It places the file in the game folder, as iw7-mod's install guide says, and adds an **IW7-Mod (Infinite Warfare)** desktop shortcut.
+  - The download runs in the background with progress in the window. DOWNLOAD in the iw7-mod row does only this step.
+- The green button walks through INSTALL → UPDATE → **PLAY**. PLAY starts iw7-mod from the game folder and opens Steam first if it is not running. REINSTALL copies the mod again.
+- No game yet: **STEAM** opens Steam's install dialog for Infinite Warfare (`steam://install/292730`; the store page if Steam is missing). The window checks again every 4 seconds and notices when the game is there.
+- A write check before downloading, so a protected game folder gets the offer to retry as administrator.
+- `-NoWindow` installs also download iw7-mod when it is missing.
+- Tests: the download against a local fake of GitHub and the update server, and the window's background download in a second runspace.
+
+**Not verified**
+- The real GitHub API and update server cannot be reached from the development environment (E6); R-I10–R-I13 check them on a player's PC.
+
 ### One-click Windows setup (2026-10-06)
 
 **Added**

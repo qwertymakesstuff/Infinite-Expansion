@@ -2,16 +2,17 @@
 Infinite Expansion - setup window.
 
 Start it with "Infinite Expansion Setup.cmd", next to the installer folder. It finds
-Infinite Warfare through Steam, shows what is installed, and installs or uninstalls the
-mod with one click (the logic is in IXSetup.Core.ps1). After installing, Windows
+Infinite Warfare through Steam (or offers Steam's install dialog), downloads the iw7-mod
+client when the game folder has none, installs or uninstalls the mod with one click, and
+then starts the game (the logic is in IXSetup.Core.ps1). After installing, Windows
 Settings > Apps lists the mod, and uninstalling there runs this script with -Uninstall.
 
 Switches:
   -GameDir <folder>   use this game folder instead of looking in Steam
   -Install            install as soon as the window opens (used after "run as administrator")
   -Uninstall          uninstall as soon as the window opens (Windows Settings > Apps)
-  -NoWindow           no window: install (or uninstall, with -Uninstall), print the result,
-                      and exit with 0 or 1
+  -NoWindow           no window: install (downloading iw7-mod if needed), or uninstall with
+                      -Uninstall; print the result and exit with 0 or 1
 
 Windows PowerShell 5.1 runs this file, so it stays ASCII and avoids PowerShell 7 syntax
 (tools/tests/test_installer.py checks both).
@@ -27,15 +28,16 @@ $ErrorActionPreference = 'Stop'
 $SetupRoot = Split-Path -Parent $PSScriptRoot
 $PackageRoot = Join-Path (Join-Path $SetupRoot 'mods') 'infinite_expansion'
 $ScriptPath = $PSCommandPath
+$CorePath = Join-Path $PSScriptRoot 'IXSetup.Core.ps1'
 $LogPath = Join-Path ([IO.Path]::GetTempPath()) 'InfiniteExpansionSetup.log'
-. (Join-Path $PSScriptRoot 'IXSetup.Core.ps1')
+. $CorePath
 
 # Every control this script uses; each must be an x:Name in IXSetup.xaml.
 $IXControlNames = @(
     'TitleBar', 'MinButton', 'CloseButton', 'VersionText',
-    'GameDot', 'GameText', 'BrowseButton',
+    'GameDot', 'GameText', 'SteamLink', 'BrowseButton',
     'ClientDot', 'ClientText', 'ClientLink',
-    'ModDot', 'ModText', 'NoteText',
+    'ModDot', 'ModText', 'ReinstallLink', 'NoteText',
     'InstallButton', 'UninstallButton', 'StatusTitle', 'StatusText', 'RepoLink'
 )
 
@@ -81,6 +83,16 @@ function Test-IXAccessDenied {
     return $false
 }
 
+# The innermost message of an error (a failed EndInvoke wraps the script's own error).
+function Get-IXErrorText {
+    param($ErrorRecord)
+    $exception = $ErrorRecord.Exception
+    while ($exception.InnerException) {
+        $exception = $exception.InnerException
+    }
+    return $exception.Message
+}
+
 # ---------------------------------------------------------------------------
 # Without a window
 
@@ -96,6 +108,10 @@ if ($NoWindow) {
             Write-Output ('Removed {0} files from {1}.' -f $result.Removed, $result.Target)
         }
         else {
+            if (-not [IO.File]::Exists((Join-Path $dir $IXClientExe))) {
+                $client = Install-IXClient $dir
+                Write-Output ('Downloaded {0} ({1}, from {2}).' -f $IXClientExe, $client.Version, $client.Source)
+            }
             $result = Install-IX $dir $PackageRoot
             Register-IXUninstaller $dir (Get-IXPackageVersion $PackageRoot) $SetupRoot | Out-Null
             Write-Output ('Installed {0} files into {1}.' -f $result.Copied, $result.Target)
@@ -177,10 +193,21 @@ function Set-IXStatus {
     $ui.StatusText.Text = $Text
 }
 
+function Set-IXVisible {
+    param($Control, [bool]$Visible)
+    if ($Visible) {
+        $Control.Visibility = 'Visible'
+    }
+    else {
+        $Control.Visibility = 'Collapsed'
+    }
+}
+
 # Reads the state of the game folder and updates every row and button.
 function Update-IXView {
     $state = Get-IXState $script:GameDir $PackageRoot
     $script:State = $state
+    $script:StateText = ConvertTo-Json -InputObject $state -Compress
 
     if ($state.PackageVersion) {
         $ui.VersionText.Text = 'v' + $state.PackageVersion
@@ -196,11 +223,11 @@ function Update-IXView {
     }
     else {
         Set-IXDot $ui.GameDot $Colors.Bad
-        $ui.GameText.Text = 'Not found ' + $Dash + ' click BROWSE'
+        $ui.GameText.Text = 'Not found ' + $Dash + ' STEAM installs it'
         $ui.GameText.ToolTip = $null
     }
+    Set-IXVisible $ui.SteamLink (-not $state.GameFound)
 
-    $ui.ClientLink.Visibility = 'Collapsed'
     if (-not $state.GameFound) {
         Set-IXDot $ui.ClientDot $Colors.Off
         $ui.ClientText.Text = 'Waiting for the game folder'
@@ -211,9 +238,9 @@ function Update-IXView {
     }
     else {
         Set-IXDot $ui.ClientDot $Colors.Warn
-        $ui.ClientText.Text = 'No iw7-mod.exe in the game folder'
-        $ui.ClientLink.Visibility = 'Visible'
+        $ui.ClientText.Text = 'Not installed ' + $Dash + ' INSTALL downloads it'
     }
+    Set-IXVisible $ui.ClientLink ($state.GameFound -and -not $state.ClientFound)
 
     $outdated = $state.Installed -and $state.PackageVersion -and ($state.InstalledVersion -ne $state.PackageVersion)
     if (-not $state.GameFound) {
@@ -241,17 +268,19 @@ function Update-IXView {
         Set-IXDot $ui.ModDot $Colors.Off
         $ui.ModText.Text = 'Not installed'
     }
+    Set-IXVisible $ui.ReinstallLink ($state.Installed -and -not $outdated -and $state.PackageFound)
 
+    # The green button is always the next step: INSTALL, UPDATE, then PLAY.
     if ($outdated) {
         $ui.InstallButton.Content = 'UPDATE'
     }
-    elseif ($state.Installed) {
-        $ui.InstallButton.Content = 'REINSTALL'
+    elseif ($state.Installed -and $state.ClientFound) {
+        $ui.InstallButton.Content = 'PLAY'
     }
     else {
         $ui.InstallButton.Content = 'INSTALL'
     }
-    $ui.InstallButton.IsEnabled = $state.GameFound -and $state.PackageFound
+    $ui.InstallButton.IsEnabled = $state.GameFound -and ($state.PackageFound -or $ui.InstallButton.Content -eq 'PLAY')
     $ui.UninstallButton.IsEnabled = $state.GameFound -and ($state.Installed -or $state.OldCopy)
 
     # One short line each: the window has room for about two.
@@ -279,19 +308,34 @@ function Update-IXView {
 function Set-IXReadyStatus {
     $state = $script:State
     if (-not $state.GameFound) {
-        Set-IXStatus 'GAME NOT FOUND' 'Steam does not list Infinite Warfare here. Click BROWSE and pick iw7_ship.exe in the game folder.' $Colors.Bad
+        Set-IXStatus 'GAME NOT FOUND' 'Click STEAM to install Infinite Warfare (you need to own it on Steam); this window notices when it is there. Installed somewhere else? Click BROWSE.' $Colors.Bad
     }
     elseif (-not $state.PackageFound) {
         Set-IXStatus 'UNINSTALL ONLY' 'To install, run the setup from the full download.' $Colors.Warn
     }
-    elseif ($state.Installed -and $state.HasRecord -and $state.InstalledVersion -eq $state.PackageVersion) {
-        Set-IXStatus 'INSTALLED' 'Start a zombies match. The dead are waiting.' $Colors.Ok
+    elseif ($ui.InstallButton.Content -eq 'PLAY') {
+        Set-IXStatus 'READY TO PLAY' 'Click PLAY, then pick Zombies in the main menu. The dead are waiting.' $Colors.Ok
     }
-    elseif ($state.Installed) {
-        Set-IXStatus 'UPDATE READY' ('Click ' + $ui.InstallButton.Content + ' to replace the installed files.') $Colors.Warn
+    elseif ($ui.InstallButton.Content -eq 'UPDATE') {
+        Set-IXStatus 'UPDATE READY' 'Click UPDATE to replace the installed files.' $Colors.Warn
+    }
+    elseif (-not $state.ClientFound) {
+        Set-IXStatus 'READY' 'Click INSTALL. It downloads the iw7-mod client from its official GitHub page, puts it in the game folder with a desktop shortcut, then installs Infinite Expansion.' $Colors.Ok
     }
     else {
         Set-IXStatus 'READY' 'Click INSTALL. It copies the mod into the game''s iw7-mod folder and adds an uninstall entry to Windows Settings.' $Colors.Ok
+    }
+}
+
+# Busy: everything that starts work is disabled until the work is done.
+function Set-IXBusy {
+    param([bool]$Busy)
+    $script:Busy = $Busy
+    foreach ($name in @('InstallButton', 'UninstallButton', 'BrowseButton', 'SteamLink', 'ClientLink', 'ReinstallLink')) {
+        $ui[$name].IsEnabled = -not $Busy
+    }
+    if (-not $Busy) {
+        Update-IXView
     }
 }
 
@@ -327,7 +371,7 @@ function Invoke-IXFailure {
             return
         }
     }
-    Set-IXStatus 'SOMETHING WENT WRONG' ($ErrorRecord.Exception.Message + ' Details: ' + $LogPath) $Colors.Bad
+    Set-IXStatus 'SOMETHING WENT WRONG' ((Get-IXErrorText $ErrorRecord) + ' Details: ' + $LogPath) $Colors.Bad
 }
 
 function Get-IXOldCopyText {
@@ -342,13 +386,15 @@ function Get-IXOldCopyText {
     return $text
 }
 
+# Installs the mod. $ClientText describes an iw7-mod download that came first.
 function Invoke-IXInstall {
+    param([string]$ClientText)
     try {
         $result = Install-IX $script:GameDir $PackageRoot
         $registered = Register-IXUninstaller $script:GameDir (Get-IXPackageVersion $PackageRoot) $SetupRoot
         $script:RemoveCopyOnExit = $false
         Write-IXLog ('installed ' + $result.Copied + ' files into ' + $result.Target)
-        $text = 'Copied ' + $result.Copied + ' files into ' + $result.Target + '.'
+        $text = $ClientText + 'Copied ' + $result.Copied + ' mod files into ' + $result.Target + '.'
         if ($result.StaleRemoved -gt 0) {
             $text = $text + ' Removed ' + $result.StaleRemoved + ' file(s) an older version left.'
         }
@@ -357,7 +403,7 @@ function Invoke-IXInstall {
             $text = $text + ' Uninstall here or in Windows Settings > Apps.'
         }
         Update-IXView
-        Set-IXStatus 'INSTALLED' ($text + ' Start a zombies match. The dead are waiting.') $Colors.Ok
+        Set-IXStatus 'ALL SET' ($text + ' Click PLAY.') $Colors.Ok
     }
     catch {
         Invoke-IXFailure $_ 'install'
@@ -371,11 +417,160 @@ function Invoke-IXUninstall {
         Write-IXLog ('removed ' + $result.Removed + ' files from ' + $result.Target)
         $text = 'Removed ' + $result.Removed + ' files from ' + $result.Target + '.' + (Get-IXOldCopyText $result)
         Update-IXView
-        Set-IXStatus 'UNINSTALLED' ($text + ' Infinite Expansion has been laid to rest.') $Colors.Bad
+        Set-IXStatus 'UNINSTALLED' ($text + ' The iw7-mod client stays. Infinite Expansion has been laid to rest.') $Colors.Bad
     }
     catch {
         Invoke-IXFailure $_ 'uninstall'
     }
+}
+
+# ---------------------------------------------------------------------------
+# Downloading iw7-mod without freezing the window: the download runs in a second
+# PowerShell runspace, and a timer shows its progress.
+
+$ClientDownloadScript = [IO.File]::ReadAllText($CorePath) + @'
+
+$ErrorActionPreference = 'Stop'
+Install-IXClient -GameDir $args[0] -Progress $args[1]
+'@
+
+function Start-IXClientDownload {
+    param([scriptblock]$Then)
+    if ($script:Busy) {
+        return
+    }
+    if (Test-IXGameRunning) {
+        Set-IXStatus 'CLOSE THE GAME FIRST' 'iw7-mod.exe cannot be replaced while the game is running.' $Colors.Warn
+        return
+    }
+    try {
+        Test-IXWritable $script:GameDir
+    }
+    catch {
+        Invoke-IXFailure $_ 'install'
+        return
+    }
+    Set-IXBusy $true
+    $progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = 'Looking up the latest iw7-mod' })
+    $shell = [PowerShell]::Create()
+    [void]$shell.AddScript($ClientDownloadScript).AddArgument($script:GameDir).AddArgument($progress)
+    $script:Job = @{ Shell = $shell; Handle = $shell.BeginInvoke(); Progress = $progress; Then = $Then }
+    Set-IXStatus 'INSTALLING IW7-MOD' ($progress.Phase + '...') $Colors.Info
+    $script:JobTimer.Start()
+}
+
+function Update-IXJob {
+    $job = $script:Job
+    if ($null -eq $job) {
+        $script:JobTimer.Stop()
+        return
+    }
+    $progress = $job.Progress
+    $text = [string]$progress.Phase
+    if ($progress.Total -gt 0) {
+        $text = $text + ': ' + ('{0:N1} of {1:N1} MB' -f ($progress.Done / 1MB), ($progress.Total / 1MB))
+    }
+    elseif ($progress.Done -gt 0) {
+        $text = $text + ': ' + ('{0:N1} MB' -f ($progress.Done / 1MB))
+    }
+    $ui.StatusText.Text = $text
+    if (-not $job.Handle.IsCompleted) {
+        return
+    }
+
+    $script:JobTimer.Stop()
+    $script:Job = $null
+    $client = $null
+    $failure = $null
+    try {
+        $output = @($job.Shell.EndInvoke($job.Handle))
+        if ($output.Count -gt 0) {
+            $client = $output[$output.Count - 1]
+        }
+        else {
+            $failure = 'The download stopped without a result.'
+        }
+    }
+    catch {
+        $failure = Get-IXErrorText $_
+    }
+    finally {
+        $job.Shell.Dispose()
+    }
+    Set-IXBusy $false
+    if ($failure) {
+        Write-IXLog ('iw7-mod download failed: ' + $failure)
+        Set-IXStatus 'IW7-MOD DOWNLOAD FAILED' ($failure + ' You can also download it by hand: ' + $IXClientUrl) $Colors.Bad
+        return
+    }
+    & $job.Then $client
+}
+
+# What a finished iw7-mod download did, for the status line; also makes the desktop shortcut.
+function Complete-IXClient {
+    param($Client)
+    Write-IXLog ('iw7-mod.exe ' + $Client.Version + ' from ' + $Client.Source + ', verified: ' + $Client.Verified)
+    $text = 'Downloaded iw7-mod ' + $Client.Version + ' from ' + $Client.Source
+    if ($Client.Verified) {
+        $text = $text + ' (checksum verified)'
+    }
+    $text = $text + '.'
+    try {
+        $shortcut = New-IXShortcut $script:GameDir
+        if ($shortcut) {
+            $text = $text + ' Desktop shortcut: ' + [IO.Path]::GetFileNameWithoutExtension($shortcut) + '.'
+        }
+    }
+    catch {
+        Write-IXLog ('shortcut: ' + $_.Exception.Message)
+    }
+    return $text + ' Its first start downloads the rest of its files. '
+}
+
+function Invoke-IXPlay {
+    try {
+        if (-not (Test-IXSteamRunning)) {
+            try {
+                Start-Process 'steam://open/main'
+            }
+            catch {
+            }
+            Set-IXStatus 'STARTING STEAM' 'iw7-mod needs Steam running. Click PLAY again once Steam is open.' $Colors.Warn
+            return
+        }
+        Start-IXGame $script:GameDir
+        Write-IXLog 'started iw7-mod'
+        $window.Close()
+    }
+    catch {
+        Invoke-IXFailure $_ 'play'
+    }
+}
+
+# The green button.
+function Invoke-IXPrimary {
+    if ($ui.InstallButton.Content -eq 'PLAY') {
+        Invoke-IXPlay
+    }
+    elseif (-not $script:State.ClientFound) {
+        Start-IXClientDownload {
+            param($Client)
+            Invoke-IXInstall (Complete-IXClient $Client)
+        }
+    }
+    else {
+        Invoke-IXInstall ''
+    }
+}
+
+function Invoke-IXSteamInstall {
+    try {
+        Start-Process $IXSteamInstallUrl
+    }
+    catch {
+        Start-Process $IXSteamStoreUrl
+    }
+    Set-IXStatus 'WAITING FOR STEAM' 'Install Infinite Warfare in the Steam window. This setup notices when the game is there.' $Colors.Info
 }
 
 function Invoke-IXBrowse {
@@ -398,6 +593,33 @@ function Invoke-IXBrowse {
     }
 }
 
+# Every few seconds while idle: notice a game Steam just installed, an iw7-mod.exe copied
+# in by hand, or the game starting and stopping.
+function Update-IXWatch {
+    if ($script:Busy) {
+        return
+    }
+    try {
+        $wasFound = $script:State.GameFound
+        if (-not $wasFound -and -not $GameDir) {
+            $found = Find-IXGameDir
+            if ($found) {
+                $script:GameDir = $found
+            }
+        }
+        $state = Get-IXState $script:GameDir $PackageRoot
+        if ((ConvertTo-Json -InputObject $state -Compress) -ne $script:StateText) {
+            Update-IXView
+            if (-not $wasFound -and $script:State.GameFound) {
+                Set-IXReadyStatus
+            }
+        }
+    }
+    catch {
+        Write-IXLog ('refresh: ' + $_.Exception.Message)
+    }
+}
+
 try {
     $icon = New-Object System.Windows.Media.Imaging.BitmapImage
     $icon.BeginInit()
@@ -410,6 +632,13 @@ catch {
     Write-IXLog ('icon: ' + $_.Exception.Message)
 }
 
+$script:JobTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:JobTimer.Interval = [TimeSpan]::FromMilliseconds(150)
+$script:JobTimer.Add_Tick({ Update-IXJob })
+$script:WatchTimer = New-Object System.Windows.Threading.DispatcherTimer
+$script:WatchTimer.Interval = [TimeSpan]::FromSeconds(4)
+$script:WatchTimer.Add_Tick({ Update-IXWatch })
+
 $ui.TitleBar.Add_MouseLeftButtonDown({
         try {
             $window.DragMove()
@@ -419,20 +648,38 @@ $ui.TitleBar.Add_MouseLeftButtonDown({
     })
 $ui.MinButton.Add_Click({ $window.WindowState = 'Minimized' })
 $ui.CloseButton.Add_Click({ $window.Close() })
+$ui.SteamLink.Add_Click({ Invoke-IXSteamInstall })
 $ui.BrowseButton.Add_Click({ Invoke-IXBrowse })
-$ui.ClientLink.Add_Click({ Start-Process $IXClientUrl })
+$ui.ClientLink.Add_Click({
+        Start-IXClientDownload {
+            param($Client)
+            $text = Complete-IXClient $Client
+            Set-IXStatus 'IW7-MOD INSTALLED' ($text + 'Now click INSTALL for Infinite Expansion.') $Colors.Ok
+        }
+    })
+$ui.ReinstallLink.Add_Click({ Invoke-IXInstall '' })
 $ui.RepoLink.Add_Click({ Start-Process $IXProjectUrl })
-$ui.InstallButton.Add_Click({ Invoke-IXInstall })
+$ui.InstallButton.Add_Click({ Invoke-IXPrimary })
 $ui.UninstallButton.Add_Click({ Invoke-IXUninstall })
 $window.Add_ContentRendered({
-        if ($Install -and $ui.InstallButton.IsEnabled) {
-            Invoke-IXInstall
+        if ($Install -and $ui.InstallButton.IsEnabled -and $ui.InstallButton.Content -ne 'PLAY') {
+            Invoke-IXPrimary
         }
         elseif ($Uninstall -and $ui.UninstallButton.IsEnabled) {
             Invoke-IXUninstall
         }
     })
+$window.Add_Closing({
+        if ($script:Busy) {
+            $answer = [System.Windows.MessageBox]::Show($window, "iw7-mod is still downloading.`n`nClose anyway?", 'Infinite Expansion Setup', 'YesNo', 'Question')
+            if ($answer -ne 'Yes') {
+                $_.Cancel = $true
+            }
+        }
+    })
 
+$script:Busy = $false
+$script:Job = $null
 $script:RemoveCopyOnExit = $false
 try {
     $script:GameDir = Resolve-IXGameDir
@@ -444,6 +691,7 @@ catch {
     Show-IXFatal ('The setup could not read the game folder: ' + $_.Exception.Message)
     exit 1
 }
+$script:WatchTimer.Start()
 
 try {
     [void]$window.ShowDialog()
@@ -451,6 +699,8 @@ try {
 catch {
     Show-IXFatal ('The setup window stopped: ' + $_.Exception.Message)
 }
+$script:WatchTimer.Stop()
+$script:JobTimer.Stop()
 
 # Uninstalled from the copy Windows Settings runs: remove that copy too.
 if ($script:RemoveCopyOnExit) {

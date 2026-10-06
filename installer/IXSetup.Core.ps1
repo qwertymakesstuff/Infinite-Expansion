@@ -19,6 +19,15 @@ $IXPayloadFolders = @('custom_scripts', 'ui_scripts')
 $IXUninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\InfiniteExpansion'
 $IXProjectUrl = 'https://github.com/qwertymakesstuff/Infinite-Expansion'
 $IXClientUrl = 'https://github.com/auroramod/iw7-mod'
+# Where iw7-mod.exe comes from (iw7-mod's install guide: "Download iw7-mod.exe on the
+# latest release"), and iw7-mod's own update server as a fallback: its updater reads
+# files.json there ([name, size, SHA-1] entries) and downloads data/<name>
+# (src/client/component/updater.cpp).
+$IXClientReleaseApi = 'https://api.github.com/repos/auroramod/iw7-mod/releases/latest'
+$IXClientUpdateServer = 'https://iw7-mod.auroramod.dev/'
+$IXSteamInstallUrl = 'steam://install/292730'
+$IXSteamStoreUrl = 'https://store.steampowered.com/app/292730/'
+$IXShortcutName = 'IW7-Mod (Infinite Warfare).lnk'
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -416,6 +425,261 @@ function Uninstall-IX {
         OldCopyLeft    = $old.Left
         OldCopyPath    = $old.Path
     }
+}
+
+# ---------------------------------------------------------------------------
+# The iw7-mod client
+
+# Windows PowerShell 5.1 may still default to TLS 1.0, which GitHub refuses.
+function Enable-IXTls12 {
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    }
+    catch {
+    }
+}
+
+function New-IXRequest {
+    param([string]$Url)
+    $request = [Net.HttpWebRequest]::Create($Url)
+    $request.UserAgent = 'InfiniteExpansionSetup'
+    $request.Timeout = 30000
+    $request.ReadWriteTimeout = 30000
+    return $request
+}
+
+function Invoke-IXHttpText {
+    param([string]$Url)
+    $request = New-IXRequest $Url
+    $request.Accept = 'application/vnd.github+json, application/json'
+    $response = $request.GetResponse()
+    try {
+        $reader = New-Object System.IO.StreamReader($response.GetResponseStream(), [Text.Encoding]::UTF8)
+        return $reader.ReadToEnd()
+    }
+    finally {
+        $response.Close()
+    }
+}
+
+# Downloads $Url to $Path. $Progress, a synchronized hashtable, gets Done and Total bytes.
+function Save-IXHttpFile {
+    param([string]$Url, [string]$Path, $Progress)
+    $response = (New-IXRequest $Url).GetResponse()
+    try {
+        if ($null -ne $Progress) {
+            $Progress.Total = $response.ContentLength
+            $Progress.Done = 0
+        }
+        $source = $response.GetResponseStream()
+        $target = [IO.File]::Create($Path)
+        try {
+            $buffer = New-Object byte[] 65536
+            $done = 0
+            while ($true) {
+                $read = $source.Read($buffer, 0, $buffer.Length)
+                if ($read -le 0) {
+                    break
+                }
+                $target.Write($buffer, 0, $read)
+                $done += $read
+                if ($null -ne $Progress) {
+                    $Progress.Done = $done
+                }
+            }
+        }
+        finally {
+            $target.Close()
+            $source.Close()
+        }
+    }
+    finally {
+        $response.Close()
+    }
+}
+
+function Get-IXFileHash {
+    param([string]$Path, [string]$Algorithm)
+    if ($Algorithm -eq 'SHA1') {
+        $hasher = [Security.Cryptography.SHA1]::Create()
+    }
+    else {
+        $hasher = [Security.Cryptography.SHA256]::Create()
+    }
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $bytes = $hasher.ComputeHash($stream)
+    }
+    finally {
+        $stream.Close()
+    }
+    return [BitConverter]::ToString($bytes).Replace('-', '')
+}
+
+# The newest release's iw7-mod.exe: download URL, and the SHA-256 GitHub lists for it, if any.
+function Get-IXClientFromGitHub {
+    param([string]$ApiUrl = $IXClientReleaseApi)
+    $release = Invoke-IXHttpText $ApiUrl | ConvertFrom-Json
+    foreach ($asset in @($release.assets)) {
+        if ([string]$asset.name -eq $IXClientExe) {
+            $hash = $null
+            $digest = [string]$asset.digest
+            if ($digest.StartsWith('sha256:')) {
+                $hash = $digest.Substring(7)
+            }
+            return [pscustomobject]@{
+                Source    = 'GitHub'
+                Version   = [string]$release.tag_name
+                Url       = [string]$asset.browser_download_url
+                Algorithm = 'SHA256'
+                Hash      = $hash
+            }
+        }
+    }
+    throw ('the latest release has no ' + $IXClientExe)
+}
+
+# The same file from iw7-mod's update server, with the SHA-1 its own updater checks.
+function Get-IXClientFromUpdateServer {
+    param([string]$ServerUrl = $IXClientUpdateServer)
+    $base = $ServerUrl.TrimEnd('/') + '/'
+    $list = Invoke-IXHttpText ($base + 'files.json') | ConvertFrom-Json
+    foreach ($entry in @($list)) {
+        $item = @($entry)
+        if ($item.Count -eq 3 -and [string]$item[0] -eq $IXClientExe -and $item[2]) {
+            return [pscustomobject]@{
+                Source    = 'the iw7-mod update server'
+                Version   = 'latest'
+                Url       = $base + 'data/' + $IXClientExe
+                Algorithm = 'SHA1'
+                Hash      = [string]$item[2]
+            }
+        }
+    }
+    throw ('files.json lists no ' + $IXClientExe)
+}
+
+# Throws unless $Path looks like the right program and matches the listed checksum.
+function Test-IXClientFile {
+    param([string]$Path, $Source)
+    if ((New-Object System.IO.FileInfo $Path).Length -lt 256KB) {
+        throw 'the download is too small to be iw7-mod.exe'
+    }
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $first = $stream.ReadByte()
+        $second = $stream.ReadByte()
+    }
+    finally {
+        $stream.Close()
+    }
+    if ($first -ne 0x4D -or $second -ne 0x5A) {
+        throw 'the download is not a Windows program'
+    }
+    if ($Source.Hash) {
+        $actual = Get-IXFileHash $Path $Source.Algorithm
+        if ($actual -ne $Source.Hash) {
+            throw ($Source.Algorithm + ' checksum mismatch')
+        }
+    }
+}
+
+# Puts iw7-mod.exe into the game folder: from the latest GitHub release, or else from
+# iw7-mod's update server. The client downloads the rest of its files itself the first
+# time it starts (iw7-mod's install guide, step 3).
+function Install-IXClient {
+    param(
+        [string]$GameDir,
+        $Progress,
+        [string]$ApiUrl = $IXClientReleaseApi,
+        [string]$ServerUrl = $IXClientUpdateServer
+    )
+    if (-not (Test-IXGameDir $GameDir)) {
+        throw "$IXGameExe was not found in '$GameDir'."
+    }
+    Enable-IXTls12
+    $target = Join-Path $GameDir $IXClientExe
+    $temp = $target + '.download'
+    $failures = @()
+    foreach ($origin in @('github', 'server')) {
+        try {
+            if ($null -ne $Progress) {
+                $Progress.Phase = 'Looking up the latest iw7-mod'
+            }
+            if ($origin -eq 'github') {
+                $source = Get-IXClientFromGitHub $ApiUrl
+            }
+            else {
+                $source = Get-IXClientFromUpdateServer $ServerUrl
+            }
+            if ($null -ne $Progress) {
+                $Progress.Phase = 'Downloading iw7-mod.exe from ' + $source.Source
+            }
+            Save-IXHttpFile $source.Url $temp $Progress
+            Test-IXClientFile $temp $source
+            if ([IO.File]::Exists($target)) {
+                [IO.File]::Delete($target)
+            }
+            [IO.File]::Move($temp, $target)
+            return [pscustomobject]@{
+                Path     = $target
+                Source   = $source.Source
+                Version  = $source.Version
+                Verified = [bool]$source.Hash
+            }
+        }
+        catch {
+            $failures += ($origin + ': ' + $_.Exception.Message)
+            if ([IO.File]::Exists($temp)) {
+                [IO.File]::Delete($temp)
+            }
+        }
+    }
+    throw ('iw7-mod could not be downloaded (' + ($failures -join '; ') + ').')
+}
+
+# A desktop shortcut that starts iw7-mod from the game folder. Windows only; returns its path or $null.
+function New-IXShortcut {
+    param([string]$GameDir)
+    if ($env:OS -ne 'Windows_NT') {
+        return $null
+    }
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    if (-not $desktop) {
+        return $null
+    }
+    $path = Join-Path $desktop $IXShortcutName
+    $exe = Join-Path $GameDir $IXClientExe
+    $shell = New-Object -ComObject WScript.Shell
+    $link = $shell.CreateShortcut($path)
+    $link.TargetPath = $exe
+    $link.WorkingDirectory = $GameDir
+    $link.IconLocation = $exe + ',0'
+    $link.Description = 'Call of Duty: Infinite Warfare with the iw7-mod client'
+    $link.Save()
+    return $path
+}
+
+# Throws (access denied) when Windows does not let this user write to the game folder.
+function Test-IXWritable {
+    param([string]$GameDir)
+    $probe = Join-Path $GameDir ('ix-setup-' + [Guid]::NewGuid().ToString('N') + '.tmp')
+    [IO.File]::WriteAllText($probe, 'probe')
+    [IO.File]::Delete($probe)
+}
+
+function Test-IXSteamRunning {
+    return @(Get-Process -Name 'steam' -ErrorAction SilentlyContinue).Count -gt 0
+}
+
+# Starts iw7-mod.exe the way its install guide says: from the game folder.
+function Start-IXGame {
+    param([string]$GameDir)
+    $exe = Join-Path $GameDir $IXClientExe
+    if (-not [IO.File]::Exists($exe)) {
+        throw "$IXClientExe is not in the game folder."
+    }
+    Start-Process -FilePath $exe -WorkingDirectory $GameDir | Out-Null
 }
 
 # ---------------------------------------------------------------------------

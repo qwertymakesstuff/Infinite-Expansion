@@ -167,6 +167,9 @@
         <Trigger Property="IsMouseOver" Value="True">
           <Setter Property="Foreground" Value="#FFFFFF"/>
         </Trigger>
+        <Trigger Property="IsEnabled" Value="False">
+          <Setter Property="Opacity" Value="0.4"/>
+        </Trigger>
       </Style.Triggers>
     </Style>
 
@@ -655,20 +658,24 @@
                 <TextBlock Text="GAME FOLDER" Style="{StaticResource Label}"/>
                 <TextBlock x:Name="GameText" Text="Looking for the game..." Style="{StaticResource Value}" FontFamily="Consolas, Segoe UI"/>
               </StackPanel>
-              <Button x:Name="BrowseButton" Grid.Row="0" Grid.Column="2" Content="BROWSE" Style="{StaticResource LinkButton}" Padding="10,6" ToolTip="Pick iw7_ship.exe in your Infinite Warfare folder"/>
+              <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="SteamLink" Content="STEAM" Style="{StaticResource LinkButton}" Padding="8,6" Visibility="Collapsed" ToolTip="Install Infinite Warfare through Steam (you need to own it)"/>
+                <Button x:Name="BrowseButton" Content="BROWSE" Style="{StaticResource LinkButton}" Padding="8,6" ToolTip="Pick iw7_ship.exe in your Infinite Warfare folder"/>
+              </StackPanel>
 
               <Ellipse x:Name="ClientDot" Grid.Row="1" Style="{StaticResource Dot}"/>
               <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,4,0,2">
                 <TextBlock Text="IW7-MOD CLIENT" Style="{StaticResource Label}"/>
                 <TextBlock x:Name="ClientText" Text="-" Style="{StaticResource Value}"/>
               </StackPanel>
-              <Button x:Name="ClientLink" Grid.Row="1" Grid.Column="2" Content="GET IT" Style="{StaticResource LinkButton}" Padding="10,6" Visibility="Collapsed" ToolTip="Open the iw7-mod page"/>
+              <Button x:Name="ClientLink" Grid.Row="1" Grid.Column="2" Content="DOWNLOAD" Style="{StaticResource LinkButton}" Padding="8,6" Visibility="Collapsed" ToolTip="Download iw7-mod.exe from its official GitHub release into the game folder"/>
 
               <Ellipse x:Name="ModDot" Grid.Row="2" Style="{StaticResource Dot}"/>
               <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,4,0,2">
                 <TextBlock Text="INFINITE EXPANSION" Style="{StaticResource Label}"/>
                 <TextBlock x:Name="ModText" Text="-" Style="{StaticResource Value}"/>
               </StackPanel>
+              <Button x:Name="ReinstallLink" Grid.Row="2" Grid.Column="2" Content="REINSTALL" Style="{StaticResource LinkButton}" Padding="8,6" Visibility="Collapsed" ToolTip="Copy the mod files again"/>
 
               <TextBlock x:Name="NoteText" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,6,0,0" FontSize="11.5" Foreground="#FFE66D" TextWrapping="Wrap" Visibility="Collapsed"/>
             </Grid>

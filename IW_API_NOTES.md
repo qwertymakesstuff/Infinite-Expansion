@@ -347,4 +347,11 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
 - **`fs_game` is not saved.** iw7-mod clears the `fs_game` dvar's flags (`filesystem.cpp`, "fs_game flags"), so a mod loaded from the Mods menu is gone after restarting the game.
 - **Steam `[STEAM]`.** The install folder is in `HKCU\Software\Valve\Steam\SteamPath`, or `InstallPath` under `HKLM\SOFTWARE\(WOW6432Node\)Valve\Steam`. `steamapps\libraryfolders.vdf` lists the other libraries: `"path" "D:\\SteamLibrary"` in the current format, `"1" "D:\\SteamLibrary"` in the old one. `steamapps\appmanifest_292730.acf` (Infinite Warfare's app id 292730) names the folder under `steamapps\common` in `"installdir"`.
 - **Apps & features.** A per-user entry is a registry key under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<name>` with `DisplayName`, `UninstallString` and related values; it needs no administrator rights.
+- **iw7-mod's install guide** (`auroramod/docs`, `iw7-install.md`): you must own the game on Steam. Download `iw7-mod.exe` from the latest GitHub release, move it into the game folder, launch it once so its updater downloads the client's files, then play. The uninstall guide lists the `iw7-mod` and `data` folders in the game folder and `%localappdata%/auroramod`.
+- **iw7-mod's updater** (`updater.cpp`) runs at every start unless `-noupdate` is given.
+  - It reads `https://iw7-mod.auroramod.dev/files.json` (`files-dev.json` for develop builds). That file is a JSON array of `[name, size, sha1]` entries, with SHA-1 in upper-case hex, and includes `iw7-mod.exe` itself.
+  - It downloads each file from `data/<name>` (`data-dev/` for develop) and checks the SHA-1.
+  - It replaces its own exe by renaming the old one to `.old`, then restarts itself (`-update-only`: exits instead). Data files go below `%LOCALAPPDATA%`.
+  - CI (`.github/workflows/build.yml`) uploads every push to `main` and `develop` to that server. GitHub releases are made by hand.
+- **Steam `[STEAM]`.** `steam://install/292730` opens Steam's install dialog for the game; `steam://open/main` starts Steam. iw7-mod exits with a message when Steam is not running (`steam_proxy.cpp`).
 

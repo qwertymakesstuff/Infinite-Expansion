@@ -84,6 +84,8 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V42 | `IXSetup.ps1 -NoWindow` under PowerShell 7 | ✅ Installs and uninstalls the fake game folder; a wrong folder exits 1 with a message and creates nothing |
 | V43 | Windows PowerShell 5.1 compatibility (`tools/tests/ps51_lint.ps1`): parse errors, PowerShell 7 syntax (`?:`, `??`, `&&`, `?.`), 5.1-missing parameters, three-part `Join-Path`, `$IsWindows`; ASCII-only scripts | ✅ Clean. A sample with each problem is flagged |
 | V44 | `IXSetup.xaml`: well formed; no `x:Class` or event attributes (so `XamlReader.Load` accepts it); every control the script uses, resource key and storyboard target exists; only known WPF element types; each element/attribute pair reviewed against WPF | ✅ All checks pass. The window itself has not been opened (E5) |
+| V46 | `Install-IXClient` against a local fake of GitHub's release API and iw7-mod's update server (`ClientDownload`, 6 tests) | ✅ The latest release with a matching SHA-256 digest is installed. A wrong digest, or GitHub answering 500, falls back to the update server's SHA-1. When every source fails (bad checksums, an HTML page instead of a program), nothing is left in the game folder. A release without a digest is accepted unverified. An old `iw7-mod.exe` is replaced |
+| V47 | The window's background download (`BackgroundDownload`): the exact script text `IXSetup.ps1` builds, run in a second runspace the same way | ✅ Exactly one result object comes back through `EndInvoke`; progress written on the download thread is visible; a failure arrives with its own message |
 | V45 | Launcher line endings | ✅ `*.cmd text eol=crlf`: `git archive` (GitHub's zip downloads) and checkouts both give CRLF |
 
 ## 3. Runtime test environment (for testers)
@@ -193,6 +195,10 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
 | R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
 | R-I9 | Game in a folder Windows protects (if available) | INSTALL offers to retry as administrator, and that works | not run |
+| R-I10 | Move `iw7-mod.exe` out of the game folder, then INSTALL | The status line shows "Downloading iw7-mod.exe from GitHub: x of y MB"; `iw7-mod.exe` is back; a desktop shortcut **IW7-Mod (Infinite Warfare)** exists; then ALL SET and the button reads PLAY. Report the version and whether it says "checksum verified" | not run |
+| R-I11 | PLAY, with Steam closed and then open | Closed: Steam opens and the window says to click PLAY again. Open: iw7-mod starts (first time: its updater runs), and the setup closes | not run |
+| R-I12 | No game installed (another PC, or a Steam account without the game) | GAME NOT FOUND; STEAM opens Steam's install dialog or the store page; after Steam installs the game, the window finds it within a few seconds | not run |
+| R-I13 | DOWNLOAD in the iw7-mod row | Only iw7-mod is downloaded; the status says to click INSTALL next | not run |
 
 ### 4.7 Compatibility matrix
 

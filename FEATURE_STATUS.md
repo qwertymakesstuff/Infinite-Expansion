@@ -30,9 +30,12 @@
 |---------|----------|-------|--------|-------|
 | One-click setup window (install / update / uninstall) | Installer | 1.5 | TESTING | `Infinite Expansion Setup.cmd` → `installer/IXSetup.ps1` (WPF, Windows PowerShell 5.1); 80s neon art; R-I1, R-I3, R-I5, R-I8 |
 | Finds the game through Steam (registry, every library, app manifest) | Installer | 1.5 | TESTING | BROWSE as fallback; R-I2, R-I7 |
+| Installs the iw7-mod client when it is missing | Installer | 1.5 | TESTING | Latest GitHub release (SHA-256 digest when listed), iw7-mod's update server as fallback (SHA-1); progress in the window; R-I10, R-I13 |
+| PLAY: starts iw7-mod (opens Steam first if needed); desktop shortcut | Installer | 1.5 | TESTING | R-I10, R-I11 |
+| Game not installed: Steam's install dialog, then automatic re-detection | Installer | 1.5 | TESTING | `steam://install/292730`; checks again every 4 s; R-I12 |
 | Uninstall from Windows Settings → Apps | Installer | 1.5 | TESTING | Per-user entry; a setup copy in `%LOCALAPPDATA%`; R-I6 |
 | Removes exactly what it installed; removes the old Mods-menu copy | Installer | 1.5 | TESTING | Record `iw7-mod/infinite-expansion.json`; R-I4, R-I5 |
-| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (21 tests), `tools/tests/ps51_lint.ps1` |
+| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks, downloads against a local fake server) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (29 tests), `tools/tests/ps51_lint.ps1` |
 | Signed installer (no Windows warning) | Installer | – | NOT PLANNED | Needs a paid certificate (L31) |
 
 ## Core (Phases 1–2)

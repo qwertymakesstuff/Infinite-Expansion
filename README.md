@@ -10,7 +10,7 @@ The BO3 mod serves only as a reference. Nothing is copied from it, and every fea
 ## Requirements
 
 - A legally owned copy of *Call of Duty: Infinite Warfare* (Steam).
-- **iw7-mod** client, latest release **v1.1.0** or a newer develop build. Stock IW7 cannot load custom scripts.
+- **iw7-mod** client, latest release **v1.1.0** or a newer develop build. Stock IW7 cannot load custom scripts. The one-click setup downloads it for you.
 
 ## Installation
 
@@ -18,9 +18,18 @@ The BO3 mod serves only as a reference. Nothing is copied from it, and every fea
 
 1. Download this repository (on GitHub: **Code → Download ZIP**) and extract the whole zip.
 2. Double-click **`Infinite Expansion Setup.cmd`**.
-3. Click **INSTALL**. Click **UNINSTALL** in the same window to remove it again.
+3. Click **INSTALL**. When it says ALL SET, the button becomes **PLAY**. Click **UNINSTALL** in the same window to remove the mod again.
 
-The setup window finds Infinite Warfare through Steam, including Steam libraries on other drives, and checks that the iw7-mod client is in the game folder. **BROWSE** lets you pick `iw7_ship.exe` yourself. INSTALL copies the mod into `<Infinite Warfare>\iw7-mod\` and records the files it copied in `iw7-mod\infinite-expansion.json`. UNINSTALL removes exactly those files, and other mods' scripts stay. Installing also removes an old copy in `mods\infinite_expansion` (see below), but keeps any file of your own in that folder.
+What the setup does for you:
+
+| Step | How |
+|------|-----|
+| Finds the game | Through Steam, including libraries on other drives. Not installed yet? **STEAM** opens Steam's own install dialog (you must own the game), and the window notices when the game is there. Installed somewhere else? **BROWSE** to `iw7_ship.exe` |
+| Installs the iw7-mod client, if the game folder has none | Downloads `iw7-mod.exe` from the latest release on [iw7-mod's GitHub page](https://github.com/auroramod/iw7-mod/releases), or from iw7-mod's own update server if GitHub fails. It checks the file against the checksum the source lists, puts it in the game folder as iw7-mod's install guide says, and adds an **IW7-Mod (Infinite Warfare)** desktop shortcut. **DOWNLOAD** in the iw7-mod row does only this step |
+| Installs the mod | Copies it into `<Infinite Warfare>\iw7-mod\` and records the copied files in `iw7-mod\infinite-expansion.json`. Also removes an old copy in `mods\infinite_expansion` (see below), keeping any file of your own in it |
+| Starts the game | **PLAY** starts iw7-mod from the game folder (Steam must be running; PLAY opens Steam if it is not). iw7-mod's first start downloads the rest of its own files, then pick Zombies |
+
+UNINSTALL removes exactly the recorded mod files; other mods' scripts and the iw7-mod client stay. To remove iw7-mod too, follow [its uninstall guide](https://github.com/auroramod/docs/blob/main/docs/iw7-uninstall.md).
 
 INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files, and the button then reads UPDATE.
 
