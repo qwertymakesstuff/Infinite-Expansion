@@ -1,0 +1,1 @@
+check.py test fixture: a small mod that follows every rule.

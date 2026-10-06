@@ -1,0 +1,37 @@
+# GSC built-ins that iw7-mod registers at runtime (gsc::function::add / gsc::method::add).
+# Extracted from auroramod/iw7-mod src/client/component/**/*.cpp; the list is identical
+# at tag v1.1.0 (1b76f04e) and develop (c0a1c6da).  Names already present in gsc-tool's
+# IW7 table (print, println, assert, assertex, logprint, setslowmotion) are kept for
+# completeness; ixcc only adds names the table does not know.
+# Regenerate:
+#   for f in $(git ls-tree -r --name-only <rev> src/client/component | grep '\.cpp$'); do
+#     git show <rev>:$f | grep -oE '(gsc::)?(function|method)::add\("[a-z_0-9]+"'; done |
+#     sed -E 's/gsc:://; s/::add\("/ /; s/"$//' | sort -u
+function assert
+function assertex
+function copyfolder
+function createdirectory
+function directoryexists
+function directoryisempty
+function executecommand
+function fileexists
+function filesize
+function getfunction
+function listfiles
+function logprint
+function print
+function println
+function readfile
+function removefile
+function replacefunc
+function say
+function setslowmotion
+function strstartswith
+function toupper
+function type
+function typeof
+function va
+function writefile
+method isinspectingweapon
+method startweaponinspection
+method tell

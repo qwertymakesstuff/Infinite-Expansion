@@ -1,0 +1,1 @@
+check.py test fixture: every script here breaks one rule on purpose.

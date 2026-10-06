@@ -258,6 +258,7 @@ AAE has **five** user-facing control surfaces.
 1. **Runtime build.** iw7-mod compiles each `.gsc` **from source** when a map loads. There is no offline build step for players.
    - A compile error in an **auto-loaded entry script** is printed to the iw7-mod console, and that script is skipped (`load_custom_script` catches the error).
    - What happens when a **module that is only referenced** fails to compile is unverified; it may abort the level load. This is another reason every script is compile-checked offline.
+     - *Phase 1 update:* iw7-mod reports any unresolved script reference as `script link error` with `ERR_SCRIPT_DROP` (`gsc/script_error.cpp`), so the load most likely ends. See `KNOWN_LIMITATIONS.md` L23; the in-game check is R-S6.
 2. **Offline verification** (this project). Compile every script with gsc-tool built at **both** pins iw7-mod uses:
    - `833822d0` → users on **v1.1.0 (release)**
    - `0be361a4` → users on **develop**

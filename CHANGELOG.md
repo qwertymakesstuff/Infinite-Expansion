@@ -4,6 +4,33 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Phase 1 — Foundation (2026-10-06)
+
+**Added**
+- The mod folder `mods/infinite_expansion/` (version 0.1.0) with `desc.txt`.
+  - Entry scripts `custom_scripts/cp/ix_main.gsc` and `custom_scripts/mp/ix_main.gsc`.
+  - `ix/core/bootstrap.gsc`: duplicate-init guard, master switch `ix_enabled`, `level.ix` state, init order (core `setup()`, then each module's `register()`), the lifecycle notifies `ix_ready`, `ix_player_connected`, `ix_player_spawned`, and `ix_shutdown`, plus `ix_version`.
+  - `ix/core/log.gsc`: `[IX] LEVEL:` console lines, `ix_debug_log`, and a 32-line ring buffer.
+  - `ix/core/compat.gsc`: client feature detection and the nine raw-id wrappers (`god_off`, `local_sound`, `third_person`, `fire_rate_on`/`off`, `recoil_get`/`off`, `spread_reset`, `has_perk`).
+  - `ix/core/util.gsc`: the first helpers.
+  - One placeholder module per area (player, weapons, zombies, mp, debug, ui).
+- `tools/ixcc`: compiles a script the way iw7-mod's in-game loader does, with iw7-mod's 28 extension built-ins registered. `setup_compilers.sh` now builds it for both pins and fetches the pinned stock-script dump.
+- `tools/check.py`: compile with both compilers, parity, stub natives and raw ids, far-call targets, mode separation, source rules, and the per-mode memory budget.
+- `tools/tests`: 11 tests on a rule-breaking and a clean fixture mod.
+
+**Findings**
+- An unresolved script reference is a `script link error` that drops the match (L23).
+- Script runtime errors are silent unless `developer_script` is on, and that dvar also compiles `/# #/` blocks (L24). Testers now launch with `+set developer_script 1`.
+- Both compilers reject a script function named after a built-in.
+- An unknown raw id compiles silently (C6), and iw7-mod's extension ids depend on registration order (C7). `check.py` catches both.
+- `scripts\engine\utility::waittill_any` ends its caller on any notify but the first, so the bootstrap uses one watcher thread per notify.
+- iw7-mod's own scripts use 711 bytes (CP) and 6,823 bytes (MP) of the 1 MiB custom-script memory.
+
+**Changed**
+- Module entry points are `register()` (feature modules) and `setup()` (core). Only entry scripts define `init()`, which iw7-mod runs in every auto-loaded file. `ARCHITECTURE.md` §3 documents the implemented flow.
+
+**Not yet verified in-game**: everything under `mods/`. `TESTING.md` R-S1, R-S2, and R-S5 to R-S9 are the first runtime checks.
+
 ### Phase 0 — BO3 reference analysis completed (2026-10-06)
 
 **Added**

@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Infinite Expansion
 
-> **Status: PROPOSED (Phase 0, final).** This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design. Implementation starts in Phase 1.
+> **Status: Phase 1 implemented** (entry scripts, bootstrap, logging, compat, first utilities, `tools/check.py`). Sections 4–6 remain the plan for Phases 2–8. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
 
 ## 1. Constraints that shape the design
 
@@ -9,7 +9,8 @@
 | iw7-mod auto-loads only top-level `.gsc` files in `custom_scripts/`, `custom_scripts/<mode>/`, and `custom_scripts/cp_mp/` | One small **entry script per mode**; every module lives in `custom_scripts/ix/…`, which is never auto-loaded |
 | Far calls to other custom files compile to `OP_ScriptFarFunctionCall custom_scripts/ix/<area>/<file> <func>` (compiled and disassembled in Phase 0) | Modules call each other by explicit path (`custom_scripts\ix\core\util::fn()`); no `#include` chains |
 | `init()` runs before the map's `main()` | Bootstrap waits for the level before wrapping map-owned callbacks |
-| 1 MiB custom bytecode budget, fatal if exceeded | Keep modules small; the build check reports total size (target ≤ 512 KiB) |
+| 1 MiB custom bytecode budget, fatal if exceeded | Keep modules small; `tools/check.py` reports the total per mode (limit 512 KiB) |
+| An unresolved reference in any loaded script is a `script link error` that drops the match (L23) | Every script must pass `tools/check.py` (compile, calls) before a release |
 | v1.1.0 compiler mislabels/lacks many method names | Every raw `_meth_` / `_func_` id lives in **one** module (`ix\core\compat`) |
 | File I/O only with `fs_game` | Persistence layer with a dvar-only fallback |
 | CP and MP have different stock script sets | Shared modules never reference `scripts\cp\…` or `scripts\mp\…`; mode modules are referenced only by their own entry script |
@@ -23,16 +24,16 @@ The repository mirrors the game folder, so installing is a straight copy of `mod
 Infinite-Expansion/                          (repository)
 ├── mods/
 │   └── infinite_expansion/                  → <Infinite Warfare>/mods/infinite_expansion/
-│       ├── desc.txt                         Mods-menu description
+│       ├── desc.txt                         Mods-menu description                         (Phase 1)
 │       └── custom_scripts/
-│           ├── cp/ix_main.gsc               ENTRY (zombies)       — auto-loaded
-│           ├── mp/ix_main.gsc               ENTRY (multiplayer)   — auto-loaded
+│           ├── cp/ix_main.gsc               ENTRY (zombies)       — auto-loaded          (Phase 1)
+│           ├── mp/ix_main.gsc               ENTRY (multiplayer)   — auto-loaded          (Phase 1)
 │           └── ix/                          MODULES               — loaded by reference only
 │               ├── core/                    ≙ requested /scripts/core/
-│               │   ├── bootstrap.gsc        init order, duplicate-init guard, shutdown
-│               │   ├── compat.gsc           raw-id wrappers + client feature detection
-│               │   ├── log.gsc              print/logprint wrappers, levels
-│               │   ├── util.gsc             player/entity/array/string/timing helpers
+│               │   ├── bootstrap.gsc        init order, duplicate-init guard, lifecycle   (Phase 1)
+│               │   ├── compat.gsc           raw-id wrappers + client feature detection    (Phase 1)
+│               │   ├── log.gsc              console logging, levels, ring buffer          (Phase 1)
+│               │   ├── util.gsc             player/entity/array/string/timing helpers     (Phase 1: first helpers)
 │               │   ├── events.gsc           event bus over real IW7 notifies
 │               │   ├── features.gsc         feature registry (register/enable/disable)
 │               │   ├── config.gsc           setting registry, get/set/reset, presets
@@ -49,40 +50,54 @@ Infinite-Expansion/                          (repository)
 │               ├── zombies/                 ≙ /scripts/zombies/  (CP ONLY)
 │               │   ├── zombies.gsc          speed, health, counts, spawn tuning
 │               │   └── rounds.gsc           round utilities and round hooks
-│               ├── mp/                      MP-only helpers
+│               ├── mp/mp.gsc                MP-only helpers                               (Phase 1: placeholder)
 │               └── debug/                   ≙ /scripts/debug/   (gated)
 │                   └── debug.gsc            inspector, trace info, perf/log read-outs
 ├── tools/                                   offline verification (Linux)
 └── *.md                                     project documentation
 ```
 
+Phase 1 also created one placeholder per feature area (`ui/ui.gsc`, `player/player.gsc`, `weapons/weapons.gsc`, `zombies/zombies.gsc`, `debug/debug.gsc`). Each only registers its name, so the init log shows the load order.
+
 `/assets/` from the original brief maps to `mods/infinite_expansion/ui_scripts/` (client Lua, later) and an optional `mod.ff` (x64-zt, deferred). Neither is used in the script phases.
 
 ## 3. Initialization flow
+
+Implemented in Phase 1 unless marked *(Phase 2+)*.
 
 ```text
 iw7-mod loads custom_scripts/<mode>/ix_main.gsc
 │
 ├─ main()     [G_LoadStructs — before stock level scripts]
-│   └─ (reserved for replacefunc hooks; nothing in Phase 1)
+│   └─ (reserved for replacefunc hooks; not defined yet)
 │
 └─ init()     [Scr_LoadLevel — before the map's main()]
-    └─ ix\core\bootstrap::start(mode)
-        ├─ guard: if level.ix already exists → log + return     (no double init)
-        ├─ level.ix = spawnstruct(); mode, map, client features (compat::detect)
-        ├─ core:     log → util → events → features → config
-        ├─ config:   register all settings → load (file if fs_game, else dvars)
-        ├─ modules:  each module's register() adds features + settings + menu items
-        │             (CP entry also registers ix\zombies\*; MP entry registers ix\mp\*)
-        ├─ events:   start listeners (connected, spawned_player, waves, game_ended)
-        ├─ wait for level ready (first "connected" / prematch) ─┐
-        │                                                       ├─ wrap map-owned callbacks
-        │                                                       └─ apply enabled global features
-        └─ per player (events: player_connect → player_spawn)
-            ├─ self.ix = spawnstruct()  (state, HUD handles, menu state)
-            ├─ menu input watcher (one thread, guarded)
-            └─ apply enabled per-player features (re-applied every spawn)
+    └─ ix\core\bootstrap::start(mode, modules())
+        ├─ guard: level.ix already exists → log a warning, return      (no double init)
+        ├─ master switch: dvar ix_enabled "0" → log, return           (mod fully off)
+        ├─ level.ix = { version, mode, map, ready = 0, modules = [] }; dvar ix_version
+        ├─ core setup():  log → compat (client feature flags)
+        ├─ (Phase 2+) events → features → config: register settings, load file or dvars
+        ├─ modules' register(), in entry-script order:
+        │     cp: player, weapons, zombies, debug, ui
+        │     mp: player, weapons, mp, debug, ui
+        ├─ log "init <version> mode=… map=… modules=…" and "client fs_game=… omnimovement=…"
+        ├─ thread wait_until_ready: first "connected" + waittillframeend
+        │     → level.ix.ready = 1, notify "ix_ready"
+        │     (Phase 2+) wrap map-owned callbacks, apply enabled global features
+        ├─ thread watch_players: every "connected"
+        │     → self.ix = { spawn_count }, notify "ix_player_connected"
+        │     → one thread per spawn notify ("spawned_player", "faux_spawn")
+        │          → notify "ix_player_spawned" on every spawn
+        │     (Phase 2+) menu input watcher; re-apply per-player features on spawn
+        └─ thread watch_shutdown: "game_ended" → notify "ix_shutdown"
 ```
+
+**Conventions** (enforced by `tools/check.py` where marked ✓):
+
+- Only entry scripts define `init()` or `main()`, because iw7-mod runs those in every file it auto-loads ✓. Feature modules expose `register()`; core files expose `setup()`.
+- `register()` and `setup()` run synchronously and must not wait. Waiting work runs in its own thread.
+- Modules take connect, spawn, ready, and shutdown from the `ix_*` notifies above instead of waiting on `connected` / `spawned_player` themselves, so that plumbing lives in one place. The Phase 2 event bus (§4.3) builds on it.
 
 **Shutdown.**
 - On `game_ended`, threads end through `level endon("game_ended")`.
@@ -145,7 +160,7 @@ One listener thread exists per source notify (per player where relevant), never 
 ### 4.4 Utilities (`ix\core\util`, `ix\core\log`, `ix\core\compat`)
 
 - **util:** player iteration and validation (`isdefined`, `isalive`, `isplayer`, not bot), array helpers, string formatting (`va`), clamps, rounding, timing helpers.
-- **log:** `ix\core\log::info/warn/error/debug(msg)`, which calls `print("[IX] …")` (iw7-mod console). Debug output is gated by setting `debug_log`.
+- **log:** `ix\core\log::info/warn/error/debug(msg)`, which calls `print("[IX] LEVEL: …")` (iw7-mod console) and keeps the last 32 lines in `level.ix.log` (`log::recent()`). Debug output is gated by dvar `ix_debug_log` (the future setting `debug_log`).
 - **compat:** the **only** place raw ids appear, each with its real name in a comment:
   - `god_off()` → `_meth_80A1`
   - `local_sound(a)` → `_meth_8242`
@@ -154,7 +169,7 @@ One listener thread exists per source notify (per player where relevant), never 
   - `recoil_get()` → `_meth_85C0`; `recoil_off()` → `_meth_822C`
   - `spread_reset()` → `_meth_8263`; `has_perk(p)` → `_meth_8181`
 
-  It also provides feature detection: `has_dvar(name)` is implemented as `getdvar(name) != ""`.
+  It also provides feature detection: `has_dvar(name)` is implemented as `getdvar(name) != ""`. `setup()` stores the results in `level.ix.client` (`has_fs_game`, `has_omnimovement`, `has_sprint_unlimited`, `has_air_control`), and `describe()` formats them for the init log.
 
 ## 5. Menu design (`ix\ui\menu`)
 
@@ -189,7 +204,7 @@ One listener thread exists per source notify (per player where relevant), never 
 3. `ix\mp\*` is referenced **only** from `custom_scripts/mp/ix_main.gsc`.
 4. Mode modules plug into shared code through function pointers stored in `level.ix` (for example `level.ix.fn_get_round`), never through direct calls.
 
-The build check verifies these rules by scanning far-call paths.
+`tools/check.py` (`modes`) verifies these rules on the compiled far-call paths. It also rejects scripts outside `custom_scripts/{cp,mp}/` and `custom_scripts/ix/<known area>/`, and warns about modules that no entry script reaches.
 
 ## 8. Naming conventions
 
@@ -202,6 +217,7 @@ The build check verifies these rules by scanning far-call paths.
 | Notifies | `ix_<event>` | `ix_menu_closed` |
 | Files | `snake_case.gsc`; one responsibility per file | `menu_tree.gsc` |
 | Functions | `snake_case`; module-qualified calls | `custom_scripts\ix\core\config::get("x")` |
+| Entry points | `init()` in entry scripts only; `register()` in feature modules; `setup()` in core files | `custom_scripts\ix\ui\ui::register` |
 
 ## 9. Adding a feature (extension guide, to be finalized in Phase 2)
 
@@ -212,7 +228,7 @@ The build check verifies these rules by scanning far-call paths.
    - add menu items to `menu_tree`.
 3. Implement enable/disable so that disable fully **restores** the previous state.
 4. Use only APIs listed in `IW_API_NOTES.md`; raw ids go through `compat`.
-5. Run `tools/` checks; add rows to `FEATURE_STATUS.md` and `TESTING.md`.
+5. Run `python3 tools/check.py` until it passes; add rows to `FEATURE_STATUS.md` and `TESTING.md`.
 
 ## 10. Mapping from AAE's architecture (BO3) to Infinite Expansion (IW7)
 

@@ -27,20 +27,25 @@ If an API is not listed here, verify it the same way before using it. The rule i
 
 | Fact | Detail |
 |------|--------|
-| Source compiled at runtime | iw7-mod compiles `.gsc` **source** with its embedded gsc-tool when a map loads. A compile error in an auto-loaded entry script is printed to the console and that script is **skipped**. The effect of a compile error in a module that is only referenced is **unverified** (it may abort the load). |
+| Source compiled at runtime | iw7-mod compiles `.gsc` **source** with its embedded gsc-tool when a map loads. A compile error in an auto-loaded entry script is printed to the console (`script compile error`) and that script is **skipped**. |
+| Link errors drop the match | An unresolved far-call target (unknown function, or a script that could not be loaded) is reported as `Com_Error(ERR_SCRIPT_DROP, "script link error …")` (`compile_error_stub`, `find_variable_stub` in `gsc/script_error.cpp`). A referenced module that fails to compile therefore most likely ends the load. Not yet observed in-game (R-S6). |
+| Runtime errors | `vm_error_internal` prints `script runtime error` **only when `developer_script` is on**; otherwise it is silent. The exception is a call to a missing built-in, which always prints `builtin function "x" doesn't exist` (`script_extension.cpp`). |
+| Compile mode | `developer_script` (registered by iw7-mod, default off in release builds) also switches the compiler from `build::prod` to `build::dev`, which compiles `/# … #/` dev blocks (`init_compiler`, `script_loading.cpp`). |
+| Extension built-ins | `function::add` / `method::add` **replace** the handler of a name already in the table (`print`, `println`, `assert`, `assertex`, `logprint`, `setslowmotion`) and **append** new names with ids from 807 (functions) and `0x85CC` (methods) in registration order. Scripts must call them by name; their raw ids are not stable. `print` joins its arguments with tabs and writes to the console. |
+| Name resolution | An unqualified call resolves to a built-in first, then a function in the same file, then an `#include`. Defining a script function with a built-in's name is a compile error (`function name 'x' already defined as builtin`) in both compilers `[COMPILED]`. |
 | Search paths | `%LOCALAPPDATA%/…/cdata` (client data), `<game>/iw7-mod/`, then the engine's search paths, which include `<game>/<fs_game>` when a mod is loaded. `[MOD filesystem.cpp]` |
 | Auto-loaded folders (in-game) | `custom_scripts/`, `custom_scripts/<mode>/` (`mp`, `cp`, `sp`), and `custom_scripts/cp_mp/` (in MP **and** CP). |
 | Auto-loaded folders (frontend) | `custom_scripts/frontend/` only, and **only on develop** (added after v1.1.0). |
 | Scanning is non-recursive | `utils::io::list_files` uses `directory_iterator`. Subfolders of the auto-load folders are **not** auto-loaded. They load only when referenced (`#include` or a far call), which is how modules are kept out of auto-execution. |
 | Entry points | For each auto-loaded file: `main()` runs at `G_LoadStructs` (**before** stock level scripts; use it for `replacefunc`). `init()` runs at `Scr_LoadLevel`, **before the map's own `main()`**. |
 | Ordering consequence | Anything that wraps a callback a map script assigns (for example `level.callbackplayerdamage`, which `cp_town`, `cp_rave`, `cp_disco`, and `cp_final` reassign) must **wait** first, for instance until `level waittill("connected")` or `"prematch_done"`, before wrapping. |
-| Custom bytecode budget | `script_memory.size = 0x100000` (**1 MiB**) for **all** custom scripts in one load. Exceeding it is a **fatal** `Com_Error("Out of custom script memory")`. iw7-mod's own bundled scripts count toward it. |
+| Custom bytecode budget | `script_memory.size = 0x100000` (**1 MiB**) for **all** custom scripts in one load. Each loaded script takes its bytecode length + 1 (`allocate_buffer`); strings and the stack are allocated elsewhere. Exceeding it is a **fatal** `Com_Error("Out of custom script memory")`. iw7-mod's own bundled scripts count toward it: **711 bytes in CP** (`cp/patches.gsc`, `cp_mp/inspect.gsc`) and **6,823 bytes in MP** (`mp/bots.gsc`, `mp/bots_loadout.gsc`, `mp/ranked.gsc`, `cp_mp/inspect.gsc`), the same at v1.1.0 and develop `[COMPILED]`. |
 | Includes | `#include path\to\file;` resolves raw `.gsc` files from the search paths first; otherwise the stock compiled script is decompiled. |
 | `developer_script` dvar | When enabled, the compiler includes `/# … #/` dev blocks. It defaults to off in release builds. |
 
 ## 3. Packaging `[MOD party.cpp, fastfiles.cpp, ui_scripts/Mods]` `[DOCS loading-mods.md]`
 
-- Mods live in `<game>/mods/<name>/`. The in-game **Mods** menu lists the folders, shows `desc.txt` as the description, sets `fs_game` to `mods/<name>`, and runs `vid_restart`.
+- Mods live in `<game>/mods/<name>/`. The in-game **Mods** menu lists the folders, shows `desc.txt` as the description (the whole file, read with `io.readfile` in `ui_scripts/Mods/ModSelectMenu.lua`), sets `fs_game` to `mods/<name>`, and runs `vid_restart`.
 - From the command line: `iw7-mod.exe +set fs_game "mods/<name>"`.
 - Optional `mod.ff`, `mod.sabs`, and `mod.sabl` (custom fastfile and sound banks) are loaded from the mod folder.
 - Servers advertise `fs_game`, which **must** start with `mods/` and contain no `.` or `::`.
@@ -95,9 +100,12 @@ These were verified by compiling with both compilers and disassembling with the 
 
 ### 4.3 Release stubs (`nullptr` natives; calling them is a runtime error)
 
+The tables mark these `// nullptr`: the exe has no function for the id. iw7-mod checks for this and raises `builtin function "x" doesn't exist` (or `builtin method …`), which is printed even without `developer_script` `[MOD script_extension.cpp]`. `tools/check.py` rejects calls to them.
+
 Debug drawing: `line`, `sphere`, `box`, `cylinder`, `orientedbox`, `print3d`, `printtoscreen2d`.
 Native file I/O: `openfile`, `closefile`, `fprintln`, `freadln`, `fgetarg`, `fprintfields`.
 Also: `adddebugcommand`, `setdebugorigin`, `setdebugangles`, `drawsoundshape`, `perlinnoise2d`, `logstring`, and others.
+Methods relevant to planned features: `noclip`, `ufo`, `allowhighjump`, `allowboostjump`, `setdevtext`, `clearalltextafterhudelem`, `openmenu`, `closemenu`, `openpopupmenu`, and `isagent` as a **method** (the function `isagent(ent)` is available).
 (`logprint` is a native stub, but iw7-mod re-implements it, so it works.) `[TOOL-D]`
 
 ## 5. Callbacks and notifies
@@ -115,6 +123,12 @@ Also: `adddebugcommand`, `setdebugorigin`, `setdebugangles`, `drawsoundshape`, `
 | Last stand (CP) | `self waittill("last_stand")` | CP |
 | Chat | `level waittill("say", player, msg)` / `self waittill("say", msg)`, plus `say_team` | all, iw7-mod v1.0.3+ `[MOD logprint.cpp]` |
 | LUI → server | `self waittill("luinotifyserver", name, value)` | all |
+
+Ordering and helper traps `[DUMP]`:
+
+- **CP connect → spawn.** `cp_globallogic::defaultplayerconnect` notifies `connected`, runs a `waittillframeend`, then calls `spawnplayer()`, which notifies `spawned_player`. A spawn watcher started on `connected` therefore sees the first spawn.
+- **Map callbacks are set synchronously.** The `main()` of `cp_disco`, `cp_final`, `cp_rave`, `cp_town`, and `cp_zmb` contains no wait, and the four maps that override `level.callbackplayerdamage` do it there (`cp_disco.gsc:54`, `cp_final.gsc:90`, `cp_rave.gsc:52`, `cp_town.gsc:53`). They are set before the first player connects.
+- **`scripts\engine\utility::waittill_any(a, b, …)`** puts `endon(b)`, `endon(c)`, … on the **calling** thread, so any notify but the first ends the caller. `waittill_any_return(…)` adds `endon("death")` to the caller unless `"death"` is one of its arguments. Long-lived watchers use one thread per notify instead.
 
 ### 5.2 Engine player notifies seen in stock scripts `[DUMP]`
 
@@ -256,11 +270,16 @@ Before using any built-in, field, notify, dvar, or stock function:
 4. **Dvars** must come from stock usage, an iw7-mod registration, or this mod's own `ix_*` namespace.
 5. **Runtime behaviour** that cannot be checked statically is marked **NEEDS TESTING** in `FEATURE_STATUS.md` until a tester confirms it.
 
+Rules 1 and 2 are enforced by `tools/check.py` (`compile`, `parity`, `natives`, `calls`).
+
 ## 13. Offline toolchain (see `tools/README.md`)
 
-- `tools/setup_compilers.sh` builds both compilers (`gsc-tool-iw7-release` at `833822d0`, `gsc-tool-iw7-develop` at `0be361a4`).
-- Compile: `gsc-tool -m comp -g iw7 -s pc <file-or-dir>`.
-- Disassemble: `gsc-tool -m disasm -g iw7 -s pc <file.gscbin>`.
+- `tools/setup_compilers.sh` builds both compilers (`gsc-tool-iw7-release` at `833822d0`, `gsc-tool-iw7-develop` at `0be361a4`), `ixcc` on top of each (it compiles with iw7-mod's extension built-ins registered), and fetches the stock dump.
+- `python3 tools/check.py` runs every static check on the mod. `python3 -m unittest discover -s tools/tests` tests the checker.
+- Disassemble: `gsc-tool -m disasm -g iw7 -s pc <file.gscbin | dir>`. Ids that neither table names print as `_func_%04X` / `_meth_%04X`.
+- Table ranges (develop): functions `0x001`–`0x326`, methods `0x8000`–`0x85CA`. `0x85CB` is unused, and iw7-mod's extension methods start at `0x85CC`.
 - Verified error behaviour:
   - an unknown built-in gives `couldn't determine function call type`;
-  - a syntax error gives `expected ';'…`.
+  - a syntax error gives `expected ';'…` (develop) or `syntax error, unexpected …` (v1.1.0);
+  - a function named after a built-in gives `function name 'x' already defined as builtin`;
+  - an unknown raw id (`_meth_85CB`) compiles **without** an error.

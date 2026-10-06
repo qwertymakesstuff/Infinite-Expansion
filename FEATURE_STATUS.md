@@ -3,7 +3,8 @@
 **Statuses:** PLANNED · INVESTIGATING · IN PROGRESS · TESTING · COMPLETE · PARTIAL · BLOCKED (· DEFERRED, N/A, NOT PLANNED)
 
 - A feature becomes **COMPLETE** only after it compiles with both iw7-mod compilers **and** is confirmed in-game (`TESTING.md`).
-- **TESTING** means the code is written and passes static checks, but no in-game run has been reported yet.
+- **TESTING** means the code is written and passes static checks (`tools/check.py`), but no in-game run has been reported yet.
+- Tooling runs offline, so a tooling row is **COMPLETE** once it works and is tested here.
 - Evidence for every API named here is in `IW_API_NOTES.md`. The BO3 origin of each AAE feature is in `PROJECT_ANALYSIS.md` §1 and §3.
 
 ## Project / analysis / tooling
@@ -14,23 +15,28 @@
 | BO3 AAE file analysis | Analysis | 0 | COMPLETE | AAE v3.9.5 decompressed; 211/216 scripts decompiled; `PROJECT_ANALYSIS.md` §1 |
 | BO3 reference pipeline | Tooling | 0 | COMPLETE | `tools/bo3_reference/extract_aae.sh` (reproduces §1.3 in ~30 s) |
 | Offline compiler toolchain (both iw7-mod pins) | Tooling | 0 | COMPLETE | `tools/setup_compilers.sh` |
-| Dual-compile parity check | Tooling | 1 | PLANNED | Diff release/develop disassembly |
-| Far-call / mode-separation lint, bytecode budget | Tooling | 1 | PLANNED | |
+| Extension-aware compiler (`tools/ixcc`) | Tooling | 1 | COMPLETE | Compiles iw7-mod extension calls; byte-identical to gsc-tool otherwise |
+| Dual-compile parity check | Tooling | 1 | COMPLETE | `tools/check.py` `parity`; catches C1/C2 (fixture-tested) |
+| Stub-native / unknown raw-id check | Tooling | 1 | COMPLETE | `natives`, `raw ids` (fixture-tested) |
+| Far-call / mode-separation lint, bytecode budget | Tooling | 1 | COMPLETE | `calls`, `modes`, `source`, `budget` (fixture-tested) |
+| Checker test suite | Tooling | 1 | COMPLETE | `tools/tests` (11 tests; `bad_mod` / `good_mod` fixtures) |
 
 ## Core (Phases 1–2)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Entry scripts (CP, MP) | Core | 1 | PLANNED | `custom_scripts/{cp,mp}/ix_main.gsc` |
-| Bootstrap + duplicate-init guard + module order | Core | 1 | PLANNED | Replaces BO3's `system::register` ordering (AAE §1.5) |
-| Compatibility module (raw ids, feature detection) | Core | 1 | PLANNED | Fixes the v1.1.0 mislabels (C1, C2) |
-| Logging | Core | 1 | PLANNED | |
+| Entry scripts (CP, MP) | Core | 1 | TESTING | `custom_scripts/{cp,mp}/ix_main.gsc`; R-S1, R-S2, R-S6 |
+| Bootstrap + duplicate-init guard + module order | Core | 1 | TESTING | Replaces BO3's `system::register` ordering (AAE §1.5); R-S1, R-S5 |
+| Master switch (`ix_enabled 0`) | Core | 1 | TESTING | Whole mod off at the next map load; R-S7 |
+| Lifecycle notifies (`ix_ready`, `ix_player_connected`, `ix_player_spawned`, `ix_shutdown`) | Core | 1 | TESTING | One connect/spawn watcher per player; R-S9 |
+| Compatibility module (raw ids, feature detection) | Core | 1 | TESTING | Fixes the v1.1.0 mislabels (C1, C2); wrappers are exercised by Phases 4 and 6; R-S8 |
+| Logging (`[IX]` console lines, `ix_debug_log`, ring buffer) | Core | 1 | TESTING | R-S1, R-S9 |
 | Feature manager | Core | 2 | PLANNED | |
 | Configuration manager (flat keys, like AAE's `tfoption_*`) | Core | 2 | PLANNED | `ix_*` dvars; live apply |
 | Settings file + schema version (AAE: save data + `tfoption_master_ver`) | Core | 2 | PLANNED | `ix_settings.cfg`; needs mod-folder install (L9) |
 | Live console overrides (`set ix_x v`) | Core | 2 | PLANNED | Replaces AAE `modvar` / `/d` (L3) |
 | Event bus | Core | 2 | PLANNED | Real IW7 notifies only |
-| Utility library | Core | 2 | PLANNED | |
+| Utility library | Core | 2 | IN PROGRESS | `util.gsc` so far: `is_valid_player`, `is_human`, `join` |
 | Chat-command router (`say` notify) | Core | 2 | PLANNED | AAE `chatnotify.gsc` equivalent |
 
 ## UI (Phase 3) / HUD (Phase 8)

@@ -4,12 +4,14 @@
 
 | Level | Where it can run | Covers |
 |-------|------------------|--------|
-| **Static** | Any Linux machine with `tools/` (including this dev environment) | Both compilers, release/develop native-call parity, far-call targets, mode separation, bytecode budget |
+| **Static** | Any Linux machine with `tools/` (including this dev environment): `python3 tools/check.py` | Both compilers (with iw7-mod's extension built-ins), release/develop parity, stub natives and raw ids, far-call targets, mode separation, source rules, bytecode budget |
 | **Runtime** | **Windows + legally owned Infinite Warfare + iw7-mod only** | Everything else: behaviour, timing, HUD, input, multiplayer |
 
 Runtime tests **cannot** be executed in the development environment. Every runtime item below stays **not run** until a tester reports a result, and `FEATURE_STATUS.md` will not mark a feature COMPLETE without one.
 
-## 2. Phase 0 verification log (actually performed)
+## 2. Verification log (actually performed in the development environment)
+
+### Phase 0
 
 | # | Check | Result |
 |---|-------|--------|
@@ -29,12 +31,32 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V14 | Script carve + T7 decompile | ✅ 216 objects carved (162 GSC / 49 CSC / 5 GSH); 211 decompiled by gsc-tool `-g t7` |
 | V15 | `tools/bo3_reference/extract_aae.sh` run from an empty directory | ✅ ~31 s; decompiled output byte-identical to the analysis run (`diff -rq` clean) |
 
+### Phase 1
+
+| # | Check | Result |
+|---|-------|--------|
+| V16 | `tools/setup_compilers.sh` (now also builds `ixcc` and fetches the stock dump) run from an empty directory | ✅ exit 0 from an empty `.toolchain/`: both pins and both `ixcc` binaries built. The stock-dump step, added afterwards, was verified by re-running the script on that toolchain (exit 0, dump at `1dd48a78`). A full run of the final script from an empty directory is recorded in the next update |
+| V17 | `ixcc` built by the setup script vs. built by hand | ✅ byte-identical `.gscbin` for all 12 mod scripts, both pins |
+| V18 | `python3 tools/check.py` on the mod | ✅ PASS, 0 errors, 0 warnings: 24/24 compiled, 12/12 identical between compilers, 31 built-in calls, 30 far references, 10 scripts load per mode, 9 raw ids (all in `compat.gsc`), 0 source issues, 1,481 bytes of custom-script memory per mode (0.14% of 1 MiB) |
+| V19 | `python3 -m unittest discover -s tools/tests` | ✅ 11 tests OK. `bad_mod` gives exactly the 23 planted errors and 1 planted warning; comments, strings, iw7-mod extensions (`va`, `tell`, `fileexists`, `logprint`), and a valid stock call are not flagged; `good_mod` passes with 0 warnings; `--budget 100` fails both modes |
+| V20 | A script function named after a built-in (`clamp`) | ✅ rejected by both compilers: `function name 'clamp' already defined as builtin` |
+| V21 | Unknown raw id `self _meth_85CB()` | ⚠️ compiles on both **without** an error (`KNOWN_LIMITATIONS.md` C6); `check.py` `natives` rejects it |
+| V22 | iw7-mod's own bundled scripts compiled with `ixcc` (both pins) | ✅ CP 711 bytes, MP 6,823 bytes of custom-script memory, the same on v1.1.0 and develop (`IW_API_NOTES.md` §2) |
+| V23 | Stock zombies map `main()` functions (static read of the dump) | ✅ none of the five waits; the four damage-callback overrides happen there, before any player connects (basis for `ix_ready`) |
+| V24 | `check.py` without the stock dump (`--stock /nonexistent`) | ✅ stock far calls become warnings ("not verified"); exit 0 |
+| V25 | `check.py` with a missing toolchain | ✅ lists the missing files; exit 2 |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
 2. iw7-mod installed (`auroramod/docs` → *iw7-install*). Record the client version: **v1.1.0** or a develop build.
-3. Install the mod folder (from Phase 1 on): copy `mods/infinite_expansion` into `<Infinite Warfare>/mods/`, then load it from the in-game **Mods** menu.
-4. Logs: the iw7-mod console (`~`) and `iw7-mod/logs/console.log`, available since iw7-mod v1.0.3. Report every line starting with `[IX]` and any `script compile error` block.
+3. Install the mod folder: copy `mods/infinite_expansion` into `<Infinite Warfare>/mods/`, then load it from the in-game **Mods** menu (or launch with `+set fs_game "mods/infinite_expansion"`).
+4. Launch with `+set developer_script 1`. Without it, script runtime errors are not printed at all (`KNOWN_LIMITATIONS.md` L24).
+5. Logs: the iw7-mod console (`~`) and `iw7-mod/logs/console.log`, available since iw7-mod v1.0.3. Report every line starting with `[IX]` and any `script compile error`, `script link error`, or `script runtime error` block.
+6. Mod dvars for testing:
+   - `ix_debug_log 1`: extra `[IX] DEBUG:` lines (player connect and spawn). Takes effect immediately.
+   - `ix_enabled 0`: turns the whole mod off from the next map load.
+   - `ix_version`: set by the mod, shows the loaded version.
 
 ## 4. Runtime checklist
 
@@ -44,12 +66,15 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` in the console; `[IX] init` logged once | not run | not run |
-| R-S2 | Start an MP private match | Same as R-S1 for MP | not run | not run |
-| R-S3 | Menu opens (ADS + Melee) | Menu visible; weapons/offhands disabled while open | not run | not run |
-| R-S4 | Menu closes (Melee at root) | Menu hidden; weapons restored | not run | not run |
-| R-S5 | `map_restart` / fast restart | Init runs once per load; no duplicate HUD/threads | not run | not run |
-| R-S6 | Module loading by reference (`custom_scripts/ix/...`) | Modules compile and load in-game | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.1.0 mode=cp map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S2 | Start an MP private match | Same as R-S1 with `mode=mp` and `modules=player,weapons,mp,debug,ui` | not run | not run |
+| R-S3 | Menu opens (ADS + Melee) *(Phase 3)* | Menu visible; weapons/offhands disabled while open | not run | not run |
+| R-S4 | Menu closes (Melee at root) *(Phase 3)* | Menu hidden; weapons restored | not run | not run |
+| R-S5 | `map_restart` / fast restart | One `init` line per load; with `ix_debug_log 1`, one `player connected` line per player per load | not run | not run |
+| R-S6 | Module loading by reference (`custom_scripts/ix/...`) | Modules compile and load in-game (the `modules=` list in R-S1 is complete) | not run | not run |
+| R-S7 | `set ix_enabled 0`, then load a map | Only `[IX] INFO: disabled by dvar ix_enabled 0`; no other `[IX]` lines | not run | not run |
+| R-S8 | Client feature line from R-S1 | v1.1.0: `omnimovement=0 sprint_unlimited=0 air_control=0`; develop: all `1`. `fs_game=1` when loaded from the Mods menu, `0` for a loose `iw7-mod/custom_scripts` install | not run | not run |
+| R-S9 | `set ix_debug_log 1`, spawn, then die and respawn (MP), or in CP co-op bleed out and respawn at the next round | `[IX] DEBUG: player connected: <name>` once; `[IX] DEBUG: player spawned: <name> (spawned_player, spawn N)` once per spawn, N rising by 1 | not run | not run |
 
 ### 4.2 Player
 

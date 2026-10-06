@@ -5,3 +5,6 @@
 compiled/
 disassembled/
 decompiled/
+
+# Python bytecode
+__pycache__/

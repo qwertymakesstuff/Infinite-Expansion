@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# Builds the two IW7 GSC compilers that iw7-mod embeds, so the mod can be
-# compile-checked offline against both client versions.
+# Builds the two IW7 GSC compilers that iw7-mod embeds (plus tools/ixcc on top
+# of each) and fetches the stock script reference, so tools/check.py can verify
+# the mod offline against both client versions.
 #
 #   release : auroramod/gsc-tool @ 833822d0  (deps/gsc-tool pin of iw7-mod v1.1.0)
 #   develop : auroramod/gsc-tool @ 0be361a4  (deps/gsc-tool pin of iw7-mod develop c0a1c6da)
 #
 # Usage:  tools/setup_compilers.sh [toolchain-dir]      (default: .toolchain)
-# Output: <toolchain-dir>/bin/gsc-tool-iw7-release
+# Output: <toolchain-dir>/bin/gsc-tool-iw7-release   stock gsc-tool (disassembler, plain compiles)
 #         <toolchain-dir>/bin/gsc-tool-iw7-develop
+#         <toolchain-dir>/bin/ixcc-release           tools/ixcc linked against the same pin:
+#         <toolchain-dir>/bin/ixcc-develop           compiles like iw7-mod's in-game loader
+#         <toolchain-dir>/src/iw7-gsc-dump/          decompiled stock IW7 scripts (mjkzy/iw7-gsc-dump
+#                                                    @ 1dd48a78); check.py verifies stock far calls
+#                                                    against it. Reference only, never shipped.
 # Needs:  Linux x86_64, git, curl, tar, make, clang/clang++ with C++20 support.
 #
 # The older commit's premake5.lua uses a flag that premake beta8 rejects, so
@@ -19,6 +25,9 @@ GSC_TOOL_REPO="https://github.com/auroramod/gsc-tool"
 RELEASE_COMMIT="833822d0c680f1a7a9a8cfdc4dd42b74bddb385f"
 DEVELOP_COMMIT="0be361a4b22be0d0997b92ad94506ee5a5f99fc9"
 PREMAKE_URL_BASE="https://github.com/premake/premake-core/releases/download"
+STOCK_DUMP_REPO="https://github.com/mjkzy/iw7-gsc-dump"
+STOCK_DUMP_COMMIT="1dd48a78e55ef9c99519fc5221a206168ce2e98a"
+IXCC_SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ixcc/ixcc.cpp"
 
 mkdir -p "$TOOLCHAIN_DIR/src" "$TOOLCHAIN_DIR/bin" "$TOOLCHAIN_DIR/premake"
 TOOLCHAIN_DIR="$(cd "$TOOLCHAIN_DIR" && pwd)"
@@ -59,9 +68,28 @@ build() {
     CC=clang CXX=clang++ make -s -C "$src/build" config=release_amd64 xsk-tool -j"$(nproc)"
     cp "$src/build/bin/amd64/release/gsc-tool" "$TOOLCHAIN_DIR/bin/gsc-tool-iw7-$name"
     echo "    -> $TOOLCHAIN_DIR/bin/gsc-tool-iw7-$name"
+
+    local lib="$src/build/bin/amd64/release"
+    clang++ -std=c++20 -O2 -DNDEBUG -Wall -Wextra -I"$src/include" "$IXCC_SOURCE" \
+        "$lib/libxsk-gsc.a" "$lib/libxsk-utils.a" "$lib/libzlib.a" \
+        -o "$TOOLCHAIN_DIR/bin/ixcc-$name"
+    echo "    -> $TOOLCHAIN_DIR/bin/ixcc-$name"
+}
+
+fetch_stock_dump() {
+    local dir="$TOOLCHAIN_DIR/src/iw7-gsc-dump"
+    echo "==> iw7-gsc-dump @ ${STOCK_DUMP_COMMIT:0:8}"
+    if [ ! -d "$dir/.git" ]; then
+        git init -q "$dir"
+        git -C "$dir" remote add origin "$STOCK_DUMP_REPO"
+    fi
+    git -C "$dir" fetch -q --depth 1 origin "$STOCK_DUMP_COMMIT"
+    git -C "$dir" checkout -q --detach FETCH_HEAD
+    echo "    -> $dir/decompiled"
 }
 
 build release "$RELEASE_COMMIT" 5.0.0-beta2 gmake2
 build develop "$DEVELOP_COMMIT" 5.0.0-beta8 gmake
+fetch_stock_dump
 
-echo "Done. Compile with: <bin> -m comp -g iw7 -s pc <file.gsc>"
+echo "Done. Check the mod with: python3 tools/check.py"

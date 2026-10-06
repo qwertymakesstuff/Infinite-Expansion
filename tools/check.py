@@ -1,0 +1,485 @@
+#!/usr/bin/env python3
+"""Static checks for the Infinite Expansion GSC sources.
+
+The game cannot run here, so this verifies everything that can be checked
+without it, using the compilers iw7-mod embeds (tools/setup_compilers.sh):
+
+  compile  every script compiles with both iw7-mod compilers (v1.1.0 and develop),
+           including iw7-mod's extension built-ins (tools/ixcc)
+  parity   both compilers emit the same instructions and call the same natives
+  natives  no calls to natives the game exe leaves unimplemented (stubs) and
+           no unknown raw ids
+  calls    every far call and far function reference names a defined function
+           (stock targets are checked against the decompiled stock scripts)
+  modes    mode-separation rules (ARCHITECTURE.md section 7), script locations,
+           entry points, unreachable modules
+  raw ids  _meth_XXXX / _func_XXX ids appear only in ix/core/compat.gsc and never
+           in the range iw7-mod assigns to its extension built-ins
+  source   no #include (modules call each other by explicit path) and no /# #/
+           dev blocks (iw7-mod compiles those only with developer_script 1, so the
+           checked code would differ from what runs)
+  budget   custom-script memory per mode (bytecode + 1 per loaded script) against a
+           512 KiB limit; iw7-mod has 1 MiB and running out is fatal
+
+Usage:
+  python3 tools/check.py [--toolchain DIR] [--mod DIR] [--stock DIR] [--work DIR]
+                         [--budget BYTES]
+
+Both compilers already reject a script function named after a built-in
+("already defined as builtin"), and ixcc registers iw7-mod's extension names,
+so that rule is covered by the compile check.
+
+Exit status 0 when there are no errors (warnings are allowed), 1 otherwise,
+2 when the toolchain is missing.
+"""
+import argparse
+import concurrent.futures
+import difflib
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from extract_iw7_builtins import parse_table  # noqa: E402
+
+REPO = Path(__file__).resolve().parent.parent
+VARIANTS = ("release", "develop")
+VARIANT_LABELS = {"release": "iw7-mod v1.1.0", "develop": "iw7-mod develop"}
+
+# iw7-mod's custom-script memory (gsc/script_loading.cpp): every loaded custom
+# script takes bytecode length + 1 bytes; running out is a fatal error.
+SCRIPT_MEMORY = 0x100000
+DEFAULT_BUDGET = 512 * 1024
+
+# Ids iw7-mod (and tools/ixcc) give to extension built-ins the table lacks.
+FIRST_CUSTOM_FUNCTION = 807
+FIRST_CUSTOM_METHOD = 0x8000 + 1484
+
+# Script location -> mode. Shared code runs in every mode.
+ENTRY_DIRS = {"custom_scripts/cp": "cp", "custom_scripts/mp": "mp"}
+MODULE_AREAS = {
+    "core": "shared",
+    "ui": "shared",
+    "player": "shared",
+    "weapons": "shared",
+    "debug": "shared",
+    "zombies": "cp",
+    "mp": "mp",
+}
+# ARCHITECTURE.md section 7: path prefixes each mode must not reference.
+FORBIDDEN_PREFIXES = {
+    "shared": ("scripts/cp/", "scripts/mp/", "custom_scripts/ix/zombies/", "custom_scripts/ix/mp/"),
+    "cp": ("scripts/mp/", "custom_scripts/ix/mp/"),
+    "mp": ("scripts/cp/", "custom_scripts/ix/zombies/"),
+}
+RAW_ID_FILES = {"custom_scripts/ix/core/compat.gsc"}
+
+RAW_ID = re.compile(r"\b_(meth|func)_([0-9A-Fa-f]+)\b")
+PLACEHOLDER = re.compile(r"^_(func|meth)_([0-9A-Fa-f]+)$")
+INCLUDE = re.compile(r"^\s*#include\b", re.MULTILINE)
+DEV_BLOCK = re.compile(r"/#")
+SUB = re.compile(r"^sub:(\S+)")
+FAR_REF = re.compile(r"^\s*OP_(ScriptFar\w+|GetFarFunction)\s+(\S+)\s+(\S+)")
+BUILTIN_REF = re.compile(
+    r"^\s*OP_(CallBuiltin[0-5]?|CallBuiltinMethod[0-5]?|GetBuiltinFunction|GetBuiltinMethod)\s+(\S+)"
+)
+IXCC_RESULT = re.compile(r"bytecode=(\d+)")
+
+
+class Report:
+    def __init__(self):
+        self.errors = []
+        self.warnings = []
+
+    def error(self, check, where, message):
+        self.errors.append(f"ERROR   [{check}] {where}: {message}")
+
+    def warn(self, check, where, message):
+        self.warnings.append(f"WARNING [{check}] {where}: {message}")
+
+
+class Builtins:
+    """The develop compiler's builtin tables plus iw7-mod's extension built-ins."""
+
+    def __init__(self, toolchain, extensions_file):
+        self.status = {}  # name -> status in the develop table (the disassembler's)
+        engine = toolchain / "src" / "gsc-tool-develop" / "src" / "gsc" / "engine"
+        develop = {
+            "function": parse_table(engine / "iw7_func.cpp"),
+            "method": parse_table(engine / "iw7_meth.cpp"),
+        }
+        for rows in develop.values():
+            for _, name, status in rows:
+                self.status.setdefault(name, status)
+
+        # Reproduce the ids ixcc gives extension built-ins, so the develop
+        # disassembler's placeholders (_func_0338) map back to their names.
+        known = {kind: {name for _, name, _ in rows} for kind, rows in develop.items()}
+        next_id = {"function": FIRST_CUSTOM_FUNCTION, "method": FIRST_CUSTOM_METHOD}
+        prefix = {"function": "_func_", "method": "_meth_"}
+        self.extensions = set()
+        self.extension_ids = {}
+        for kind, name in read_extensions(extensions_file):
+            self.extensions.add(name)
+            if name not in known[kind]:
+                self.extension_ids[f"{prefix[kind]}{next_id[kind]:04X}"] = name
+                next_id[kind] += 1
+
+
+def read_extensions(path):
+    entries = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        kind, name = line.split()
+        entries.append((kind, name))
+    return entries
+
+
+def strip_code(text):
+    """Blank out comments and string contents, keeping line structure."""
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if text.startswith("//", i):
+            end = text.find("\n", i)
+            end = n if end == -1 else end
+            out.append(" " * (end - i))
+            i = end
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = n if end == -1 else end + 2
+            out.append("".join(ch if ch == "\n" else " " for ch in text[i:end]))
+            i = end
+        elif c == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            out.append('"' + " " * (min(j, n) - i - 1) + '"')
+            i = j + 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def classify(rel):
+    """Return the mode a script runs in, or None for an unsupported location."""
+    parts = rel.split("/")
+    parent = "/".join(parts[:-1])
+    if parent in ENTRY_DIRS:
+        return ENTRY_DIRS[parent]
+    if len(parts) >= 4 and parts[0] == "custom_scripts" and parts[1] == "ix":
+        return MODULE_AREAS.get(parts[2])
+    return None
+
+
+def parse_asm(path):
+    subs, far_refs, builtin_refs = [], [], []
+    current = None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = SUB.match(line)
+        if match:
+            current = match.group(1)
+            subs.append(current)
+            continue
+        match = FAR_REF.match(line)
+        if match:
+            far_refs.append((current, match.group(1), match.group(2), match.group(3)))
+            continue
+        match = BUILTIN_REF.match(line)
+        if match:
+            builtin_refs.append((current, match.group(1), match.group(2)))
+    return subs, far_refs, builtin_refs
+
+
+def compile_all(tools, extensions_file, mod_root, scripts, work):
+    """Compile every script with both ixcc variants. Returns {(variant, rel): (ok, detail)}."""
+    jobs = []
+    for variant in VARIANTS:
+        for rel in scripts:
+            out = work / variant / "bin" / (rel[: -len(".gsc")] + ".gscbin")
+            jobs.append((variant, rel, [str(tools[f"ixcc-{variant}"]), str(extensions_file), str(mod_root), rel, str(out)]))
+
+    def run(job):
+        variant, rel, command = job
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout).strip()
+            message = message.removeprefix(f"[ERROR] {rel}: ").removeprefix("[ERROR]:compiler:")
+            return variant, rel, False, message
+        match = IXCC_RESULT.search(result.stdout)
+        return variant, rel, True, int(match.group(1)) if match else 0
+
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count() or 4) as pool:
+        for variant, rel, ok, detail in pool.map(run, jobs):
+            results[(variant, rel)] = (ok, detail)
+    return results
+
+
+def disassemble(tools, work, variant):
+    out_dir = work / variant
+    bin_dir = out_dir / "bin"
+    if not bin_dir.is_dir():
+        return None
+    result = subprocess.run(
+        [str(tools["gsc-tool-iw7-develop"]), "-m", "disasm", "-g", "iw7", "-s", "pc", str(bin_dir)],
+        cwd=out_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"disassembler failed for {variant}: {result.stdout}{result.stderr}")
+    return out_dir / "disassembled" / "iw7"
+
+
+def stock_defines(stock_root, path, func, cache):
+    if path not in cache:
+        source = stock_root / (path + ".gsc")
+        if source.is_file():
+            names = re.findall(r"^([A-Za-z_][A-Za-z_0-9]*)\s*\(", source.read_text(encoding="utf-8", errors="replace"), re.MULTILINE)
+            cache[path] = {name.lower() for name in names}
+        else:
+            cache[path] = None
+    defined = cache[path]
+    if defined is None:
+        return "missing-file"
+    return "ok" if func.lower() in defined else "missing-function"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--toolchain", type=Path, default=REPO / ".toolchain")
+    parser.add_argument("--mod", type=Path, default=REPO / "mods" / "infinite_expansion")
+    parser.add_argument("--stock", type=Path, help="decompiled stock scripts (default: <toolchain>/src/iw7-gsc-dump/decompiled)")
+    parser.add_argument("--work", type=Path, help="keep compiled and disassembled output here (default: temporary)")
+    parser.add_argument("--budget", type=int, default=DEFAULT_BUDGET, help=f"bytecode limit per mode (default {DEFAULT_BUDGET})")
+    args = parser.parse_args()
+
+    toolchain = args.toolchain.resolve()
+    mod_root = args.mod.resolve()
+    stock_root = (args.stock or toolchain / "src" / "iw7-gsc-dump" / "decompiled").resolve()
+    extensions_file = REPO / "tools" / "ixcc" / "iw7mod_extensions.txt"
+
+    tools = {name: toolchain / "bin" / name for name in ("ixcc-release", "ixcc-develop", "gsc-tool-iw7-develop")}
+    tables = [toolchain / "src" / "gsc-tool-develop" / "src" / "gsc" / "engine" / name for name in ("iw7_func.cpp", "iw7_meth.cpp")]
+    missing = [str(path) for path in [*tools.values(), *tables] if not path.is_file()]
+    if missing:
+        print("missing toolchain files (run tools/setup_compilers.sh):\n  " + "\n  ".join(missing))
+        return 2
+
+    builtins = Builtins(toolchain, extensions_file)
+    report = Report()
+    scripts_root = mod_root / "custom_scripts"
+    scripts = sorted(path.relative_to(mod_root).as_posix() for path in scripts_root.rglob("*.gsc"))
+    have_stock = stock_root.is_dir()
+
+    print("Infinite Expansion static check")
+    print(f"  mod:        {display(mod_root)} ({len(scripts)} scripts)")
+    print("  compilers:  " + ", ".join(f"ixcc-{v} ({VARIANT_LABELS[v]})" for v in VARIANTS))
+    print(f"  stock dump: {display(stock_root) if have_stock else 'not found; stock far calls are not verified'}")
+    print()
+
+    # Mod folder: fs_game must start with "mods/" and contain no "." (iw7-mod party.cpp).
+    if "." in mod_root.name:
+        report.error("layout", display(mod_root), "mod folder name must not contain '.' (fs_game rule)")
+    if not (mod_root / "desc.txt").is_file():
+        report.warn("layout", display(mod_root), "no desc.txt; the Mods menu shows a default description")
+
+    with tempfile.TemporaryDirectory(prefix="ix_check_") as temp:
+        work = (args.work or Path(temp)).resolve()
+        work.mkdir(parents=True, exist_ok=True)
+
+        # compile
+        results = compile_all(tools, extensions_file, mod_root, scripts, work)
+        compiled = 0
+        for (variant, rel), (ok, detail) in sorted(results.items()):
+            if ok:
+                compiled += 1
+            else:
+                report.error("compile", rel, f"{VARIANT_LABELS[variant]} compiler: {detail}")
+        print(f"[compile]  {compiled}/{len(results)} compiled")
+
+        asm_dirs = {variant: disassemble(tools, work, variant) for variant in VARIANTS}
+        asm = {}
+        for variant in VARIANTS:
+            for rel in scripts:
+                if results[(variant, rel)][0]:
+                    asm[(variant, rel)] = asm_dirs[variant] / (rel[: -len(".gsc")] + ".gscasm")
+
+        # parity
+        identical = 0
+        both = [rel for rel in scripts if all((variant, rel) in asm for variant in VARIANTS)]
+        for rel in both:
+            release_text = asm[("release", rel)].read_text(encoding="utf-8").splitlines()
+            develop_text = asm[("develop", rel)].read_text(encoding="utf-8").splitlines()
+            if release_text == develop_text:
+                identical += 1
+                continue
+            diff = [
+                f"{line[0]} {line[1:].strip()}"
+                for line in difflib.unified_diff(release_text, develop_text, n=0, lineterm="")
+                if line[:1] in "+-" and line[:3] not in ("+++", "---")
+            ]
+            report.error("parity", rel, "v1.1.0 (-) and develop (+) compile it differently:\n          " + "\n          ".join(diff[:12]))
+        print(f"[parity]   {identical}/{len(both)} identical")
+
+        # parse the develop disassembly for the remaining checks
+        parsed = {rel: parse_asm(asm[("develop", rel)]) for rel in scripts if ("develop", rel) in asm}
+        defined = {rel: {name.lower() for name in subs} for rel, (subs, _, _) in parsed.items()}
+
+        # natives
+        native_calls = 0
+        for rel, (_, _, builtin_refs) in parsed.items():
+            for func, op, name in builtin_refs:
+                native_calls += 1
+                where = f"{rel} ({func})"
+                if PLACEHOLDER.match(name):
+                    if name in builtins.extension_ids:
+                        continue
+                    if builtins.status.get(name) == "unnamed":
+                        continue
+                    report.error("natives", where, f"{op} {name}: id is not in the IW7 table or iw7-mod's extensions")
+                elif builtins.status.get(name) == "stub" and name not in builtins.extensions:
+                    report.error("natives", where, f"{name} has no implementation in the game exe (stub)")
+        print(f"[natives]  {native_calls} built-in calls checked")
+
+        # calls
+        stock_cache = {}
+        far_count = stock_count = 0
+        unverified_stock = set()
+        for rel, (_, far_refs, _) in parsed.items():
+            for func, op, path, target in far_refs:
+                far_count += 1
+                where = f"{rel} ({func})"
+                if path.startswith("custom_scripts/"):
+                    target_rel = path + ".gsc"
+                    if target_rel not in scripts:
+                        report.error("calls", where, f"{path}::{target}: no such script in the mod")
+                    elif target_rel in defined and target.lower() not in defined[target_rel]:
+                        report.error("calls", where, f"{path}::{target}: function not defined there")
+                elif path.startswith("scripts/"):
+                    stock_count += 1
+                    if not have_stock:
+                        unverified_stock.add(f"{path}::{target}")
+                        continue
+                    state = stock_defines(stock_root, path, target, stock_cache)
+                    if state == "missing-file":
+                        report.error("calls", where, f"{path}::{target}: no such stock script in the dump")
+                    elif state == "missing-function":
+                        report.error("calls", where, f"{path}::{target}: function not defined in the stock script")
+                else:
+                    report.error("calls", where, f"{op} {path}::{target}: unexpected script path")
+        for name in sorted(unverified_stock):
+            report.warn("calls", name, "stock target not verified (no stock dump)")
+        print(f"[calls]    {far_count} far references checked ({stock_count} into stock scripts)")
+
+        # modes
+        modes = {}
+        for rel in scripts:
+            mode = classify(rel)
+            if mode is None:
+                report.error("modes", rel, "unsupported location: entry scripts go in custom_scripts/cp|mp/, modules in custom_scripts/ix/<area>/ (areas: " + ", ".join(sorted(MODULE_AREAS)) + ")")
+            modes[rel] = mode
+        for rel, (_, far_refs, _) in parsed.items():
+            mode = modes[rel]
+            if mode is None:
+                continue
+            for func, _, path, target in far_refs:
+                for prefix in FORBIDDEN_PREFIXES[mode]:
+                    if (path + "/").startswith(prefix):
+                        report.error("modes", f"{rel} ({func})", f"{mode} code must not reference {path}::{target}")
+        entries = [rel for rel in scripts if "/".join(rel.split("/")[:-1]) in ENTRY_DIRS]
+        for rel in entries:
+            if rel in defined and not defined[rel] & {"init", "main"}:
+                report.error("modes", rel, "entry script defines neither init() nor main(); iw7-mod would run nothing")
+        for rel, names in defined.items():
+            if rel not in entries and modes[rel] is not None and names & {"init", "main"}:
+                report.error("modes", rel, "only entry scripts define init() or main() (iw7-mod runs them in every file it auto-loads); use register() or setup()")
+        loaded = {}
+        for entry in entries:
+            mode = modes[entry]
+            seen = loaded.setdefault(mode, set())
+            pending = [entry]
+            while pending:
+                rel = pending.pop()
+                if rel in seen:
+                    continue
+                seen.add(rel)
+                for _, _, path, _ in parsed.get(rel, ([], [], []))[1]:
+                    if path.startswith("custom_scripts/") and path + ".gsc" in scripts:
+                        pending.append(path + ".gsc")
+        reachable = set().union(*loaded.values()) if loaded else set()
+        for rel in scripts:
+            if modes[rel] is not None and rel not in reachable:
+                report.warn("modes", rel, "not reachable from any entry script; it never loads")
+        print("[modes]    " + ", ".join(f"{mode}: {len(files)} scripts load" for mode, files in sorted(loaded.items())))
+
+        # raw ids, include
+        raw_total = 0
+        for rel in scripts:
+            code = strip_code((mod_root / rel).read_text(encoding="utf-8"))
+            for match in RAW_ID.finditer(code):
+                line = code.count("\n", 0, match.start()) + 1
+                ident = int(match.group(2), 16)
+                first_custom = FIRST_CUSTOM_METHOD if match.group(1) == "meth" else FIRST_CUSTOM_FUNCTION
+                if ident >= first_custom:
+                    report.error("raw ids", f"{rel}:{line}", f"{match.group(0)} is in the range iw7-mod gives its extension built-ins, which depends on registration order; call it by name")
+                elif rel in RAW_ID_FILES:
+                    raw_total += 1
+                else:
+                    report.error("raw ids", f"{rel}:{line}", f"{match.group(0)} outside ix/core/compat.gsc; add a named wrapper there")
+        print(f"[raw ids]  {raw_total} in " + ", ".join(sorted(RAW_ID_FILES)))
+        source_issues = 0
+        for rel in scripts:
+            code = strip_code((mod_root / rel).read_text(encoding="utf-8"))
+            for pattern, message in (
+                (INCLUDE, "#include is not used in this mod; call other files by explicit path"),
+                (DEV_BLOCK, "/# #/ dev blocks compile only with developer_script 1; gate debug code with a dvar instead"),
+            ):
+                for match in pattern.finditer(code):
+                    source_issues += 1
+                    line = code.count("\n", 0, match.start()) + 1
+                    report.error("source", f"{rel}:{line}", message)
+        print(f"[source]   {source_issues} #include / dev-block issues")
+
+        # budget
+        sizes = {}
+        for rel in scripts:
+            values = [results[(variant, rel)][1] for variant in VARIANTS if results[(variant, rel)][0]]
+            if values:
+                sizes[rel] = max(values) + 1
+        for mode, files in sorted(loaded.items()):
+            total = sum(sizes.get(rel, 0) for rel in files)
+            print(f"[budget]   {mode}: {total:,} bytes of custom-script memory ({100 * total / SCRIPT_MEMORY:.2f}% of 1 MiB; limit {args.budget:,})")
+            if total > args.budget:
+                report.error("budget", mode, f"{total:,} bytes exceeds the limit of {args.budget:,}")
+
+    print()
+    for line in report.errors + report.warnings:
+        print(line)
+    if report.errors or report.warnings:
+        print()
+    verdict = "FAIL" if report.errors else "PASS"
+    print(f"RESULT: {verdict} ({plural(len(report.errors), 'error')}, {plural(len(report.warnings), 'warning')})")
+    return 1 if report.errors else 0
+
+
+def plural(count, noun):
+    return f"{count} {noun}" + ("" if count == 1 else "s")
+
+
+def display(path):
+    try:
+        return path.relative_to(REPO).as_posix()
+    except ValueError:
+        return str(path)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

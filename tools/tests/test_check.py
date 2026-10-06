@@ -1,0 +1,110 @@
+"""Tests for tools/check.py against the fixture mods in tools/tests/fixtures/.
+
+bad_mod breaks every rule once (each file's first comment says which);
+good_mod follows every rule. Needs the toolchain from tools/setup_compilers.sh.
+
+Run: python3 -m unittest discover -s tools/tests -v
+"""
+import re
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+CHECK = REPO / "tools" / "check.py"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+TOOLCHAIN = REPO / ".toolchain"
+HAVE_TOOLCHAIN = all((TOOLCHAIN / "bin" / name).is_file() for name in ("ixcc-release", "ixcc-develop", "gsc-tool-iw7-develop"))
+
+
+def run_check(mod, *extra):
+    result = subprocess.run(
+        [sys.executable, str(CHECK), "--mod", str(FIXTURES / mod), *extra],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode, result.stdout
+
+
+@unittest.skipUnless(HAVE_TOOLCHAIN, "run tools/setup_compilers.sh first")
+class BadMod(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.code, cls.output = run_check("bad_mod")
+        cls.errors = [line for line in cls.output.splitlines() if line.startswith("ERROR")]
+
+    def assert_reported(self, *fragments):
+        for line in self.output.splitlines():
+            if all(fragment in line for fragment in fragments):
+                return
+        self.fail(f"no line contains {fragments}:\n{self.output}")
+
+    def test_fails(self):
+        self.assertEqual(self.code, 1)
+        self.assertIn("RESULT: FAIL", self.output)
+
+    def test_compile(self):
+        self.assert_reported("[compile]", "broken.gsc", "v1.1.0 compiler")
+        self.assert_reported("[compile]", "broken.gsc", "develop compiler")
+        self.assert_reported("[compile]", "develop_only.gsc", "v1.1.0 compiler", "couldn't determine function call type")
+
+    def test_parity(self):
+        self.assert_reported("[parity]", "shared.gsc")
+        self.assertIn("- OP_CallBuiltinMethod0 disablegrenadetouchdamage", self.output)
+        self.assertIn("+ OP_CallBuiltinMethod0 disableinvulnerability", self.output)
+
+    def test_natives(self):
+        self.assert_reported("[natives]", "shared.gsc", "line has no implementation")
+        self.assert_reported("[natives]", "compat.gsc", "_meth_85CB")
+
+    def test_calls(self):
+        self.assert_reported("[calls]", "custom_scripts/ix/core/shared::not_defined", "function not defined there")
+        self.assert_reported("[calls]", "custom_scripts/ix/core/nowhere::run", "no such script")
+        self.assert_reported("[calls]", "scripts/engine/utility::not_a_stock_function", "not defined in the stock script")
+        self.assert_reported("[calls]", "scripts/engine/no_such_script::run", "no such stock script")
+
+    def test_modes(self):
+        self.assert_reported("[modes]", "shared.gsc", "shared code must not reference scripts/cp/utility::_hasperk")
+        self.assert_reported("[modes]", "shared.gsc", "shared code must not reference custom_scripts/ix/zombies/z::run")
+        self.assert_reported("[modes]", "mp/entry.gsc", "mp code must not reference custom_scripts/ix/zombies/z::run")
+        self.assert_reported("[modes]", "no_entry.gsc", "neither init() nor main()")
+        self.assert_reported("[modes]", "custom_scripts/loose.gsc", "unsupported location")
+        self.assert_reported("[modes]", "custom_scripts/ix/hud/x.gsc", "unsupported location")
+        self.assert_reported("[modes]", "zombies/z.gsc", "only entry scripts define init() or main()")
+        self.assert_reported("WARNING", "orphan.gsc", "not reachable")
+
+    def test_raw_ids(self):
+        self.assert_reported("[raw ids]", "shared.gsc:8", "_meth_845E outside ix/core/compat.gsc")
+        self.assert_reported("[raw ids]", "compat.gsc:5", "_meth_FFF0", "extension built-ins")
+        self.assert_reported("[raw ids]", "compat.gsc:6", "_meth_85CE", "extension built-ins")
+
+    def test_source(self):
+        self.assert_reported("[source]", "include_user.gsc:1", "#include")
+        self.assert_reported("[source]", "include_user.gsc:6", "dev blocks")
+
+    def test_no_false_positives(self):
+        # Comments and strings, iw7-mod extensions (logprint is a stub in the
+        # table but iw7-mod implements it) and a valid stock call are fine.
+        for name in ("_meth_80A1", "va", "logprint", "tell", "fileexists", "waittill_any"):
+            for line in self.errors:
+                self.assertIsNone(re.search(rf"\b{name}\b", line), line)
+        self.assertEqual(len(self.errors), 23, "\n".join(self.errors))
+
+
+@unittest.skipUnless(HAVE_TOOLCHAIN, "run tools/setup_compilers.sh first")
+class GoodMod(unittest.TestCase):
+    def test_passes_cleanly(self):
+        code, output = run_check("good_mod")
+        self.assertEqual(code, 0, output)
+        self.assertIn("RESULT: PASS (0 errors, 0 warnings)", output)
+
+    def test_budget_limit(self):
+        code, output = run_check("good_mod", "--budget", "100")
+        self.assertEqual(code, 1, output)
+        self.assertIn("ERROR   [budget] cp:", output)
+        self.assertIn("ERROR   [budget] mp:", output)
+
+
+if __name__ == "__main__":
+    unittest.main()
