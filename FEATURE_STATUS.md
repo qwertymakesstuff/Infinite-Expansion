@@ -52,7 +52,7 @@
 | Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied when the player connects. Host: `ix_character`. Every player: specials through `characterSelect`. Toggle `ix_character_select`; R-CH1–R-CH3 |
 | A guest's special-character pick in someone else's match | Player | 1.5 | TESTING | Travels in the guest's stats (`characterSelect`); works on the special's own map even without the mod on the host; R-CH3, R-CH8 |
 | A guest's regular-character pick in someone else's match | Player | 1.5 | BLOCKED | No verified channel (L29); the guest gets a random character; R-CH4, probe R-CH12 |
-| "<player> is playing as <character>" line after the intro | HUD | 1.5 | TESTING | Shown to everyone, once per player; `ix_character_announce`; R-CH1, R-CH10 |
+| "<player> is playing as <character>" line after the intro | HUD | 1.5 | TESTING | Off by default; `ix_character_announce 1` shows it to everyone, once per player; R-CH10 |
 | Per-map cast names | Player | 1.5 | TESTING | Actor names verified from stock VO code; outfit labels made from each map's model names |
 | One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; also stops two players getting the same special, which the stock game allows; R-CH5 |
 | Special characters gated by unlocks | Player | 1.5 | TESTING | Soul keys / merit stats, checked for every pick (L27); `ix_character_specials` 0/1/2; R-CH6 |

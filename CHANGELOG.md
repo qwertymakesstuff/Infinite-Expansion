@@ -16,7 +16,7 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 - Installation: copy the mod into `<game>/iw7-mod/` (README). A host who loaded the mod from the Mods menu cannot be joined (L30).
 
 **Added**
-- After the intro, everyone sees "<player> is playing as <character>" for each player (`ix_character_announce`).
+- Optional, off by default: after the intro, everyone sees "<player> is playing as <character>" for each player (`ix_character_announce 1`).
 - `test_character_data.py`: the menu's lobby values must match the cast table.
 
 **Removed**

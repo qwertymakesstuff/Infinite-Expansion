@@ -53,7 +53,7 @@ In the **Zombies** menu, press **CHARACTER** (under the other buttons) and pick 
 | A special character you have unlocked | You play as them on their own map. On other maps only with `ix_character_crossmap 1` | The same. The pick travels with you in the stock lobby setting, so on the character's own map it works even if the host does not have this mod |
 | Random | The game picks | The game picks |
 
-No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. After the intro, everyone sees a line such as "Alex is playing as Andre (Rapper)" for each player. The card in the bottom-right corner shows your own character.
+No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. If the host sets `ix_character_announce 1`, everyone also sees a line such as "Alex is playing as Andre (Rapper)" for each player after the intro. The card in the bottom-right corner shows your own character.
 
 The rules are enforced by the host's copy of the mod. A host without the mod runs the stock game, which hands out a special character on its own map without checking the unlock.
 
@@ -63,7 +63,7 @@ The rules are enforced by the host's copy of the mod. A host without the mod run
 | `ix_character_select 0` | 1 | Host: turns character selection off |
 | `ix_character_specials` | 1 | Host: 0 = no special characters, 1 = the ones each player has unlocked, 2 = all of them |
 | `ix_character_crossmap 1` | 0 | Host, **experimental:** special characters on other maps (The Hoff on any map, for example). Set it before the map loads; their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26) |
-| `ix_character_announce 0` | 1 | Host: no "is playing as" lines |
+| `ix_character_announce 1` | 0 | Host: an "is playing as" line for each player after the intro |
 | `ix_player_card 0` | 1 | Host: hides the card; `ix_player_card_x` / `ix_player_card_y` move it |
 
 ## Documentation

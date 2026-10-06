@@ -40,7 +40,7 @@
 //                              (experimental: KNOWN_LIMITATIONS.md L26). Read once,
 //                              while the map loads, because their models can only
 //                              be precached then.
-//   ix_character_announce  1   0 = no "<player> is playing as <character>" line
+//   ix_character_announce  0   1 = a "<player> is playing as <character>" line
 //                              for everyone after a player's first spawn
 
 register()
@@ -83,7 +83,7 @@ crossmap_enabled()
 
 announce_enabled()
 {
-    return custom_scripts\ix\core\util::dvar_int( "ix_character_announce", 1 ) != 0;
+    return custom_scripts\ix\core\util::dvar_int( "ix_character_announce", 0 ) != 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -554,8 +554,9 @@ lobby_choice()
     return undefined;
 }
 
-// After the first spawn and the intro: the player's own message, if any, then
-// a line for everyone saying who this player is playing as.
+// After the first spawn and the intro: the player's own message, if any, then,
+// with ix_character_announce 1, a line for everyone saying who this player is
+// playing as.
 announce_after_spawn( message )
 {
     self endon( "disconnect" );

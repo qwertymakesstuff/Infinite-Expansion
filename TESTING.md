@@ -145,16 +145,16 @@ Characters are chosen in the CHARACTER menu before a match (§4.6) and kept for 
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-CH1 | Host: pick Andre in the menu, start `cp_zmb` | You spawn as Andre; the console shows `[IX] INFO: character: <you> -> Andre (ix_character)`; after the intro, "<you> is playing as Andre (Rapper)" | not run | not run |
+| R-CH1 | Host: pick Andre in the menu, start `cp_zmb` | You spawn as Andre; the console shows `[IX] INFO: character: <you> -> Andre (ix_character)` | not run | not run |
 | R-CH2 | During a match, type `!char 1` in chat, then `set ix_character sally` in the console | Nothing changes until the next match, and the mod does not reply | not run | not run |
-| R-CH3 | Co-op: the guest picks a special they have unlocked (The Hoff), then joins the host's `cp_zmb` | The guest is The Hoff; the host's console shows `(lobby)`; everyone sees "<guest> is playing as The Hoff" | not run | not run |
-| R-CH4 | Co-op: the guest picks Poindexter, then joins | The guest gets a random character, and the line names it | not run | not run |
+| R-CH3 | Co-op: the guest picks a special they have unlocked (The Hoff), then joins the host's `cp_zmb` | The guest is The Hoff; the host's console shows `(lobby)` | not run | not run |
+| R-CH4 | Co-op: the guest picks Poindexter, then joins | The guest gets a random character | not run | not run |
 | R-CH5 | Co-op: host and guest both pick The Hoff | The second to connect gets a random character and "Can't play as The Hoff: The Hoff is taken by <name>" | not run | not run |
 | R-CH6 | Pick The Hoff without the Spaceland soul key, host `cp_zmb`; repeat after `unlockallEE` | First a random character and "Can't play as The Hoff: The Hoff is locked: earn the soul key on Zombies in Spaceland"; then The Hoff | not run | not run |
 | R-CH7 | `set ix_character_crossmap 1`, pick The Hoff, load `cp_town` | **Experimental:** report whether the map loads, what the body and arms look like, and any console error. With the setting off: a random character and "... belongs to Zombies in Spaceland ..." | not run | not run |
 | R-CH8 | Co-op: the guest picks an unlocked special, then joins a host **without** this mod on that special's map | The guest is that special (the stock lobby rule) | not run | not run |
 | R-CH9 | Player card | Bottom right, not covering the ammo counter; `ix_player_card 0` hides it; `ix_player_card_y 140` moves it up | not run | not run |
-| R-CH10 | `set ix_character_announce 0`, then a new match; `set ix_character_select 0`, then a new match | No "is playing as" lines; with selection off, the game picks characters as usual | not run | not run |
+| R-CH10 | A match with default settings; then `set ix_character_announce 1` and a new match (co-op if possible); then `set ix_character_select 0` and a new match | First no "is playing as" lines. With the setting on, after the intro, everyone sees one line per player, such as "<guest> is playing as The Hoff". With selection off, the game picks characters as usual | not run | not run |
 | R-CH11 | Die or bleed out, then respawn | Same character and knife as before | not run | not run |
 | R-CH12 | Probe for L29, in the zombies main menu console: `setCoopPlayerData zombiePlayerLoadout characterSelect 14`, then `getCoopPlayerData zombiePlayerLoadout characterSelect` | Report the printed value (14, another number, or an error). Afterwards pick any character in the CHARACTER menu, which writes the field again | not run | not run |
 
