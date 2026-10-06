@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A0B45"/><stop offset="0.62" stop-color="#4A1060"/><stop offset="0.62" stop-color="#12051F"/><stop offset="1" stop-color="#07020D"/></linearGradient>
+ <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE66D"/><stop offset="0.45" stop-color="#FF9A3D"/><stop offset="1" stop-color="#FF2E97"/></linearGradient>
+ <linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="0.5" stop-color="#fff"/><stop offset="0.5" stop-color="#000"/><stop offset="0.56" stop-color="#000"/><stop offset="0.56" stop-color="#fff"/><stop offset="0.64" stop-color="#fff"/><stop offset="0.64" stop-color="#000"/><stop offset="0.71" stop-color="#000"/><stop offset="0.71" stop-color="#fff"/><stop offset="0.79" stop-color="#fff"/><stop offset="0.79" stop-color="#000"/><stop offset="0.87" stop-color="#000"/><stop offset="0.87" stop-color="#fff"/><stop offset="1" stop-color="#fff"/></linearGradient>
+ <mask id="stripes" maskContentUnits="objectBoundingBox"><rect width="1" height="1" fill="url(#m)"/></mask>
+ <clipPath id="round"><rect width="256" height="256" rx="52"/></clipPath>
+ <clipPath id="ground"><rect width="256" height="236"/></clipPath>
+ <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g clip-path="url(#round)">
+ <rect width="256" height="256" fill="url(#bg)"/>
+ <circle cx="128" cy="118" r="82" fill="url(#sun)" mask="url(#stripes)"/>
+ <rect y="157" width="256" height="99" fill="#12051F"/>
+ <path d="M128,158 L-60,256 M128,158 L10,256 M128,158 L80,256 M128,158 L128,256 M128,158 L176,256 M128,158 L246,256 M128,158 L316,256 M0,178 H256 M0,206 H256" stroke="#FF2E97" stroke-width="3" opacity="0.7"/>
+ <rect y="155" width="256" height="4" fill="#FF6EC4"/>
+ <g clip-path="url(#ground)">
+  <g transform="translate(128,236) rotate(-6) scale(1.05) translate(-62,-200)" filter="url(#glow)">
+   <path d="M33,121 L19,105 L12,87 M41,94 L35,63 L37,35 M55,90 L56,53 L58,21 M69,92 L77,61 L74,36 M81,100 L93,81 L93,63" stroke="#39FF14" stroke-width="17" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+   <path d="M35,91 L85,94 L90,129 L80,151 L44,151 L31,128 Z M44,148 L80,148 L83,185 L41,185 Z" fill="#39FF14" stroke="#39FF14" stroke-width="6" stroke-linejoin="round"/>
+   <path d="M34,182 L42,172 L48,180 L55,169 L62,179 L69,170 L76,180 L84,171 L91,184 L95,240 L29,240 Z" fill="#39FF14" stroke="#39FF14" stroke-width="6" stroke-linejoin="round"/>
+   <path d="M33,121 L19,105 L12,87 M41,94 L35,63 L37,35 M55,90 L56,53 L58,21 M69,92 L77,61 L74,36 M81,100 L93,81 L93,63" stroke="#0A0612" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+   <path d="M35,91 L85,94 L90,129 L80,151 L44,151 L31,128 Z M44,148 L80,148 L83,185 L41,185 Z" fill="#0A0612"/>
+   <path d="M34,182 L42,172 L48,180 L55,169 L62,179 L69,170 L76,180 L84,171 L91,184 L95,240 L29,240 Z" fill="#1C0A2B"/>
+  </g>
+ </g>
+</g>
+<rect x="2" y="2" width="252" height="252" rx="50" fill="none" stroke="#FF2E97" stroke-width="4"/>
+</svg>

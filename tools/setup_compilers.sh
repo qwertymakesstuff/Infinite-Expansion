@@ -17,6 +17,8 @@
 #         <toolchain-dir>/src/iw7-mod-ui/            iw7-mod's own Lua UI scripts (auroramod/iw7-mod
 #                                                    develop @ c0a1c6da, sparse); check.py only lets the
 #                                                    mod's Lua use API names these scripts use.
+#         <toolchain-dir>/pwsh/pwsh                  PowerShell 7.4.6 (sha256-checked), which runs the
+#                                                    Windows installer's logic in tools/tests/test_installer.py
 # Optional: luac5.1 (Debian/Ubuntu package lua5.1) for the Lua syntax check.
 # Needs:  Linux x86_64, git, curl, tar, make, clang/clang++ with C++20 support.
 #
@@ -33,6 +35,8 @@ STOCK_DUMP_REPO="https://github.com/mjkzy/iw7-gsc-dump"
 STOCK_DUMP_COMMIT="1dd48a78e55ef9c99519fc5221a206168ce2e98a"
 IW7MOD_REPO="https://github.com/auroramod/iw7-mod"
 IW7MOD_COMMIT="c0a1c6dacd33c86320b308656d9ba895291c2198"
+PWSH_VERSION="7.4.6"
+PWSH_SHA256="6f6015203c47806c5cc444c19d8ed019695e610fbd948154264bf9ca8e157561"
 IXCC_SOURCE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ixcc/ixcc.cpp"
 
 mkdir -p "$TOOLCHAIN_DIR/src" "$TOOLCHAIN_DIR/bin" "$TOOLCHAIN_DIR/premake"
@@ -107,9 +111,26 @@ fetch_iw7mod_ui() {
     echo "    -> $dir/data/cdata/ui_scripts"
 }
 
+fetch_pwsh() {
+    local dir="$TOOLCHAIN_DIR/pwsh"
+    echo "==> PowerShell $PWSH_VERSION"
+    if [ ! -x "$dir/pwsh" ]; then
+        local archive="$TOOLCHAIN_DIR/powershell-$PWSH_VERSION-linux-x64.tar.gz"
+        curl -sSL --fail -o "$archive" \
+            "https://github.com/PowerShell/PowerShell/releases/download/v$PWSH_VERSION/powershell-$PWSH_VERSION-linux-x64.tar.gz"
+        echo "$PWSH_SHA256  $archive" | sha256sum -c --quiet
+        mkdir -p "$dir"
+        tar -xzf "$archive" -C "$dir"
+        chmod 755 "$dir/pwsh"
+        rm -f "$archive"
+    fi
+    echo "    -> $dir/pwsh"
+}
+
 build release "$RELEASE_COMMIT" 5.0.0-beta2 gmake2
 build develop "$DEVELOP_COMMIT" 5.0.0-beta8 gmake
 fetch_stock_dump
 fetch_iw7mod_ui
+fetch_pwsh
 
 echo "Done. Check the mod with: python3 tools/check.py"

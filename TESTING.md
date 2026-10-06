@@ -76,11 +76,21 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V39 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 24/24 compiled, 12/12 identical, 125 built-in calls, 43 far references (6 into stock scripts, all loaded on every zombies map), 12 scripts load, 6,204 bytes; `lua`: 94 API names |
 | V40 | `tools/tests/test_character_data.py` | ✅ 6 tests OK. The new menu test compares the menu's lobby values with the GSC cast table. A wrong value, a lobby value on a regular character, and a commented-out row are all caught |
 
+### One-click Windows setup
+
+| # | Check | Result |
+|---|-------|--------|
+| V41 | `tools/tests/test_installer.py`, installer logic with PowerShell 7.4.6 (sha256-checked) on fake Steam libraries | ✅ The game is found in a second Steam library (both `libraryfolders.vdf` formats). Install copies every payload file and writes the record. Updating removes a file an older version left. Uninstall removes exactly the recorded files and leaves another mod's script and `iw7-mod/players2` alone. The Mods-menu copy loses only its own files. Record entries that point outside the mod's folders (`..`, absolute paths, `players2/…`) are ignored |
+| V42 | `IXSetup.ps1 -NoWindow` under PowerShell 7 | ✅ Installs and uninstalls the fake game folder; a wrong folder exits 1 with a message and creates nothing |
+| V43 | Windows PowerShell 5.1 compatibility (`tools/tests/ps51_lint.ps1`): parse errors, PowerShell 7 syntax (`?:`, `??`, `&&`, `?.`), 5.1-missing parameters, three-part `Join-Path`, `$IsWindows`; ASCII-only scripts | ✅ Clean. A sample with each problem is flagged |
+| V44 | `IXSetup.xaml`: well formed; no `x:Class` or event attributes (so `XamlReader.Load` accepts it); every control the script uses, resource key and storyboard target exists; only known WPF element types; each element/attribute pair reviewed against WPF | ✅ All checks pass. The window itself has not been opened (E5) |
+| V45 | Launcher line endings | ✅ `*.cmd text eol=crlf`: `git archive` (GitHub's zip downloads) and checkouts both give CRLF |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
 2. iw7-mod installed (`auroramod/docs` → *iw7-install*). Record the client version: **v1.1.0** or a develop build.
-3. Install the mod: copy `mods/infinite_expansion/custom_scripts` and `mods/infinite_expansion/ui_scripts` into `<Infinite Warfare>/iw7-mod/`. Every player in a co-op test installs it the same way. The Mods-menu install (`mods/infinite_expansion` in `<Infinite Warfare>/mods/`) works for solo tests only (L30, R-S10).
+3. Install the mod with `Infinite Expansion Setup.cmd` (README; §4.8 tests the setup itself), or by hand: copy `mods/infinite_expansion/custom_scripts` and `mods/infinite_expansion/ui_scripts` into `<Infinite Warfare>/iw7-mod/`. Every player in a co-op test installs it the same way. The Mods-menu install (`mods/infinite_expansion` in `<Infinite Warfare>/mods/`) works for solo tests only (L30, R-S10).
 4. Launch with `+set developer_script 1`. Without it, script runtime errors are not printed at all (`KNOWN_LIMITATIONS.md` L24).
 5. Logs: the iw7-mod console (`~`) and `iw7-mod/logs/console.log`, available since iw7-mod v1.0.3. Report every line starting with `[IX]` and any `script compile error`, `script link error`, or `script runtime error` block.
 6. **No `[IX]` lines at all?** Check that `<Infinite Warfare>/iw7-mod/custom_scripts/cp/ix_main.gsc` exists. Then try the Mods-menu install, check that the console's `----- FS_Startup -----` list includes `mods/infinite_expansion`, and report which install worked.
@@ -167,6 +177,22 @@ Characters are chosen in the CHARACTER menu before a match (§4.6) and kept for 
 | R-UI3 | Pick Andre, then start a solo match | You play as Andre; the console shows `(ix_character)`; after restarting the game the menu still says "Selected: Andre" | not run | not run |
 | R-UI4 | Pick a special you have not unlocked, then start a match | A random character, and after the intro "Can't play as ...: ... is locked: ..." | not run | not run |
 | R-UI5 | Pick The Hoff, then run `getCoopPlayerData zombiePlayerLoadout characterSelect`; pick Sally and run it again | `1`, then `0`; no console error from `setCoopPlayerData` or `uploadstats` | not run | not run |
+
+### 4.8 One-click Windows setup
+
+Start from a fresh **Code → Download ZIP** of the repository, extracted, as a player would.
+
+| ID | Test | Expected | Result |
+|----|------|----------|--------|
+| R-I1 | Double-click `Infinite Expansion Setup.cmd` | The window opens within a few seconds: grid scrolling, hands rising, wheel turning. No error box. If Windows warns, note the exact wording | not run |
+| R-I2 | Game detection | The game folder is filled in (also from a Steam library on another drive); IW7-MOD CLIENT is green when `iw7-mod.exe` is there, yellow with GET IT when not | not run |
+| R-I3 | INSTALL, then start a zombies match | Status INSTALLED; `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` and `iw7-mod\infinite-expansion.json` exist; *Settings → Apps* lists Infinite Expansion; the console shows `[IX] INFO: init` | not run |
+| R-I4 | With the old `mods\infinite_expansion` copy present | The yellow note shows; INSTALL removes that copy's files and says so | not run |
+| R-I5 | UNINSTALL | Status UNINSTALLED; the mod's files and the record are gone; other files in `iw7-mod` stay; the Settings entry is gone | not run |
+| R-I6 | Install, delete the download, then uninstall from *Settings → Apps* | The setup window opens and uninstalls by itself; after closing it, `%LOCALAPPDATA%\InfiniteExpansion` is gone | not run |
+| R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
+| R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
+| R-I9 | Game in a folder Windows protects (if available) | INSTALL offers to retry as administrator, and that works | not run |
 
 ### 4.7 Compatibility matrix
 

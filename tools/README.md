@@ -15,6 +15,7 @@ tools/setup_compilers.sh            # builds into .toolchain/ (git-ignored)
 | `.toolchain/bin/ixcc-release`, `ixcc-develop` | `tools/ixcc/ixcc.cpp` linked against each pin | compile **exactly as iw7-mod's in-game loader does** (see below) |
 | `.toolchain/src/iw7-gsc-dump/decompiled/` | mjkzy/iw7-gsc-dump `1dd48a78` | decompiled stock scripts; reference for far-call checks, never shipped |
 | `.toolchain/src/iw7-mod-ui/data/cdata/ui_scripts/` | auroramod/iw7-mod develop `c0a1c6da` (sparse) | iw7-mod's own Lua UI scripts; reference for the `lua` check |
+| `.toolchain/pwsh/pwsh` | PowerShell 7.4.6 release (sha256-checked) | runs the Windows installer's logic in `tests/test_installer.py` |
 
 Requirements: `git`, `curl`, `tar`, `make`, `clang`/`clang++` (C++20), and Python 3.9+ for `check.py` (standard library only). Optional: `luac5.1` (package `lua5.1`) for the Lua syntax check. The script downloads premake 5.0.0-beta2 and 5.0.0-beta8 from the premake GitHub releases, because each pin needs the premake version its own CI used. A run from an empty directory takes about 8 minutes.
 
@@ -43,7 +44,7 @@ Options: `--mod DIR`, `--toolchain DIR`, `--stock DIR`, `--budget BYTES`, and `-
 
 Both compilers already reject a script function named after a built-in (`function name 'clamp' already defined as builtin`), so that rule needs no separate check.
 
-`tools/tests/fixtures/bad_mod` breaks every rule once (each file's first comment says which), and `good_mod` follows them all. `tools/tests/test_check.py` asserts the exact findings for both. `tools/tests/test_character_data.py` checks the character table in `ix/player/character.gsc` against the stock scripts (models, slots, lobby ids, and soul keys) and against the lobby values the CHARACTER menu writes.
+`tools/tests/fixtures/bad_mod` breaks every rule once (each file's first comment says which), and `good_mod` follows them all. `tools/tests/test_check.py` asserts the exact findings for both. `tools/tests/test_installer.py` runs the Windows installer's logic (`installer/IXSetup.Core.ps1`) and its `-NoWindow` mode with PowerShell 7 on fake Steam libraries and game folders. It also checks the window's files statically: `ps51_lint.ps1` for Windows PowerShell 5.1 compatibility, ASCII-only scripts, a CRLF launcher, and XAML that `XamlReader.Load` accepts and that matches the script's control names. `tools/tests/test_character_data.py` checks the character table in `ix/player/character.gsc` against the stock scripts (models, slots, lobby ids, and soul keys) and against the lobby values the CHARACTER menu writes.
 
 ## ixcc
 

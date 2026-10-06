@@ -14,6 +14,20 @@ The BO3 mod serves only as a reference. Nothing is copied from it, and every fea
 
 ## Installation
 
+### One-click setup (Windows)
+
+1. Download this repository (on GitHub: **Code → Download ZIP**) and extract the whole zip.
+2. Double-click **`Infinite Expansion Setup.cmd`**.
+3. Click **INSTALL**. Click **UNINSTALL** in the same window to remove it again.
+
+The setup window finds Infinite Warfare through Steam, including Steam libraries on other drives, and checks that the iw7-mod client is in the game folder. **BROWSE** lets you pick `iw7_ship.exe` yourself. INSTALL copies the mod into `<Infinite Warfare>\iw7-mod\` and records the files it copied in `iw7-mod\infinite-expansion.json`. UNINSTALL removes exactly those files, and other mods' scripts stay. Installing also removes an old copy in `mods\infinite_expansion` (see below), but keeps any file of your own in that folder.
+
+INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files, and the button then reads UPDATE.
+
+Windows asks before running a file from the internet, and the setup is not code-signed, so it may show "Windows protected your PC". Choose *More info → Run anyway*. The setup is plain PowerShell (`installer\IXSetup.ps1`) that you can read first. If something goes wrong, details go to `%TEMP%\InfiniteExpansionSetup.log`. For a protected game folder, the setup offers to retry as administrator.
+
+### By hand
+
 Copy the two folders inside `mods/infinite_expansion` into the `iw7-mod` folder of your game. Every player who wants the CHARACTER menu installs it the same way:
 
 ```text
@@ -21,7 +35,7 @@ copy  mods/infinite_expansion/custom_scripts   →   <Infinite Warfare>/iw7-mod/
 copy  mods/infinite_expansion/ui_scripts       →   <Infinite Warfare>/iw7-mod/ui_scripts
 ```
 
-The mod then runs in every zombies match you host, and friends can join you.
+The mod then runs in every zombies match you host, and friends can join you. The setup's UNINSTALL also removes a copy made this way.
 
 **Solo only:** you can instead copy `mods/infinite_expansion` to `<Infinite Warfare>/mods/` and load it from the **Mods** menu (or launch with `+set fs_game "mods/infinite_expansion"`). Nobody can join a game started that way. iw7-mod asks joining players to download the host's `mod.ff`, and this mod has none, so they get "Server 'mod_hash' is empty" (`KNOWN_LIMITATIONS.md` L30).
 
@@ -78,6 +92,7 @@ The rules are enforced by the host's copy of the mod. A host without the mod run
 | `TESTING.md` | Verification levels, verification log (Phases 0–1), runtime test checklist |
 | `CHANGELOG.md` | History |
 | `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests |
+| `installer/` | The Windows setup: `IXSetup.ps1` (window), `IXSetup.Core.ps1` (install logic), `IXSetup.xaml` (layout and artwork) |
 
 ## Roadmap
 

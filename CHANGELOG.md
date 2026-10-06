@@ -4,6 +4,21 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### One-click Windows setup (2026-10-06)
+
+**Added**
+- `Infinite Expansion Setup.cmd` opens a setup window (`installer/`) with INSTALL / UPDATE and UNINSTALL buttons.
+  - It finds Infinite Warfare through Steam (registry, every library in `libraryfolders.vdf`, the game's app manifest), or the player picks `iw7_ship.exe` with BROWSE.
+  - It shows whether the iw7-mod client is there and which version of the mod is installed.
+  - Installing copies the mod into `<game>\iw7-mod\`, records the copied files, removes files an older version left, removes the old Mods-menu copy's files, and adds an entry to *Windows Settings → Apps*. Uninstalling removes exactly the recorded files.
+  - Artwork, all original vector drawings: a synthwave sunset with a striped sun, a neon ferris wheel, a scrolling pink grid, toxic fog and zombie hands rising from the ground; plus an app icon (`installer/ix.ico`, source `ix-icon.svg`).
+  - Errors go to `%TEMP%\InfiniteExpansionSetup.log`. A protected game folder gets an offer to retry as administrator. `-NoWindow` installs or uninstalls from a script.
+- `tools/tests/test_installer.py` and `ps51_lint.ps1`: the install logic runs with PowerShell 7 on fake Steam libraries, and the window's files are checked for Windows PowerShell 5.1 and `XamlReader` compatibility. `setup_compilers.sh` fetches PowerShell 7.4.6 for them.
+- `.gitattributes`: `.cmd` files keep CRLF line endings, also in GitHub's zip downloads.
+
+**Not verified**
+- The window has not been opened yet: WPF needs Windows, and the .NET SDK that could compile-check the XAML cannot be downloaded here (E5). `TESTING.md` §4.8 lists what to check.
+
 ### Phase 1.5 — Characters chosen before the match; guests (2026-10-06)
 
 **Changed**

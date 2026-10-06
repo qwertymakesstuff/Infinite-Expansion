@@ -337,3 +337,14 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
   - Events from C++: iw7-mod dispatches `mod_download_*` events to `Engine.GetLuiRoot()`, where `registerEventHandler` receives them (`Mods/ModDownload.lua`).
 - **Not available.** No timer or other in-game trigger appears in iw7-mod's ui_scripts, so in-game Lua has no verified way to act on its own after the map loads. iw7-mod's `io` table has no write. Adding localized strings is commented out in iw7-mod, so labels are plain text, as iw7-mod's own "Server Browser" button does. The in-game pause menu's type name appears in no script.
 - **Checking.** `tools/check.py` `lua` runs `luac5.1 -p` (it parses all 31 of iw7-mod's own scripts) and allows only API names that iw7-mod's ui_scripts at `c0a1c6da` use.
+
+## 17. Windows setup facts `[MOD main.cpp, filesystem.cpp]` `[STEAM]`
+
+`[STEAM]` marks Steam's own file formats and registry keys, which are general knowledge, not read from a source in this repository; R-I2 confirms them.
+
+- **Game folder.** The game's executable is `iw7_ship.exe`, and the iw7-mod client must sit next to it: `iw7-mod.exe` exits with "Please copy the iw7-mod.exe into your Call of Duty: Infinite Warfare installation folder" otherwise (`main.cpp`). The installer accepts a folder only when it contains `iw7_ship.exe`.
+- **iw7-mod's folder.** iw7-mod registers `<current dir>/iw7-mod` as a search path (`filesystem.cpp`), with the game folder as the current directory. It also moves the `players2` folder (player configs and stats) into `iw7-mod/players2`, so the installer must never touch that folder. The recorded-file check enforces this.
+- **`fs_game` is not saved.** iw7-mod clears the `fs_game` dvar's flags (`filesystem.cpp`, "fs_game flags"), so a mod loaded from the Mods menu is gone after restarting the game.
+- **Steam `[STEAM]`.** The install folder is in `HKCU\Software\Valve\Steam\SteamPath`, or `InstallPath` under `HKLM\SOFTWARE\(WOW6432Node\)Valve\Steam`. `steamapps\libraryfolders.vdf` lists the other libraries: `"path" "D:\\SteamLibrary"` in the current format, `"1" "D:\\SteamLibrary"` in the old one. `steamapps\appmanifest_292730.acf` (Infinite Warfare's app id 292730) names the folder under `steamapps\common` in `"installdir"`.
+- **Apps & features.** A per-user entry is a registry key under `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<name>` with `DisplayName`, `UninstallString` and related values; it needs no administrator rights.
+

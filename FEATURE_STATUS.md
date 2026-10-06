@@ -24,6 +24,17 @@
 | Cast data test (character table vs. stock scripts and the menu) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (6 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
 
+## Installer (Windows)
+
+| Feature | Category | Phase | Status | Notes |
+|---------|----------|-------|--------|-------|
+| One-click setup window (install / update / uninstall) | Installer | 1.5 | TESTING | `Infinite Expansion Setup.cmd` → `installer/IXSetup.ps1` (WPF, Windows PowerShell 5.1); 80s neon art; R-I1, R-I3, R-I5, R-I8 |
+| Finds the game through Steam (registry, every library, app manifest) | Installer | 1.5 | TESTING | BROWSE as fallback; R-I2, R-I7 |
+| Uninstall from Windows Settings → Apps | Installer | 1.5 | TESTING | Per-user entry; a setup copy in `%LOCALAPPDATA%`; R-I6 |
+| Removes exactly what it installed; removes the old Mods-menu copy | Installer | 1.5 | TESTING | Record `iw7-mod/infinite-expansion.json`; R-I4, R-I5 |
+| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (21 tests), `tools/tests/ps51_lint.ps1` |
+| Signed installer (no Windows warning) | Installer | – | NOT PLANNED | Needs a paid certificate (L31) |
+
 ## Core (Phases 1–2)
 
 | Feature | Category | Phase | Status | Notes |

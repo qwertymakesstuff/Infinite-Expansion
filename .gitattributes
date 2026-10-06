@@ -1,0 +1,3 @@
+# Windows batch files need CRLF line endings: in clones and in GitHub's zip downloads.
+*.cmd text eol=crlf
+*.ico binary

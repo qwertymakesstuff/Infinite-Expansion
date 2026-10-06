@@ -56,6 +56,9 @@ Infinite-Expansion/                          (repository)
 │               │   └── rounds.gsc           round utilities and round hooks
 │               └── debug/                   ≙ /scripts/debug/   (gated)
 │                   └── debug.gsc            inspector, trace info, perf/log read-outs
+├── Infinite Expansion Setup.cmd             double-click: opens the setup window (Windows)
+├── installer/                               one-click setup: IXSetup.ps1 (WPF window), IXSetup.Core.ps1
+│                                            (install logic, tested on Linux), IXSetup.xaml (layout + art), ix.ico
 ├── tools/                                   offline verification (Linux)
 └── *.md                                     project documentation
 ```
