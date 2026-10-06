@@ -1,0 +1,54 @@
+# KNOWN_LIMITATIONS.md
+
+Each entry gives: what the limit is, how it was verified, its impact, and the workaround (if any).
+
+Status labels:
+- **BLOCKED — IW LIMITATION**: the engine or client does not expose it.
+- **HAZARD**: the feature works but has a trap.
+- **NEEDS TESTING**: cannot be decided without running the game.
+- **ENV**: a limitation of this development environment, not of the mod.
+
+---
+
+## A. Engine / client limitations
+
+| ID | Limitation | Evidence | Impact | Workaround | Status |
+|----|-----------|----------|--------|------------|--------|
+| L1 | No official IW mod tools; everything depends on the **iw7-mod** client | No official SDK exists; the client source is in `auroramod/iw7-mod` | The mod requires iw7-mod; stock Steam IW7 cannot load it | Document iw7-mod as a hard requirement | Accepted |
+| L2 | Debug drawing built-ins are `nullptr` stubs in the release exe: `line`, `sphere`, `box`, `cylinder`, `orientedbox`, `print3d`, `printtoscreen2d` | gsc-tool IW7 function table comments (`// nullptr`) | No 3D debug lines or text for the debug tools | HUD-element read-outs and waypoint-style markers | BLOCKED — IW LIMITATION |
+| L3 | GSC cannot register console commands (`adddebugcommand` is a stub) | Same table | No AAE-style `/d name value` command | Players use `set ix_<name> <value>`; a watcher thread applies changes | BLOCKED — IW LIMITATION (workaround available) |
+| L4 | Weapon-definition field edits (`setWeaponFieldFloat/Int/Bool`) exist only in iw7-mod **debug** builds | `#ifdef _DEBUG` in `iw7-mod/src/client/component/weapon.cpp` | No per-weapon asset tweaking (fire time, damage tables) at runtime | Per-player native fire-time scale (`_meth_85C1`), recoil scale, spread override, damage-callback multipliers | BLOCKED — IW LIMITATION (partial workaround) |
+| L5 | Server GSC cannot read client-only data (FPS, client dvars, key bindings) | GSC runs server-side; no built-in exposes client FPS | No FPS counter in the GSC HUD | Client-side Lua could show FPS later (needs LUI work) | BLOCKED — IW LIMITATION (for GSC) |
+| L6 | Custom script bytecode budget is **1 MiB per map load**, shared with iw7-mod's own custom scripts and other mods; overflow is a **fatal error** | `script_memory.size = 0x100000` and `Com_Error(ERR_FATAL, "Out of custom script memory")` in `gsc/script_loading.cpp` | A very large mod could crash the game at load | Build check reports total compiled size; budget target ≤ 512 KiB | HAZARD |
+| L7 | Auto-load folder scanning is **non-recursive** | `utils::io::list_files` → `std::filesystem::directory_iterator` | Modules in subfolders do not run on their own | Intended: one entry script per mode, modules loaded by reference | Accepted (design) |
+| L8 | Custom `init()` runs **before** the map's `main()` | `scr_load_level_stub` runs custom init handles, then the original `Scr_LoadLevel` | Wrapping callbacks set by map scripts too early is silently undone | Wait (e.g. for `"connected"`) before wrapping; verify the pointer is still ours | HAZARD |
+| L9 | GSC file I/O works **only** when a mod is loaded through `fs_game`; otherwise every call throws | `convert_path` in `iw7-mod/src/client/component/io.cpp` | Loose-script installs cannot persist settings to disk | Mod-folder install (`mods/infinite_expansion`); dvar-only fallback | HAZARD (design handles it) |
+| L10 | IW7 **hashes** many stock identifiers (fields, functions, dvars). Guessed names compile but refer to different data | Dump shows `_id_XXXX`; the compiler accepts unknown field names as new strings | Silent bugs (reads return `undefined`) | Use names exactly as in the dump; verified-dvar list only | HAZARD |
+| L11 | Scripts run on the **server**. In MP only the host's game runs them | Listen-server architecture; Synergy README notes the same | MP features apply only in games the user hosts | Document; CP solo/co-op works for all players in the host's game | Accepted |
+| L12 | The classic HUD string-overflow fix (`clearalltextafterhudelem`) is a stub | Method table (`stub`) | Many unique `settext` strings *may* exhaust configstrings (unconfirmed for IW7) | Use `setvalue` for numbers, a fixed label vocabulary, and HUD elements created once and reused | NEEDS TESTING |
+| L13 | Zombie dodge, new animations, and AI states need new ASM/animation assets | No script API creates animations | AAE "zombie dodge" cannot be ported | none | BLOCKED — IW LIMITATION |
+| L14 | New assets (camos, sounds, models, weapons) need fastfile building with **x64-zt** on Windows with the game installed | `auroramod/docs` zonetool pages | AAE camo and sound additions are out of scope for script phases | Possible later via `mod.ff` | DEFERRED |
+| L15 | IW7 zombies is a 4-player mode; no verified way to raise the CP client limit | No script control found; engine limits unverified | AAE's "10-player zombies" cannot be promised | none known | BLOCKED — IW LIMITATION (pending test) |
+| L16 | No verified dvar for jump height | Not used by any stock script; not registered by iw7-mod | "Jump height" option may be impossible | Runtime feature-detect (`getdvar("jump_height") != ""`); boost energy and velocity tricks as alternatives | NEEDS TESTING |
+| L17 | `bg_gravity` and `g_speed` are **global** (all players); range of `bg_gravity` is 1–1000 | `dvars::override::register_*` in `gameplay.cpp` | Gravity cannot be per-player | Per-player speed uses `setmovespeedscale` instead | Accepted |
+| L18 | Third person through `cg_thirdPerson` is a **client** cheat dvar and is not registered on dedicated servers | `thirdperson.cpp` | Host-only via dvar | Per-player `setcamerathirdperson` (`_meth_845E`), used by stock scripts | Accepted (workaround) |
+| L19 | No IW7 zombies bot AI found | No CP bot scripts in the dump | AAE "offline bots" likely not portable | none | NEEDS TESTING |
+| L20 | Dvars are process-wide: a global dvar the mod changed (e.g. `bg_gravity`, `g_speed`, `player_sustainAmmo`) keeps its value after the match unless a script restores it, and an abrupt map change can end scripts before they do | Dvar model (GSC `setdvar` changes the process-wide value) | Changes can leak into a later stock match until restored | Restore on feature disable and on `game_ended`; re-apply or reset on every load; show changed globals in *Active modifiers* | HAZARD |
+
+## B. Compiler / client-version hazards (verified with real compilers)
+
+| ID | Hazard | Evidence | Mitigation |
+|----|--------|----------|------------|
+| C1 | On iw7-mod **v1.1.0**, `disableinvulnerability()` compiles to native `disablegrenadetouchdamage` | Compiled with gsc-tool `833822d0`, disassembled with `0be361a4` | Always call `_meth_80A1()` through the compat module |
+| C2 | On v1.1.0, `playlocalsound(x)` compiles to native `playercommandbot` | Same | Always call `_meth_8242(x)` through the compat module |
+| C3 | 503 method and 5 function names are unknown to the v1.1.0 compiler (compile error) | Table diff between `833822d0` and `0be361a4` | Raw `_meth_XXXX` / `_func_XXX` ids, wrapped and commented, in the compat module |
+| C4 | Develop-only client features: `bg_omnimovement`, `bg_sprintUnlimited`, `bg_airControl` dvars; `custom_scripts/frontend/` loading | `git diff v1.1.0..develop` of `gameplay.cpp` and `script_loading.cpp` | Feature-detect at runtime; hide options that are unavailable |
+| C5 | Future iw7-mod releases may change compiler tables again | Two tables already differ | Re-run the dual-compile parity check whenever iw7-mod updates its `deps/gsc-tool` pin |
+
+## C. Development-environment limitations (ENV)
+
+| ID | Limitation | Impact | Resolution |
+|----|-----------|--------|-----------|
+| E1 | The BO3 AAE archive cannot be downloaded (egress policy denies `*.dl.dropboxusercontent.com`; the connector only reads files ≤ 5 MiB; the archive is 1.48 GB) | BO3 analysis is provisional (secondary sources) | Allow the host in environment network settings, **or** upload extracted script files individually, **or** commit them to a branch |
+| E2 | `steamcommunity.com`, `catalogue.smods.ru`, and `docs.auroramod.dev` are blocked | Only search-result summaries of the AAE description are available; the iw7-mod docs were read from the GitHub repo instead | Same as E1 |
+| E3 | No Windows, no game install here | **No runtime testing possible in this environment**; every runtime behaviour stays NEEDS TESTING until a user runs `TESTING.md` | User-side testing |

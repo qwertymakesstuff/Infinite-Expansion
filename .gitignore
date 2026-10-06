@@ -1,0 +1,7 @@
+# offline compiler toolchain built by tools/setup_compilers.sh
+.toolchain/
+
+# gsc-tool output
+compiled/
+disassembled/
+decompiled/
