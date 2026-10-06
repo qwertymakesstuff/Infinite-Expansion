@@ -36,6 +36,10 @@ Errors observed in Phase 0:
 - An unknown built-in gives `couldn't determine function call type`.
 - A syntax error gives `expected ';', got …`.
 
+## BO3 reference workspace
+
+`tools/bo3_reference/extract_aae.sh <AllAroundEnhancement.7z> <out-dir>` regenerates the decompiled AAE reference used in `PROJECT_ANALYSIS.md` §1 (see `tools/bo3_reference/README.md`).
+
 ## Planned (Phase 1)
 
 - `check.sh` will:

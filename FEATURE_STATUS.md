@@ -1,47 +1,57 @@
 # FEATURE_STATUS.md
 
-**Statuses:** PLANNED · INVESTIGATING · IN PROGRESS · TESTING · COMPLETE · PARTIAL · BLOCKED
+**Statuses:** PLANNED · INVESTIGATING · IN PROGRESS · TESTING · COMPLETE · PARTIAL · BLOCKED (· DEFERRED, N/A, NOT PLANNED)
 
-Nothing is COMPLETE yet; Phase 0 produced analysis only. A feature becomes COMPLETE only after it is compiled with both iw7-mod compilers **and** confirmed in-game (see `TESTING.md`). Evidence for every API named here is in `IW_API_NOTES.md`.
+- A feature becomes **COMPLETE** only after it compiles with both iw7-mod compilers **and** is confirmed in-game (`TESTING.md`).
+- **TESTING** means the code is written and passes static checks, but no in-game run has been reported yet.
+- Evidence for every API named here is in `IW_API_NOTES.md`. The BO3 origin of each AAE feature is in `PROJECT_ANALYSIS.md` §1 and §3.
 
-## Project / analysis
+## Project / analysis / tooling
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | IW7 modding research | Analysis | 0 | COMPLETE | `PROJECT_ANALYSIS.md` §2, `IW_API_NOTES.md` |
-| BO3 AAE file analysis | Analysis | 0 | BLOCKED | Archive not downloadable here (env egress policy). Provisional inventory from secondary sources only |
-| Offline compiler toolchain (both iw7-mod pins) | Tooling | 0 | COMPLETE | Built and exercised in Phase 0; `tools/setup_compilers.sh` |
+| BO3 AAE file analysis | Analysis | 0 | COMPLETE | AAE v3.9.5 decompressed; 211/216 scripts decompiled; `PROJECT_ANALYSIS.md` §1 |
+| BO3 reference pipeline | Tooling | 0 | COMPLETE | `tools/bo3_reference/extract_aae.sh` (reproduces §1.3 in ~30 s) |
+| Offline compiler toolchain (both iw7-mod pins) | Tooling | 0 | COMPLETE | `tools/setup_compilers.sh` |
 | Dual-compile parity check | Tooling | 1 | PLANNED | Diff release/develop disassembly |
-| Far-call / mode-separation lint | Tooling | 1 | PLANNED | Checks `scripts\…` targets against the dump |
+| Far-call / mode-separation lint, bytecode budget | Tooling | 1 | PLANNED | |
 
 ## Core (Phases 1–2)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | Entry scripts (CP, MP) | Core | 1 | PLANNED | `custom_scripts/{cp,mp}/ix_main.gsc` |
-| Bootstrap + duplicate-init guard | Core | 1 | PLANNED | |
+| Bootstrap + duplicate-init guard + module order | Core | 1 | PLANNED | Replaces BO3's `system::register` ordering (AAE §1.5) |
 | Compatibility module (raw ids, feature detection) | Core | 1 | PLANNED | Fixes the v1.1.0 mislabels (C1, C2) |
-| Logging | Core | 1 | PLANNED | iw7-mod `print`/`logprint` |
+| Logging | Core | 1 | PLANNED | |
 | Feature manager | Core | 2 | PLANNED | |
-| Configuration manager | Core | 2 | PLANNED | Registry + clamp/validate + `ix_*` dvars |
-| Live console overrides (`set ix_x v`) | Core | 2 | PLANNED | Replaces AAE `/d` (L3) |
-| File persistence | Core | 2 | PLANNED | Needs a mod-folder install (L9) |
+| Configuration manager (flat keys, like AAE's `tfoption_*`) | Core | 2 | PLANNED | `ix_*` dvars; live apply |
+| Settings file + schema version (AAE: save data + `tfoption_master_ver`) | Core | 2 | PLANNED | `ix_settings.cfg`; needs mod-folder install (L9) |
+| Live console overrides (`set ix_x v`) | Core | 2 | PLANNED | Replaces AAE `modvar` / `/d` (L3) |
 | Event bus | Core | 2 | PLANNED | Real IW7 notifies only |
 | Utility library | Core | 2 | PLANNED | |
+| Chat-command router (`say` notify) | Core | 2 | PLANNED | AAE `chatnotify.gsc` equivalent |
 
 ## UI (Phase 3) / HUD (Phase 8)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | GSC menu engine (pages, toggles, sliders, selects, actions) | UI | 3 | PLANNED | Create-once HUD elements |
-| Menu controls (ADS+Melee open, etc.) | UI | 3 | PLANNED | Avoids all CP action slots |
-| Reset / defaults from menu | UI | 3 | PLANNED | |
-| Host-only access rules | UI | 3 | PLANNED | |
-| HUD: round, zombies remaining | HUD | 8 | PLANNED | CP |
-| HUD: coordinates, speed, weapon/ammo, health | HUD | 8 | PLANNED | |
-| HUD: active modifiers list | HUD | 8 | PLANNED | |
-| HUD: FPS | HUD | 8 | BLOCKED | L5: server GSC cannot read client FPS |
-| HUD style swap of stock LUI HUD | HUD | – | INVESTIGATING | Needs client Lua; deferred |
+| Menu controls (open ADS+Melee, configurable) | UI | 3 | PLANNED | Avoids all CP action slots |
+| Settings pages mirroring AAE "Custom Mutations" categories | UI | 3 | PLANNED | Game / Player / Zombie / Weapon / Perk / Power-up / Modes |
+| Reset / defaults / presets from menu | UI | 3/11 | PLANNED | |
+| Host-only access + per-player access list | UI | 3 | PLANNED | AAE dev menu "verification" |
+| LUI front-end (lobby-style options) | UI | – | DEFERRED | Client Lua; optional later |
+| HUD: zombie counter (remaining + active) | HUD | 8 | PLANNED | AAE `_zm_counter` |
+| HUD: round, timer, coordinates, speed, weapon/ammo, health | HUD | 8 | PLANNED | |
+| HUD: active modifiers list | HUD | 8 | PLANNED | Also lists changed global dvars (L20) |
+| HUD: low-ammo hint | HUD | 8 | PLANNED | |
+| HUD: player health bar (self) | HUD | 8 | PLANNED | hudelem bar |
+| HUD: ally overhead bars / zombie health bars | HUD | 8 | INVESTIGATING | `setwaypoint` + `settargetent`, NEEDS TESTING |
+| HUD: damage numbers / score-event popups | HUD | 8 | INVESTIGATING | hudelem budget (L12) |
+| HUD: FPS | HUD | – | BLOCKED | L5 |
+| Restyle stock IW7 HUD (colour/format/scale) | HUD | – | DEFERRED | Client Lua |
 | HUD string-overflow behaviour | HUD | 3/8 | INVESTIGATING | L12, NEEDS TESTING |
 
 ## Player (Phase 4) / Movement (Phase 5)
@@ -49,89 +59,103 @@ Nothing is COMPLETE yet; Phase 0 produced analysis only. A feature becomes COMPL
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | God mode | Player | 4 | PLANNED | `enableinvulnerability` / `_meth_80A1` |
-| Health settings | Player | 4 | PLANNED | `.maxhealth`; CP regen interaction NEEDS TESTING |
-| Player damage multiplier | Player | 4 | PLANNED | Wrap `level.callbackplayerdamage` after map init |
-| Third person | Player | 4 | PLANNED | `_meth_845E` (per player) |
+| Player health (AAE 1–5 hits) | Player | 4 | PLANNED | `.maxhealth`; regen interaction NEEDS TESTING |
+| Starting points | Player | 4 | PLANNED | `set_player_currency` (CP) |
+| Friendly-fire modes / one-team grief | Player | 4 | PLANNED | Damage-callback wrapper |
+| Rocket jump | Player | 4 | PLANNED | Callback + `setvelocity` |
+| Third person (incl. back-of-head) | Player | 4 | PLANNED | `_meth_845E` |
+| Gun (arm) position | Player | 4 | INVESTIGATING | `cg_gun_x/y/z` via `setclientdvar` |
 | Teleport / position utilities | Player | 4 | PLANNED | `setorigin`, traces |
+| Zombies ignore player | Player | 4 | PLANNED | `self.ignoreme` |
 | Player collision (ejection) | Player | 4 | PLANNED | `bg_playerEjection` (global) |
-| Movement speed (per player) | Movement | 5 | PLANNED | `setmovespeedscale`, safe range 0.5–3.0 (NEEDS TESTING) |
-| Gravity | Movement | 5 | PLANNED | `bg_gravity` 1–1000 (global) |
-| Jump height | Movement | 5 | INVESTIGATING | No verified dvar (L16) |
-| Disable slide / wallrun / double jump / mantle | Movement | 5 | PLANNED | `allow*` methods |
-| Unlimited sprint | Movement | 5 | PLANNED | `bg_sprintUnlimited`, develop only (C4) |
-| Omni-movement | Movement | 5 | PLANNED | `bg_omnimovement`, develop only (C4) |
-| Air control | Movement | 5 | PLANNED | `bg_airControl`, develop only (C4) |
+| Move-speed multiplier (AAE: same `g_speed`) | Movement | 5 | PLANNED | `g_speed` / `setmovespeedscale` |
+| Gravity | Movement | 5 | PLANNED | `bg_gravity` 1–1000 |
+| Jump height | Movement | 5 | INVESTIGATING | L16 |
+| No slide / no wallrun / no double jump / no mantle | Movement | 5 | PLANNED | `allow*` |
+| Unlimited sprint / omni-movement / air control | Movement | 5 | PLANNED | develop-only dvars (C4), feature-detected |
 | Fall damage toggle | Movement | 5 | PLANNED | `jump_enableFallDamage` |
 | Legacy mantle | Movement | 5 | PLANNED | `mantle_legacy*` |
-| Boost energy tuning | Movement | 5 | INVESTIGATING | `energy_*` semantics NEED TESTING |
+| Boost energy tuning | Movement | 5 | INVESTIGATING | `energy_*` semantics |
 
 ## Weapons (Phase 6)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Infinite ammo | Weapons | 6 | PLANNED | `player_sustainAmmo` (global) or per-player refill |
-| No reload (always-full clip) | Weapons | 6 | PLANNED | Per-player clip refill |
-| Fire-rate modifier / rapid fire | Weapons | 6 | PLANNED | `_meth_85C1(pct)`; valid range NEEDS TESTING |
-| Recoil modifier | Weapons | 6 | PLANNED | `player_recoilscaleon(0–100)` / `_meth_822C` |
-| Spread modifier | Weapons | 6 | PLANNED | `setspreadoverride` / `_meth_8263` |
-| Damage multiplier (vs zombies) | Weapons | 6 | PLANNED | Agent `on_damaged` wrapper (CP) |
-| Give / take / weapon info | Weapons | 6 | PLANNED | |
-| Weapon testing tools (give by full name incl. `+attachments`, refill, cycle list) | Weapons | 6/10 | PLANNED | Debug-gated |
-| Quick weapon switch | Weapons | 6 | INVESTIGATING | `_meth_84AF`, no stock usage |
-| Weapon-asset edits | Weapons | – | BLOCKED | L4: debug builds only |
-| New camos | Weapons | – | BLOCKED | L14: needs x64-zt assets (deferred) |
+| Infinite ammo / no reload | Weapons | 6 | PLANNED | `player_sustainAmmo` or per-player refill |
+| Fire-rate modifier | Weapons | 6 | PLANNED | `_meth_85C1(pct)`; range NEEDS TESTING |
+| Recoil / spread modifiers | Weapons | 6 | PLANNED | `player_recoilscaleon`, `setspreadoverride` |
+| Start with max ammo / extra start weapons / random start weapon (AAE) | Weapons | 6 | PLANNED | |
+| Give / take / weapon info / testing tools | Weapons | 6/10 | PLANNED | |
+| Weapon trade between players (AAE) | Weapons | 6 | PLANNED | Use + trace |
+| Weapon roulette / gun game (AAE) | Weapons | 6/7 | PLANNED | |
+| Keep kit camo / choose PaP camo (AAE) | Weapons | 6 | INVESTIGATING | `+camoN` suffix; PaP flow |
+| Random weapon kit (AAE) | Weapons | 6 | INVESTIGATING | Attachment validity |
+| Quick weapon switch | Weapons | 6 | INVESTIGATING | `_meth_84AF` |
+| Box filters by source title / ported weapons (AAE) | Weapons | – | BLOCKED | Needs fastfiles (L14) |
+| Weapon-asset edits | Weapons | – | BLOCKED | L4 |
 
 ## Zombies (Phase 7)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Zombie count info | Zombies | 7 | PLANNED | Wave counters |
-| Round utilities (set / skip round) | Zombies | 7 | PLANNED | `level.wave_num`; side effects NEED TESTING |
-| Zombie speed (default/sprint/super) | Zombies | 7 | PLANNED | `level.movemodefunc[type]`, `moveratescale` |
-| Zombie health modifier / cap | Zombies | 7 | PLANNED | Post-spawn scaling |
-| Spawn cap / extra zombies | Zombies | 7 | INVESTIGATING | Engine agent cap unknown |
-| Kill all / freeze / teleport zombies (debug) | Zombies | 7 | PLANNED | Debug-gated |
-| Zombie targeting: zombies ignore a player | Zombies | 7 | PLANNED | `self.ignoreme` (token; 49 stock uses) |
-| Melee damage modifier | Zombies | 7 | PLANNED | Agent `on_damaged` wrapper, `MOD_MELEE` |
-| Power-up spawning (debug) | Zombies | 7 | PLANNED | `scripts\cp\loot::drop_loot` |
-| Perk utilities | Zombies | 7 | PLANNED | `give_zombies_perk` / `take_zombies_perk` |
-| Currency utilities | Zombies | 7 | PLANNED | `cp_persistence` currency functions |
-| Max Ammo refills clips (AAE) | Zombies | 7 | PLANNED | Hook the `ammo_max` power-up |
-| Weapon roulette (AAE) | Zombies | 7 | PLANNED | On `regular_wave_starting` |
-| Friendly fire options (AAE) | Zombies | 7 | PLANNED | `scr_team_fftype` / callback |
+| Zombie speed (default/sprint/super) + super-sprint after 40 rule (AAE) | Zombies | 7 | PLANNED | `level.movemodefunc`, `moveratescale` |
+| Weaker zombies / zombie health cap round (AAE) | Zombies | 7 | PLANNED | Post-spawn scaling |
+| Starting round (AAE) | Zombies | 7 | PLANNED | `level.wave_num`; side effects NEED TESTING |
+| Extra points per kill / melee / headshot (AAE) | Zombies | 7 | PLANNED | Agent `on_killed` wrapper |
+| Zombie damage multiplier / melee modifier | Zombies | 7 | PLANNED | Agent `on_damaged` wrapper |
+| BO4 Max Ammo refills clips (AAE) | Zombies | 7 | PLANNED | Hook `ammo_max` |
+| Perk utilities; spawn with perks; perk decay when downed (AAE) | Zombies | 7 | PLANNED | `give_zombies_perk` / `take_zombies_perk` |
+| Currency utilities; share points (AAE) | Zombies | 7 | PLANNED | `cp_persistence` |
+| Power-up spawning (debug) | Zombies | 7/10 | PLANNED | `drop_loot` |
 | Bank / weapon locker (AAE) | Zombies | 7 | PLANNED | File I/O (fs_game) |
-| Weapon restore on reconnect (AAE) | Zombies | 7 | PLANNED | Per-GUID store |
-| Non-stop spawns / round break timing (AAE) | Zombies | 7 | INVESTIGATING | Wave-loop internals are hashed |
-| Disable Fate & Fortune cards (≈ gobblegums) | Zombies | 7 | INVESTIGATING | `zombies_consumables.gsc` |
-| Perk limit (AAE) | Zombies | 7 | INVESTIGATING | No IW7 perk-cap logic found |
-| Zombie dodge (AAE) | Zombies | – | BLOCKED | L13: needs animations/ASM |
-| 10-player zombies (AAE) | Zombies | – | BLOCKED | L15: 4-player mode (pending test) |
-| Offline bots (AAE) | Zombies | – | INVESTIGATING | L19: no CP bot AI found |
-| Solo Easter eggs / EE rewards (AAE) | Zombies | – | INVESTIGATING | Large per-map effort; deferred |
+| Weapon restore on reconnect/death (AAE) | Zombies | 7 | PLANNED | Per-GUID store |
+| Immortal snail / Gambler events (AAE fun) | Zombies | 7 | PLANNED | |
+| Max spawned zombies / extra zombies (AAE) | Zombies | 7 | INVESTIGATING | Engine agent cap unknown |
+| Horrific (double-speed) zombies (AAE) | Zombies | 7 | INVESTIGATING | `generalspeedratescale` |
+| Round size algorithm / no spawn delay / no round delay (AAE) | Zombies | 7 | INVESTIGATING | Hashed wave-loop internals |
+| Timed gameplay / Roamer / end-game challenge (AAE) | Zombies | 7 | INVESTIGATING | Same |
+| Open all doors / power on / box everywhere (AAE) | Zombies | 7 | INVESTIGATING | Door/power/magic-wheel logic to trace |
+| Round revive / spectator respawn (AAE) | Zombies | 7 | INVESTIGATING | `cp_laststand`, afterlife |
+| Power-up frequency / improved Nuke / BO4 Carpenter (AAE) | Zombies | 7 | INVESTIGATING | `scripts\cp\loot` |
+| Bigger Mule Munchies (AAE "bigger Mule Kick") | Zombies | 7 | INVESTIGATING | `give_more_perk` |
+| Fate & Fortune cards disable/unlimited (≈ AAE gum options) | Zombies | 7 | INVESTIGATING | `zombies_consumables`, `cg_unlimited_cards` |
+| Perk limit (AAE) | Zombies | – | INVESTIGATING | No IW7 perk cap found |
+| Zombie juke (AAE) | Zombies | – | BLOCKED | L13 |
+| >4 players (AAE 10-player) | Zombies | – | BLOCKED | L15 (pending test) |
+| Offline bots (AAE) | Zombies | – | INVESTIGATING | L19 |
+| Solo Easter eggs / EE rewards / career stats (AAE) | Zombies | – | DEFERRED | Large per-map effort |
 
-## Gameplay / QoL / Visuals / Utilities (Phases 9, 11)
+## Quality of life / visuals / utilities (Phases 9, 11)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Fast restart | QoL | 9 | PLANNED | `map_restart` / `executecommand("fast_restart")`, NEEDS TESTING |
+| Chat commands (bank, share, save, tp, ammo, help) | QoL | 9 | PLANNED | iw7-mod `say` notify |
+| Fast restart | QoL | 9 | PLANNED | `map_restart` / `fast_restart` |
 | Timescale | Utilities | 9 | PLANNED | `setslowmotion` / `timescale` |
 | Presets (Default/Classic/Enhanced/Testing/Developer/Custom) | Config | 11 | PLANNED | |
 | Feature reset (all / per category) | Config | 9/11 | PLANNED | |
-| Night vision | Visuals | 9 | INVESTIGATING | `_meth_821A`, no stock usage |
 | Vision presets | Visuals | 9 | PLANNED | `visionsetnakedforplayer` |
+| Night vision | Visuals | 9 | INVESTIGATING | `_meth_821A` |
 | Pinging / outlines | Visuals | 9 | INVESTIGATING | `cp_outline`, `_meth_8549` |
-| Hitmarker sounds | Visuals | 9 | PARTIAL | Stock sounds only (`_meth_8242`) |
-| Damage numbers / health bars | Visuals | 9 | INVESTIGATING | HUD budget risk |
+| Hitmarkers | Visuals | – | INVESTIGATING | IW7 CP has native damage feedback |
+| Overhead map view (AAE keybind) | QoL | 9 | INVESTIGATING | `playerlinkto` camera |
+| Client "disable X" visual toggles (AAE) | Visuals | – | DEFERRED | Client Lua / client dvars, per item |
+| Grenade projection, player POV camera (AAE) | Visuals | – | BLOCKED | Client rendering |
 
 ## Debug / developer (Phase 10)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Developer menu gate (never accidental) | Debug | 10 | PLANNED | Requires `ix_dev 1` **and** a menu confirm |
-| Entity inspector / trace info | Debug | 10 | PLANNED | `bullettrace`, entity fields |
-| Player / weapon / map / round info | Debug | 10 | PLANNED | |
-| Coordinates | Debug | 10 | PLANNED | |
-| Spawn testing | Debug | 10 | INVESTIGATING | |
-| Script log viewer | Debug | 10 | PLANNED | Ring buffer of recent `ix` log lines |
-| Performance information | Debug | 10 | INVESTIGATING | Server-side only (`gettime()` frame deltas, entity/agent counts); client FPS is L5 |
-| 3D debug drawing | Debug | – | BLOCKED | L2: `line`/`print3d` are stubs |
+| Developer menu gate (never accidental) | Debug | 10 | PLANNED | `ix_dev 1` + host + confirm (AAE: `elmg_cheats`) |
+| UFO / noclip-style fly | Debug | 10 | PLANNED | Script mover |
+| Teleport tools (save/load, crosshair, nearest zombie, teleport zombies) | Debug | 10 | PLANNED | |
+| Entity tools (spawn/place/rotate/delete models) | Debug | 10 | PLANNED | `spawn`, `setmodel`, `rotateto` |
+| Entity inspector / trace info | Debug | 10 | PLANNED | `bullettrace` |
+| Player / weapon / map / round info, coordinates | Debug | 10 | PLANNED | |
+| Disable AI spawners | Debug | 10 | INVESTIGATING | `debug_pause_spawning` |
+| Clone player / fun effects | Debug | 10 | PLANNED | `_meth_8086`, `earthquake`, `hide` |
+| Spawn testing | Debug | 10 | INVESTIGATING | `spawnnewagent` semantics |
+| Script log viewer | Debug | 10 | PLANNED | Ring buffer of `[IX]` lines |
+| Performance information | Debug | 10 | INVESTIGATING | Server-side only |
+| 3D debug drawing | Debug | – | BLOCKED | L2 |
+| Aimbot (in AAE's dev menu) | Debug | – | NOT PLANNED | MP cheating tool; excluded by design |

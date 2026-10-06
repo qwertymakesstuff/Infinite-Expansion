@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Infinite Expansion
 
-> **Status: PROPOSED (Phase 0).** This design follows from the verified IW7 facts in `IW_API_NOTES.md`. It will be revisited once the BO3 reference files are readable (`PROJECT_ANALYSIS.md` §1.1), and it is implemented starting in Phase 1.
+> **Status: PROPOSED (Phase 0, final).** This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design. Implementation starts in Phase 1.
 
 ## 1. Constraints that shape the design
 
@@ -116,6 +116,7 @@ get(id) / set(id, value) / reset(id) / reset_all() / apply_preset(name)
 - **Source of truth at runtime:** `level.ix.settings[id]`.
 - **Live console overrides.** Every setting is mirrored to dvar `ix_<id>`. A watcher thread polls these dvars about every 0.5 s and applies changes, so `set ix_<id> <value>` in the console works live. This replaces AAE's `/d name value`.
 - **Persistence (`ix\core\persist`).** With `fs_game`, settings are stored in `ix_settings.cfg` inside the mod folder, as human-editable `id = value` lines with `//` comments. Without `fs_game`, the dvars are the only store (session-only), and the menu says so.
+- **Schema version.** A `settings_version` key works like AAE's `tfoption_master_ver` guard: when it changes, known keys are migrated and unknown or invalid ones fall back to defaults.
 - **Presets.** Default, Classic, Enhanced, Testing, Developer, and Custom are defined as data (`id → value` maps).
 
 ### 4.3 Event bus (`ix\core\events`)
@@ -212,3 +213,19 @@ The build check verifies these rules by scanning far-call paths.
 3. Implement enable/disable so that disable fully **restores** the previous state.
 4. Use only APIs listed in `IW_API_NOTES.md`; raw ids go through `compat`.
 5. Run `tools/` checks; add rows to `FEATURE_STATUS.md` and `TESTING.md`.
+
+## 10. Mapping from AAE's architecture (BO3) to Infinite Expansion (IW7)
+
+| AAE v3.9.5 (from the decompiled package) | Infinite Expansion | Why it differs |
+|------------------------------------------|--------------------|----------------|
+| `autoexec` functions + `system::register(name, __init__, __main__, deps)` | One entry script per mode → `ix\core\bootstrap` calls each module's `register()` in a fixed order | IW7 has no `system::` manager; iw7-mod runs only `main()`/`init()` of auto-loaded files |
+| `tfoption.gsc` reads ~80 `tfoption_*` modvars **once** at match start | `ix\core\config`: flat `ix_*` keys, applied at start **and live** | Same flat-key model; live apply because the menu is in-game |
+| LUI save data + `exec AAECustomMutations` + `tfoption_master_ver` reset | `ix\core\persist`: `ix_settings.cfg` via GSC file I/O + `settings_version` | GSC can write files in IW7 (with `fs_game`); BO3 GSC could not |
+| LUI "Custom Mutations" lobby menus (`tfoptions*.lua`) | GSC HUD menu, Settings pages | A LUI front-end would be client code every player needs (L22) |
+| `_clientid.gsc` dev menu (`elmg_cheats`, host verification, Stance+Reload) | Debug pages gated by `ix_dev` + host + confirmation | Same idea; never reachable by accident |
+| `callback::on_connect/on_spawned`, `zm::register_*_callback`, `level._custom_powerups[..].grab_powerup`, `level.round_wait_func` | `ix\core\events` over IW7 notifies; wrappers around `level.callbackplayerdamage` / `level.agent_funcs[..]`; `level.movemodefunc`; `replacefunc` | Use the hooks IW7 actually has |
+| Patched **copies** of stock scripts (e.g. `zombie_utility`) | `replacefunc` detours of single functions | No redistribution of modified stock code; smaller surface |
+| `chatnotify.gsc` (`chat` notify, `/bal`, `/dep`, …) | Chat-command router on iw7-mod's `say` notify | Equivalent mechanism |
+| Client sys-state "set client dvar" bridge; `luinotifyevent` score popups | `setclientdvar(s)`; GSC HUD text | Native in IW7 |
+| 48 custom CSV tables, 1,678 localized strings | Inline GSC data; plain `settext` labels | New tables/strings need a fastfile (L21) |
+| ~800 ported assets, sound banks, movies | Not ported (optional future asset phase, x64-zt) | Script-only scope |

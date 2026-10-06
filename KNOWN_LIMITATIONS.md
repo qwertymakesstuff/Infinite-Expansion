@@ -34,6 +34,8 @@ Status labels:
 | L18 | Third person through `cg_thirdPerson` is a **client** cheat dvar and is not registered on dedicated servers | `thirdperson.cpp` | Host-only via dvar | Per-player `setcamerathirdperson` (`_meth_845E`), used by stock scripts | Accepted (workaround) |
 | L19 | No IW7 zombies bot AI found | No CP bot scripts in the dump | AAE "offline bots" likely not portable | none | NEEDS TESTING |
 | L20 | Dvars are process-wide: a global dvar the mod changed (e.g. `bg_gravity`, `g_speed`, `player_sustainAmmo`) keeps its value after the match unless a script restores it, and an abrupt map change can end scripts before they do | Dvar model (GSC `setdvar` changes the process-wide value) | Changes can leak into a later stock match until restored | Restore on feature disable and on `game_ended`; re-apply or reset on every load; show changed globals in *Active modifiers* | HAZARD |
+| L21 | New data tables (CSV string tables) and new localized strings need a fastfile; GSC `tablelookup` only reads tables that already exist | AAE ships 48 custom tables and 1,678 strings (`PROJECT_ANALYSIS.md` §1.8, §1.10) | Data such as weapon lists, presets, and labels must live inline in GSC | Keep data in GSC arrays; plain-text labels via `settext` | Accepted (design) |
+| L22 | IW7 LUI menus are client-side Lua; a LUI front-end must be installed by every player and can only reach GSC through integer `luinotifyserver` notifies and predefined omnvars | iw7-mod `ui_scripting.cpp`; `Engine.NotifyServer` usage | AAE's main UX (LUI lobby options) cannot be mirrored server-side | GSC HUD menu as the primary UI; LUI deferred | Accepted (design) |
 
 ## B. Compiler / client-version hazards (verified with real compilers)
 
@@ -49,6 +51,7 @@ Status labels:
 
 | ID | Limitation | Impact | Resolution |
 |----|-----------|--------|-----------|
-| E1 | The BO3 AAE archive cannot be downloaded (egress policy denies `*.dl.dropboxusercontent.com`; the connector only reads files ≤ 5 MiB; the archive is 1.48 GB) | BO3 analysis is provisional (secondary sources) | Allow the host in environment network settings, **or** upload extracted script files individually, **or** commit them to a branch |
-| E2 | `steamcommunity.com`, `catalogue.smods.ru`, and `docs.auroramod.dev` are blocked | Only search-result summaries of the AAE description are available; the iw7-mod docs were read from the GitHub repo instead | Same as E1 |
+| E1 | ~~The BO3 AAE archive could not be downloaded~~ | — | **RESOLVED 2026-10-06**: `*.dl.dropboxusercontent.com` allowed; archive downloaded, hash-verified, and analysed (`PROJECT_ANALYSIS.md` §1) |
+| E2 | `steamcommunity.com`, `catalogue.smods.ru`, and `docs.auroramod.dev` are blocked | No longer needed. The AAE package itself is the source; the iw7-mod docs are read from the `auroramod/docs` GitHub repo | None required |
+| E4 | The AAE package is compiled, not source. BO3 hashes function names, and the LUI is Havok Lua bytecode | AAE's own function names are unknown (`_id_XXXXXXXX`); LUI logic is known only from source paths and strings | Behaviour is read from decompiled GSC plus UI strings; `tools/bo3_reference/` reproduces the workspace |
 | E3 | No Windows, no game install here | **No runtime testing possible in this environment**; every runtime behaviour stays NEEDS TESTING until a user runs `TESTING.md` | User-side testing |

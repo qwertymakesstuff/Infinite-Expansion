@@ -228,6 +228,11 @@ Also: `adddebugcommand`, `setdebugorigin`, `setdebugangles`, `drawsoundshape`, `
   - `executecommand("cmd")` runs a console command.
 - **Strings and output (iw7-mod):** `print`/`println` (console), `logprint`, `va("…%s…", …)`, `typeof`/`type`, `toupper`, `strstartswith`.
 - **Chat (iw7-mod):** `say(msg)` (to all), `player tell(msg)`.
+- **Entities and markers** (named in both tables): `spawn("script_model", origin)`, `setmodel`, `moveto`, `rotateto`, `delete`, `hide`, `show`, `linkto`, `playerlinkto`, `dropitem`. HUD waypoints: `setwaypoint`, `settargetent` (for overhead markers and health bars; NEEDS TESTING). `cloneplayer` is develop-only (`_meth_8086`).
+- **More verified dvars:**
+  - `debug_pause_spawning` (stock CP scripts read it; release behaviour NEEDS TESTING).
+  - `cg_unlimited_cards` (iw7-mod v1.0.4+, unlimited Fate & Fortune cards) `[DOCS iw7-changelog]`.
+  - `cg_draw2d` (stock).
 - **Stock helpers:**
   - `iprintln` / `iprintlnbold` (function and method), `map_restart`, `exitlevel`, `setslowmotion`.
   - Vision: `visionsetnaked`, `visionsetnakedforplayer` (method).

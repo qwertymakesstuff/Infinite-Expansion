@@ -2,12 +2,14 @@
 
 **Project:** Infinite Expansion: an enhancement framework for *Call of Duty: Infinite Warfare*, inspired by *All-Around Enhancement* (BO3)
 **Phase:** 0, Project Forensics
-**Date:** 2026-10-06
+**Updated:** 2026-10-06
 
-> **Phase 0 status: PARTIAL.**
-> The Infinite Warfare half of this analysis is complete. Every claim in it was checked against source code, real script dumps, or a real compiler run.
-> The BO3 reference half is **BLOCKED**. The supplied archive (`/AllAroundEnhancement.7z` in Dropbox, 1,485,295,642 bytes) could not be downloaded into the build environment, because the environment's network egress policy denies the Dropbox download host (`*.dl.dropboxusercontent.com`, HTTP 403 on CONNECT). The Dropbox connector can only read files up to 5 MiB, and the archive is a single 1.48 GB 7z.
-> Everything in section 1 comes from **secondary public descriptions** returned by web search. Those descriptions are labelled *PROVISIONAL* throughout. They must be re-verified against the real files before Phase 1 relies on them. See section 1.1 for ways to unblock this.
+> **Phase 0 status: COMPLETE.** Both halves now rest on primary material.
+> - **BO3 reference** (section 1). The supplied archive (`/AllAroundEnhancement.7z`, AAE **v3.9.5**) was downloaded, hash-verified, and extracted, and its main fastfile was decompressed.
+>   - **211 of its 216 compiled scripts were decompiled.**
+>   - Its 1,678 English UI strings and 501 LUI (Lua UI) chunks were inventoried.
+>   - Section 1.3 explains the method and its limits.
+> - **Infinite Warfare** (section 2). Every claim was verified against iw7-mod source, the stock IW7 script dump, or a real compiler run.
 
 ---
 
@@ -15,104 +17,193 @@
 
 | # | Source | Version / commit | Used for | Access |
 |---|--------|------------------|----------|--------|
-| S1 | BO3 *All-Around Enhancement* archive (`/AllAroundEnhancement.7z`, Dropbox) | uploaded 2026-10-06 09:40 UTC | BO3 reference implementation | **BLOCKED** (egress policy, see 1.1) |
-| S2 | Public descriptions of AAE (Steam Workshop item 2631943123 and community guides), seen **only through web-search result summaries** | n/a | Provisional BO3 feature inventory | Search summaries only; steamcommunity.com and mirrors are blocked by egress policy |
+| S1 | BO3 *All-Around Enhancement* package (`/AllAroundEnhancement.7z`, Dropbox) | AAE **v3.9.5** (`workshop.json`) | BO3 reference implementation | ✅ Downloaded (Dropbox `content_hash` verified). Extracted with 7-Zip 23.01. `core_mod.ff` decompressed and scripts decompiled with gsc-tool `t7` (section 1.3) |
+| S2 | Public descriptions of AAE (Workshop item 2631943123, community guides), via web-search summaries | n/a | Context only; superseded by S1 | Search summaries |
 | S3 | `auroramod/iw7-mod`, the IW7 community client that loads custom GSC | `develop` @ `c0a1c6da` (2026-10-05); release tag `v1.1.0` @ `1b76f04e` (2026-09-26) | Script loading, mod loading, client-added GSC/Lua functions, dvars | Cloned and read |
-| S4 | `auroramod/gsc-tool`, branch `iw7-more` (the compiler embedded in iw7-mod) | develop pin `0be361a4` (2026-09-24); v1.1.0 pin `833822d0` (2026-01-10) | IW7 builtin function and method tables; real compile checks | Cloned, **both pins built locally**, and test-compiled |
+| S4 | `auroramod/gsc-tool`, branch `iw7-more` (the compiler embedded in iw7-mod) | develop pin `0be361a4` (2026-09-24); v1.1.0 pin `833822d0` (2026-01-10) | IW7 builtin tables; real compile checks; **T7 decompiler for S1** | Cloned; **both pins built locally** |
 | S5 | `xensik/gsc-tool` (upstream) | `05d212f5` | Comparison of builtin tables | Cloned |
 | S6 | `mjkzy/iw7-gsc-dump`, decompiled stock IW7 GSC (MP + CP/zombies) | `1dd48a78` (2026-09-26) | Callbacks, notifies, zombies wave system, stock helper APIs | Cloned and read |
-| S7 | `auroramod/docs` (source of docs.auroramod.dev) | `236d8155` | Official folder layout, mod loading, command-line flags | Cloned and read (the docs website itself is blocked) |
+| S7 | `auroramod/docs` (source of docs.auroramod.dev) | `236d8155` | Official folder layout, mod loading, command-line flags | Cloned and read |
 | S8 | `SyndiShanX/Synergy-GSC-Menu` (`IW/`), an existing IW7 GSC menu | `33bcc80f` | Which APIs work in practice in IW7 (feasibility only; GPL-3.0, **no code copied**) | Cloned and read |
 
 ---
 
-## 1. BO3 REFERENCE: All-Around Enhancement (AAE)
+## 1. BO3 REFERENCE: All-Around Enhancement (AAE) v3.9.5
 
-### 1.1 Access status: BLOCKED
+### 1.1 Package identity
 
-| Attempt | Result |
-|---------|--------|
-| Direct download (Dropbox temporary link, `uc…dl.dropboxusercontent.com`) | `403` at the egress gateway: *"gateway answered 403 to CONNECT (policy denial)"* |
-| Dropbox connector `fetch` | `FILE_TOO_LARGE`: the connector limit is 5 MiB and the archive is 1,485,295,642 bytes |
-| Public mirrors (steamcommunity.com, catalogue.smods.ru) | Blocked by egress policy |
+- **`workshop.json`:** title `[ZM] All-around Enhancement v3.9.5`, Workshop ID `2631943123`, folder `all_around_enhancement`, type `mod`. Tags: Animation, Audio, Character, Mod, Skin, Specialist, UI, Weapon, Zombies.
+- **Declared incompatibilities** (same file):
+  - Clean Ops, ezz BOIII, original BOIII, T7x, CB Servers, BO3Enhanced, and macOS.
+  - A host/client version mismatch kicks the client.
+  - A separate "Lite" version exists for players whose maps crash.
+- **What was supplied is the compiled Steam-Workshop build, not source.** There are no `.gsc`, `.csc`, or `.lua` files on disk. All logic is compiled inside fastfiles, which is why section 1.3 was needed.
 
-Any one of these unblocks the BO3 analysis:
+### 1.2 Folder structure
 
-1. Allow `dl.dropboxusercontent.com` (with subdomains) in the cloud environment's network settings. The environment's **Edit → Network access** menu offers either a broader level or *Custom* with that host added. After that, the archive can be downloaded and extracted here.
-2. Extract the archive locally and upload only the **script/text files** to Dropbox as individual files under 5 MiB each (`.gsc`, `.csc`, `.gsh`, `.lua`, `.zpkg`, `.gdt`, `.csv`, `.txt`, `.json`, `.cfg`, `.str`). The connector can then read each one.
-3. Commit the extracted scripts to a branch of this repository, or to another repository.
+| Path | Size | Purpose |
+|------|------|---------|
+| `core_mod.ff` | 54.1 MB | Main fastfile: compiled GSC/CSC, LUI (Havok Lua), string tables, localized strings, weapons/models/materials |
+| `core_mod.xpak` | 177 MB | Streamed image data |
+| `{bp,ea,en,es,fr,ge,it,ja,po,ru,sc,tc}_core_mod.ff` | 45 KB – 31 MB | Language packs (the `ja`/`sc`/`tc` packs are ~31 MB each) |
+| `snd/<lang>/core_mod.<lang>.sabs/.sabl` | 577 MB | Sound banks (570 MB in `snd/all`) |
+| `video/*.mkv` (11) | 738 MB | Loading/outro movies for stock maps and the frontend background |
+| `T7Overcharged.ff` | 3.2 MB | **A Windows PE executable with an `.ff` extension** (engine extension, section 1.12), not a fastfile. Not executed or analysed further |
+| `T7Overcharged/` | 7.5 MB | `assetlimits.txt` (raised asset-pool sizes, e.g. scriptparsetree 1150→1354, stringtable 220→272); `viewmodel_hide.cfg` (ammo-count-based bullet-joint hiding for ported weapons); `cursors/*.ani`; `discord_game_sdk.dll` |
+| `workshop.json` | 2 KB | Workshop metadata |
+| `17/`, `18/` `localization.txt` | 5 KB | Stock BO3 Windows dialog strings (Traditional/Simplified Chinese), not mod logic |
+| `stats_zm_offline_0.cgp`, `loadouts_zm_offline_0.cgp`, `aae_loadout4` | 68 KB | Player save data (stats, loadouts); `aae_loadout4` is empty |
 
-### 1.2 Items that require the real files (PENDING)
+### 1.3 Method and limits of the analysis
 
-The following analyses were requested and **cannot be produced honestly without the archive**. They are listed so nothing is silently dropped:
+1. **Fastfile.** `core_mod.ff` has a 0x248-byte `TAff0000` header (version 0x251) followed by 492 zlib blocks and 6 stored blocks. Each block has a 16-byte header: compressed size, decompressed size, aligned size, and its own file offset. Seven small unframed regions (360 KB in total) were copied through undecoded. The result is a **114 MB zone**, matching the header's size field.
+2. **Scripts.** 216 compiled objects were carved by their T7 magic (`\x80GSC\r\n\0`) and 72-byte header: **162 GSC, 49 CSC, 5 GSH**. They were decompiled with the locally built gsc-tool (`-m decomp -g t7 -s pc64`). **211 succeeded**; the 5 `.gsh` headers were skipped.
+3. **Strings.** 1,678 localized key→English pairs were extracted from `en_core_mod.ff`.
+4. **LUI.** 501 Havok-Lua chunks were inventoried by source path and string constants. They were **not decompiled**.
+5. **Limits:**
+   - BO3 stores function and namespace names as 32-bit hashes, so AAE's own functions appear as `_id_XXXXXXXX`. All strings (dvars, notifies, labels, table paths) are intact.
+   - Lua control flow was not recovered.
+   - Behaviour descriptions below come from decompiled GSC where a script is named, and otherwise from UI strings.
+   - No AAE code or text is copied into this project; only behaviour and design are described.
+6. **Reproducing it.** `tools/bo3_reference/extract_aae.sh` regenerates this whole workspace from the archive in about 30 s.
 
-| Requested analysis | Status | What will be checked once accessible |
-|--------------------|--------|--------------------------------------|
-| Folder structure | PENDING | Full tree; size by type; zone/source layout |
-| Script structure | PENDING | Every `.gsc`/`.csc`/`.gsh`; entry points (`autoexec`, `__init__`, `main`, `init`); namespaces |
-| Major functions | PENDING | Call graph of the menu, config, and feature modules |
-| Menu structure | PENDING | Full option tree, labels, defaults, ranges |
-| Feature categories | PROVISIONAL (1.3) | Confirm against the menu definitions in code |
-| Shared utilities | PENDING | Common helpers (HUD, input, string, array, player) |
-| Initialization flow | PENDING | What runs on level load, player connect, spawn, and round start |
-| Configuration flow | PROVISIONAL (1.4) | How "modvars" are parsed, stored, persisted, and applied |
-| Asset usage | PENDING | Models, images, sounds, FX, weapons, camos, LUI widgets, and which zones contain them |
-| UI implementation | PROVISIONAL (1.5) | GSC HUD menu vs LUI; how HUD styles are swapped |
-| Dependencies | PENDING | T7 shared scripts (`zm_utility`, `zm_powerups`, …), other workshop items, BO3 modtools, external tools |
-| Multiplayer / co-op handling | PROVISIONAL | Host-only logic, 10-player handling, per-player state |
+### 1.4 Script structure
 
-### 1.3 Provisional feature inventory (secondary sources only)
+| Group | Scripts (examples) | Role |
+|-------|-------------------|------|
+| **Core (server)** | `motherfucker.gsc` (that is its name in the package; 323 functions, ~8.5k lines decompiled), `tfoption.gsc` (110 functions), `_clientdvar.gsc`, `aae_separators.gsc` | Registers client fields and client channels; applies options; score events; general fixes |
+| **Core (client)** | `aae_core.csc` (72 functions) | Client-side HUD and visual support |
+| **Options UI (LUI)** | `ui/uieditor/menus/pc/tfoptions*.lua` (10 menus), `menus/lobby/common/popups/gamesettingsflyout_aae*.lua`, `menus/pc/aaecareer*.lua`, `ui/t7/utility/aaesavingdatautility.lua`, `lobbyutility.lua` | Lobby options, career screen, save data |
+| **HUD (LUI + GSC/CSC)** | Widgets: `aae_zombiecounter`, `aae_damagenumber`, `aae_overhead_healthbar`, `aae_t9_zombie_health_bar`, `aae_countdown`, `aae_lowammo_hint`, `aae_wallbuy_hints`, `aae_3rd_crosshair`, `aae_playercam`, `aae_introscreen`, `aae_za`, several score-widget styles imitating other titles, and `t7hud_zm*` HUD variants | Info HUD and HUD restyling |
+| **Gameplay modules** | `banks.gsc`, `timedplay.gsc`, `moreplayers.gsc`, `hot_join_spawn.gsc`, `_zm_counter.gsc`, `_aae_zombie_health_bar.gsc/.csc`, `elmg_hitmarker.gsc`, `elmg_gambler*.gsc`, `elmg_powerups.gsc`, `share_points_powerup.gsc`, `bo3_mc_playerweapontrade.gsc`, `chatnotify.gsc`, `zmsavedata.gsc`, `extra_weapon_load.gsc`, `explosive_zomb.gsc`, `aae_left_ges.gsc`, `aae_phd.gsc`, `_zm_laststand_bar`, `bots/_bot*.gsc` | Individual features (about 54 AAE-specific modules) |
+| **Dev/cheat menu** | `gametypes/_clientid.gsc` (180 functions) | GSC HUD menu, enabled only when dvar `elmg_cheats` ≠ 0 |
+| **Modified stock scripts** | `_zm_utility`, `_zm_weapons`, `_zm_powerups`, `_zm_bgb*`, `_zm_audio`, `_zm_stats`, `shared/ai/zombie_utility`, other `shared/*` | AAE ships **patched copies** of stock scripts (e.g. `zombie_utility` reads `tfoption_weaker_zombs`) |
+| **Map-specific** | ~90 `zm_<map>_*` scripts covering 17 stock maps (castle, factory, genesis, island, moon, prison, stalingrad, temple, theater, tomb, zod, cosmodrome, pentagon, tranzit remakes, …), plus Workshop maps keyed by Workshop ID | Fixes, solo Easter-egg support, VO |
+| **Third-party modules** | `sg4y/hitmarker`, `lilrobot/_inspectable_weapons`, `wardog/perk/_wardog_perk_phd`, `sphynx/_zm_subtitles` | Bundled community scripts |
 
-Each item below was described in web-search summaries of the Workshop page and community guides (S2). How each one is implemented stays unknown until the files are read.
+### 1.5 Initialization flow (from decompiled GSC)
 
-**Gameplay / zombies tuning**
-- Zombie speed: default, sprinting, or "super sprinter"; `zm_speed` 0–100
-- Zombie health changes; cap zombie health after a chosen round
-- Zombie spawn cap raised from 24 up to 64; spawn delay; "spawn additional zombies" (`zombie` 1–60)
-- Zombie dodge (from BO1)
-- Start round 1–255 (`round`)
-- Perk limit 1–50
-- Disable gobblegums; enable the Rampage Inducer on most maps
-- Weapon Roulette mode (random weapon each round); End-Game Challenge; 30-second break after round 20
-- Time-based gameplay (non-stop spawning)
-- Friendly-fire options
-- BO4-style Max Ammo that also refills clips
-- Change player health
+```text
+BO3 loads core_mod.ff → every script's `autoexec` functions run at script load
+ ├─ system::register("<name>", &__init__, &__main__, deps)   ← BO3's dependency-ordered module system
+ │    ("motherfucker", "aae_core", "banks", …); system::ignore("…") disables stock systems AAE replaces
+ ├─ core __init__: clientfield::register(clientuimodel "hudItems.aae…"); util::registerclientsys("deadshot_keyline",
+ │    "levelNotify", "musicCmd", …); resets developer dvars; map-specific registration (incl. Workshop IDs);
+ │    hooks the zombie-melee notetrack
+ ├─ tfoption::init(): only if  tfoption_tf_enabled == tfoption_master_ver  (version handshake)
+ │    ├─ immediately: level/zombie_vars, power-up handler swaps, damage/friendly-fire callbacks, round setup
+ │    └─ after flag "all_players_connected": power on, open doors, boxes everywhere, max-AI limits,
+ │          damage-number wrapper around level.callbackactordamage, round limit, …
+ ├─ per player: callback::on_connect / callback::on_spawned → per-player options
+ │    (waits until the player is valid; perks, movement flags)
+ └─ dev menu: autoexec checks elmg_cheats → on_spawned → waits "initial_blackscreen_passed" → host gets "Host" verification
+```
 
-**Quality of life**
-- BO2-style bank (balance carries across maps) and weapon locker
-- Weapon restore on disconnect (weapons, perks, points); optional clear on bleed-out
-- Offline bots
-- Solo-completable Easter eggs (e.g. Shadows of Evil, Ascension, Shangri-La)
-- Easter-egg-count reward system (cheaper bank/share at 15 EEs, Gambler changes at 25, longer bleed-out at 30)
-- Developer console support (`~`)
-- Marked/"pinged" doors; pinging
-- `no_inspect` modvar (disable weapon inspect)
+### 1.6 Configuration flow
 
-**HUD / visual**
-- HUD colour; HUD style selection (AAE, default, BO2)
-- Health bars (modern-zombies style); zombie counter; damage numbers on zombies
-- Hitmarkers with sounds from several CoD titles
-- Night vision
-- Camos from other titles (IW Diamond, Cold War Dark Aether, AW X-ray)
+```text
+Lobby LUI "CUSTOM MUTATIONS" (tfoptions*.lua)          ← player edits options before the match
+  │ AAESavingDataUtility: LoadFromSaveData / SetToSaveData — ~80 keys kept in save data
+  │ Engine.ExecNow("modvar tfoption_<key> <value>") per key;  "exec AAECustomMutations"
+  │ version guard: tfoption_master_ver changed → ResetTFDefault
+  ▼
+BO3 modvars  tfoption_*  ── read once at match start ──▶  tfoption.gsc applies them
+Client options (AAEOPTIONS_*): per-player LUI/CSC preferences (UI colour, hide X, HUD format, …)
+Other dvars: zm_speed (zombie run cycle), elmg_cheats (dev menu), aae_boiii_maxplayers (player cap), DontLoadDlls
+Server→client bridges: util::setclientsysstate("deadshot_keyline", "dvar,<name><sep><value>")   (sets a client dvar)
+                       luinotifyevent(&"aae_score_event", …) + gamedata/tables/common/aae_scoreevents.csv
+```
 
-**Movement**
-- Exo-movement option; option to disable sliding
+The ~80 option keys (`tfoption_<key>`):
+`tf_enabled starting_points max_ammo higher_health no_perk_lim more_powerups extra_cash weaker_zombs roamer_enabled roamer_time zcounter_enabled starting_round perkaholic exo_movement perk_powerup melee_bonus headshot_bonus max_zombies no_delay start_rk5 hitmarkers no_round_delay bo4_max_ammo better_nuke better_nuke_points spawn_with_quick_res roundlimit roundtime bo4_carpenter timed_gameplay move_speed open_all_doors every_box random_weapon start_bowie start_power bgb roundrevive trade spectator_spawn perk_lose safeArea_horizontal camo_pap og_camo boxshare loadoutsave ff iw4 t5 t7 bgb_cost bgb_loadout bgb_use spfreemus fixed_cost elmg bank c4nuke nt_death se damagestats crazy_zombie hud limit duck nohotjoin snail roulette gambler no_dog status pregum solorevive flamer gungame perkplus rj shock juke dpap vclut noslide bigger_mule loadoutsave2 bot eereward`
 
-**Multiplayer**
-- Up to 10 players in zombies (gobblegums disabled at that size)
+### 1.7 Menu and UI structure
 
-### 1.4 Provisional configuration model (secondary sources)
+AAE has **five** user-facing control surfaces.
 
-- Options are **"modvars"** set from the developer console with a short command (described as `/d <name> <value>`), before or during a match. Examples named in the sources: `zm_speed`, `round`, `hitmarker`, `zombie`, `no_inspect`.
-- An **"Advanced Features"** master switch gates the GSC mod menu and some commands.
-- Some options are applied in real time; others are meant to be set before the match starts.
+**(a) Lobby options, "CUSTOM MUTATIONS"** (LUI, pre-match, host). There is a master switch ("Enable … / Reset to Default"), safe-area sliders, and these pages:
 
-### 1.5 Provisional menu model (secondary sources)
+| Page | Options |
+|------|---------|
+| Game | Starting round; zombie counter; hitmarkers (+ sound style: IW/MW2019, Cold War, BO3/BO4); score events; timed gameplay; start with all doors open; box at all locations; start with power; weapon trade; spectator respawn; disable locker & bank; no round delay; round revive |
+| Player | Starting points; move-speed multiplier; player health (1/2/4/5 hits); EXO movement; friendly fire (reflect / shared / knock-back / can't kill); player health bar; damage analysis; no HUD |
+| Zombie | Extra points per kill / melee / headshot; max spawned zombies (default 24); weaker zombies; zombie speed (default / sprint / super sprint); no spawn delay; horrific (double-speed) zombies |
+| Weapon | Start with max ammo / RK5 / Bowie; random starting weapon; keep weapon-kit camo when PaP'd; choose PaP camo; box share (melee to share); weapon restore; disable C4 ending |
+| Mystery Box filters | Enable/disable weapons by source title (WaW, MW2, BO1, MW3, BO2, Ghosts, AW, IW, MWR, WW2, BO4, MW2019, CW, AAE); add BO3 weapons; multiple wonder weapons |
+| Perk | Perk limit; bigger Mule Kick (4 weapons); spawn with Perkaholic / Quick Revive; time-based perk decay when downed |
+| Power-up | Drop frequency (6 levels); improved Nuke and its points; BO4 Carpenter; perk-bottle drop; BO4 Max Ammo |
+| GobbleGum | Disable machines; random gums; fixed cost; base cost; per-round limit; disable Shopping Free music; unlimited Newtonian Negation |
+| Roamer | Intermission between rounds (start the next round with ADS + Melee); max roamer time |
+| Advanced (TFP/TFT) | Party size; finish on round N + end-game challenge; one-team grief; rocket jump; no slide; solo revive; disable perk enhancements / purifier / blood; BO4 repack; clear loadout after bleed-out; Ripper upgrade toggle; dual-wield PaP wonder weapons; enemy HP bar; zombie juke; disable super sprinters after round 40; random weapon kit; weapon limit; pre-patch gum machines; zombie-count algorithm; special-enemy modifiers; zombie health cap round; damage numbers; crosshair dot; highlighted craftables; weapon roulette; immortal snail; duck float; Rampage Inducer instead of Gambler; low-cost wall buys; hide custom/AAE weapons; disable omni-movement/strafe-jump |
 
-- A **GSC mod menu**, opened with **ADS + Melee**. The sources call it a GSC menu; that it is drawn with HUD elements rather than LUI is an inference to confirm in code.
-- **Shoot/ADS** scroll, **Use (F)** selects, **Melee** goes back or closes. Controller users rebind to the D-pad.
-- It requires "Advanced Features = On".
+**(b) Client options, "AAE Options"** (LUI, per player). Covers:
+- UI colour (40+ presets), HUD format (BO3 vanilla / centered perks), HUD scale, flat UI, BO6-style team colours
+- First-person arm (gun) position, back-of-head view, player POV camera
+- In-game timer, movement-speed statistics, system time display, grenade projection (line/timer), potato graphics / forced high LOD
+- A long list of "disable X" toggles: hints, wall-buy hints, flashes, letterboxing, intro, solo loading movies, low-ammo sound, reload prompt, names through walls, last-zombie outlines, zone announcer, HP bars, stamina bar, grenade countdown, perk indicators, character dialogue, team subtitles, auto-leaning, ADS zoom, extra recoil, muzzle smoke, AATs, left-hand gestures
+
+**(c) Keybinds** (configurable in LUI): flashlight, drop points (shares 1000 at a time), third person, overhead map view, pay half a door's cost, set the Mule Kick weapon, change reticle, weapon inspect/redraw, emote wheel.
+
+**(d) Chat commands** (`chatnotify.gsc`, `self waittill("chat", msg)`): `/` prefix with `bal`, `dep`, `transfer` (bank), `save`, `tp`, `ammo`, `ee`, `ct`, `cin`, `?` (help), single-letter shortcuts, and map names.
+
+**(e) GSC dev/cheat menu** (`gametypes/_clientid.gsc`, enabled by `elmg_cheats`; host-verified; opened with **Stance + Reload**). An "EnCoRe"-style framework (internal version 14.2) with themeable colours, shaders, width, animations, and sounds. Pages:
+- Client mods: god, unlimited ammo/stock, refill, UFO, forge tool, score, print origin / zombie count, zombies ignore you, …
+- Fun: invisible, flashing, earthquake, drop vending machine, clone + animations
+- Perks: give / remove all / keep on death
+- GobbleGums; power-ups
+- Weapons: normal / upgraded
+- Weapon mods: PaP / unpack / drop / hide / shoot power-ups
+- Bullets: weapon / FX projectiles
+- Teleport: save/load position, teleport zombies, sky / ground / crosshair / nearest zombie
+- Aimbot
+- Entity: spawn / place / physics-drop / rotate / delete models
+- Visions
+- Lobby: box mods, super speed / gravity / timescale, disable spawners, friendly fire, grab craftables, unlock wearables, revive all, no fall damage, open doors
+- Clients: per-player pages
+
+### 1.8 Shared utilities and inter-module communication
+
+- **BO3 registries.** AAE hooks the engine through BO3 registries rather than its own event bus:
+  - `callback::on_connect` / `on_spawned`
+  - `zm::register_zombie_damage_override_callback`, `register_player_friendly_fire_callback`, `register_vehicle_damage_callback`
+  - `zm_spawner::add_custom_zombie_spawn_logic`
+  - `level._custom_powerups[<name>].grab_powerup` swaps, `level.round_wait_func`, `level.func_get_zombie_spawn_delay`
+  - `zombie_utility::set_zombie_var`, `level.zombie_vars[…]`
+- **Callback wrapping.** The original handler is stored and a wrapper installed, e.g. for `level.callbackactordamage` (damage numbers).
+- **Server→client.** Client fields / UI models (`hudItems.aae*`), named client sys-states (including a generic "set client dvar" bridge), and `luinotifyevent` for LUI popups.
+- **Data tables.** CSV string tables under `gamedata/tables/common/` (48 tables: score events, box chances, music player, custom-map categories, …).
+- **The dev menu's own framework.** Per-player menu state arrays and helpers for adding pages and options.
+
+### 1.9 UI implementation
+
+- **The main AAE UX is LUI** (client Lua, built with BO3's UI editor): lobby options, client options, career, and the HUD widgets. The **GSC HUD menu is only the gated dev/cheat menu.**
+- **HUD restyles.** AAE replaces or extends stock HUD widgets (`t7hud_zm*` variants, score widgets imitating other titles) and adds 3D/overhead widgets.
+- 200 of the 501 Lua chunks are a Chinese input-method dictionary for chat.
+
+### 1.10 Asset usage
+
+| Asset class | Evidence | Scale |
+|-------------|----------|-------|
+| Ported weapons/models/attachments | Distinct asset names with a game prefix in the zone | ~800 names: T7 360, T6 130, S2 95, T5 46, T9 33, IW8 31, T8 24, T4 21, S1 16, H2 13, H1 8, S4 8, IW6 8, IW5 4, IW4 2 |
+| Sounds | Sound banks; ~227 `mus_*` and ~624 `zmb_*` alias names | 577 MB |
+| Images | `core_mod.xpak` | 177 MB |
+| Movies | `video/*.mkv` | 11 files, 738 MB |
+| String tables | `gamedata/tables/common/*.csv` | 48 |
+| Localized text | 12 language packs; 1,678 English strings | |
+
+### 1.11 Multiplayer and co-op handling
+
+- **Host authority.** Lobby options are host settings, the dev menu is host-verified, and some options are gated by a host/eligibility check.
+- **Player count.** `moreplayers.gsc` raises `com_maxclients` from `aae_boiii_maxplayers` (needs the BOIII client) and adjusts the zombie AI/actor limits. GobbleGums are disabled above 5 players.
+- **Joining and reconnecting.** Hot-join spawning, spectator respawn, weapon restore for players who reconnect or die, and a version-mismatch kick.
+- **Bots.** Scripted bot AI on top of `addtestclient()` (`bots/_bot*.gsc`).
+
+### 1.12 Dependencies
+
+- **BO3 stock script library:** `scripts\shared\*`, `scripts\zm\*`, and the `system::` / `callback::` / `clientfield::` frameworks.
+- **T7Overcharged:** a native engine extension shipped as a renamed PE file. It provides asset-pool limit overrides, a viewmodel bullet-hide config, cursors, and Discord SDK integration. A `DontLoadDlls` dvar gates part of the core module's start-up; that this is the extension loader is likely but not confirmed. **In IW7 this layer is iw7-mod itself**, which provides the console, Discord RPC, file I/O, extra dvars, and script hooks.
+- **The BOIII client**, for the >4-player feature.
+- **Workshop custom maps**, recognised by numeric Workshop IDs, with per-map compatibility categories.
 
 ---
 
@@ -231,110 +322,211 @@ Loader facts that drive the layout:
 
 ---
 
-## 3. FEATURE COMPATIBILITY MATRIX (PROVISIONAL)
+## 3. FEATURE COMPATIBILITY MATRIX
 
-The *BO3 Implementation* column is from secondary descriptions (S2) and will be re-verified against the archive.
-Difficulty: E = Easy, M = Medium, H = Hard.
-Classification:
-- **DP**: Directly Portable
-- **RI**: Reimplementable
-- **PP**: Partially Possible
-- **NCP**: Not Currently Possible
-- **UNK**: Unknown / Needs Testing
+The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is named, otherwise the UI strings). Every IW mechanism was verified in S3/S4/S6. A raw `_meth_XXXX` id means the name is callable on iw7-mod v1.1.0 only in that form (section 2.7).
 
-Every IW mechanism named here was checked in S3/S4/S6. A mechanism written as a raw `_meth_XXXX` id is callable on iw7-mod v1.1.0 only in that form (section 2.7).
+**Legend**
+- Difficulty: E = Easy, M = Medium, H = Hard.
+- Classification:
+  - **DP**: Directly Portable (same mechanism exists)
+  - **RI**: Reimplementable
+  - **PP**: Partially Possible
+  - **NCP**: Not Currently Possible
+  - **UNK**: Unknown / Needs Testing
+  - **N/A**: Not applicable to IW7
+- Statuses follow `FEATURE_STATUS.md`. "IW" below means Infinite Warfare zombies (CP) unless stated.
 
-### 3.1 Framework / menu / config
+### 3.1 Framework: menus, configuration, persistence
 
-| BO3 Feature | BO3 Implementation (provisional) | IW Equivalent | Diff. | Class | Status |
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| GSC mod menu (ADS+Melee open; Shoot/ADS scroll; Use select; Melee back) | GSC HUD menu | GSC HUD menu: `newclienthudelem` + polled `adsbuttonpressed/meleebuttonpressed/attackbuttonpressed/usebuttonpressed` (all present in both compilers). Proven feasible in IW7 CP by S8 | M | RI | PLANNED (Phase 3) |
-| "Advanced Features" master switch | Modvar gate | `ix_enabled` / `ix_dev` dvars read by the feature manager | E | RI | PLANNED |
-| Modvars set via console (`/d name value`) | Custom command + dvars | `set ix_<name> <value>` in the iw7-mod console (GSC cannot add console commands); a watcher thread applies changes live | E | RI | PLANNED (Phase 2) |
-| Developer console | BO3 lacks a console | Provided by iw7-mod (`~`) | – | DP | N/A (already exists) |
-| Settings persistence | Unknown (PENDING) | `writefile`/`readfile` to `ix_settings.cfg` under `fs_game`; fallback is dvars only (session) | M | RI | PLANNED (Phase 2/11) |
-| Multiplayer / co-op | Unknown (PENDING) | Per-player state on the player entity; host-only menu in MP | M | RI | PLANNED |
+| Lobby options ("Custom Mutations") | LUI menus `tfoptions*.lua`; writes `modvar tfoption_*`; read once by `tfoption.gsc` | **In-game GSC HUD menu** ("Settings" pages) writing `ix_*` dvars, plus a settings file. Lobby LUI is a later optional client add-on (`ui_scripts/`) | M | RI | PLANNED (Phase 3) |
+| Option persistence | LUI save data (`AAESavingDataUtility`), `exec AAECustomMutations` | GSC `writefile`/`readfile` of `ix_settings.cfg` under `fs_game` (iw7-mod I/O) | M | RI | PLANNED (Phase 2) |
+| Option-schema versioning | `tfoption_master_ver` vs `tfoption_tf_enabled`; reset on mismatch | `ix_settings_version` key in the settings file; migrate or reset | E | RI | PLANNED (Phase 2) |
+| Console overrides | `modvar tfoption_<k> <v>`; plain dvars `zm_speed`, `elmg_cheats` | `set ix_<k> <v>` (iw7-mod console); watcher thread applies live | E | RI | PLANNED (Phase 2) |
+| Presets | Client "Preset" list (`AAE_PRESENT_LIST`) | Data-defined presets (Default/Classic/Enhanced/Testing/Developer/Custom) | E | RI | PLANNED (Phase 11) |
+| Module system / init order | `autoexec` + `system::register(name, __init__, __main__, deps)` | No BO3 system manager in IW7. `ix\core\bootstrap` calls each module's `register()` in a fixed order from one entry script per mode | M | RI | PLANNED (Phase 1) |
+| Engine hooks | `callback::on_connect/on_spawned`, `zm::register_*_callback`, `level._custom_powerups[..].grab_powerup`, `level.round_wait_func` | `level waittill("connected")` / `"spawned_player"`; wrap `level.callbackplayerdamage`, `level.agent_funcs[type]["on_damaged"/"on_killed"]`, `level.movemodefunc[type]`; `replacefunc` for the rest | M | RI | PLANNED (Phase 2) |
+| Server→client dvar bridge | Client sys-state `"deadshot_keyline"` carrying `dvar,<name>,<value>` | Native `setclientdvar(s)` (both compilers); client acceptance of cheat-flagged dvars UNK | E | RI / UNK | PLANNED |
+| LUI notifications (score popups) | `luinotifyevent(&"aae_score_event", …)` + CSV table | GSC HUD text; LUI only through predefined omnvars, or later client Lua | M | PP | PLANNED (HUD) |
+| String tables | `gamedata/tables/common/*.csv` | `tablelookup` works on stock tables; **new** tables need a fastfile, so data is inlined in GSC | E | PP | Design note |
+| Dev/cheat menu gate | dvar `elmg_cheats`, host verification | `ix_dev` dvar + host-only + in-menu confirm | E | RI | PLANNED (Phase 10) |
+| Developer console | BO3 lacks one (T7Overcharged adds tooling) | Provided by iw7-mod (`~`) | – | DP | N/A (exists) |
+| Engine extension (T7Overcharged DLL) | Native DLL, asset limits, Discord SDK | iw7-mod is the equivalent layer; a mod cannot ship DLLs | – | N/A | N/A |
 
-### 3.2 Zombies (IW7 "cp" mode)
+### 3.2 Game options
 
-| BO3 Feature | BO3 Implementation (provisional) | IW Equivalent | Diff. | Class | Status |
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Zombie speed (default / sprint / super sprint; `zm_speed`) | Modifies zombie move speed | `level.movemodefunc[agent_type]` returns `"sprint"`; "super" adds `self.moveratescale > 1` (stock uses 1.15) | M | RI | PLANNED (super-sprint values UNK) |
-| Zombie health / cap after round | Health calc override | Scale `.maxhealth/.health` after spawn (`agent_spawned` notify), or `replacefunc` each map's `calculatezombiehealth` | M | RI | PLANNED |
-| Zombie spawn cap 24→64 | Spawn limit | `level.max_static_spawned_enemies` (stock 24) is a script var; the engine agent cap is unknown | H | PP / UNK | INVESTIGATING |
-| Extra zombies (`zombie 1–60`) | Spawns more | Raise `level.desired_enemy_deaths_this_wave`; or stock `scripts\mp\mp_agent::spawnnewagent(...)` (argument semantics to be read before use) | M | PP | PLANNED |
-| Start round 1–255 (`round`) | Sets round | Set `level.wave_num` before the wave loop advances; push omnvar `zombie_wave_number` | M | RI / UNK | PLANNED (side effects need testing) |
-| Zombie dodge (BO1) | Custom anim/AI | Needs new ASM states and animations | H | NCP | BLOCKED — IW LIMITATION |
-| Perk limit 1–50 | Perk cap var | No perk-cap logic found in IW7 `zombies_perk_machines` / `perks/` (grep found none) | – | UNK | INVESTIGATING (may be N/A) |
-| Disable gobblegums | Disable feature | IW7 analogue is Fate & Fortune cards (`zombies_consumables.gsc`); disabling needs `replacefunc` research | M | PP | INVESTIGATING |
-| Rampage Inducer | Faster early rounds | Combine move-mode override and spawn pacing for rounds < N | M | PP | PLANNED |
-| Weapon Roulette + End-Game Challenge | Random weapon per round | On `regular_wave_starting`: `takeweapon` + `giveweapon(random)` from a curated `iw7_*_zm` list | M | RI | PLANNED |
-| 30 s break after round 20 | Wave timing | The wait between waves is internal to the wave loop (`_id_E81B`); would need `replacefunc` of hashed functions | H | PP | INVESTIGATING |
-| Time-based (non-stop) spawning | Spawner change | Same wave-loop internals | H | PP | INVESTIGATING |
-| Friendly fire options | Damage callback | `scr_team_fftype` dvar (stock) and/or a damage-callback wrapper | E | RI | PLANNED |
-| BO4 Max Ammo refills clips | Power-up override | Hook the `ammo_max` power-up (`scripts\cp\loot`), then `setweaponammoclip(w, weaponclipsize(w))` | M | RI | PLANNED |
-| Bank / weapon locker across maps | Persistent storage | GSC file I/O under `fs_game` (`writefile`) | M | RI | PLANNED (requires mod-folder install) |
-| Weapon restore on disconnect | Stores loadout | Per-GUID store in `level` (same match) or file (cross-session) | M | RI | PLANNED |
-| Offline bots | Bots in zombies | `addtestclient`/`addbot` exist, but no IW7 CP bot AI was found | H | NCP / UNK | INVESTIGATING |
-| Solo Easter eggs | Script edits per map | Per-map `replacefunc` of quest steps (5 maps; many hashed names) | H | PP | DEFERRED |
-| EE-count rewards | Persistent stats | File I/O counters + perk/cost hooks | H | PP | DEFERRED |
-| 10-player zombies | Engine/lobby change | IW7 CP is a 4-player mode; the engine client cap is unverified | H | NCP / UNK | BLOCKED — IW LIMITATION (pending test) |
-| Pinging / marked doors | Ping system | `scripts\cp\cp_outline::enable_outline_for_players`, `scriptmoveroutline` (`_meth_8549`), waypoint hudelems | M | PP | PLANNED |
-| (new) Zombies ignore a player | – | `self.ignoreme = 1` (token; 49 uses in stock MP/CP scripts) | E | RI | PLANNED |
+| Starting round | Sets `level.start_round`/`round_number`, recomputes zombie speed/health, `zm::set_round_number` | Set `level.wave_num` before the first wave; health scales per spawn from `wave_num`; push omnvar `zombie_wave_number` | M | RI / UNK | PLANNED (side effects NEED TESTING) |
+| Zombie counter | `_zm_counter.gsc` + LUI widget | GSC HUD: `desired_enemy_deaths_this_wave − current_enemy_deaths`, `current_num_spawned_enemies` | E | RI | PLANNED (Phase 8) |
+| Hitmarkers (+ sound styles) | `elmg_hitmarker.gsc`, custom sounds | IW7 CP already has damage feedback (`scripts\cp\cp_damage::updatedamagefeedback`); other titles' sounds need assets | E | PP | INVESTIGATING (likely native) |
+| Score events | LUI popups via `luinotifyevent` + CSV | GSC HUD popup near crosshair from kill events | M | PP | PLANNED |
+| Timed gameplay | `level.round_wait_func` override, no round delay, HUD timer | Wave-loop internals are hashed (`_id_E81B`, `_id_13BCB`); needs `replacefunc` research | H | PP | INVESTIGATING |
+| Start with all doors open | Thread after `all_players_connected` | `scripts\cp\zombies\zombie_doors` (door logic to be traced) | M | UNK | INVESTIGATING |
+| Mystery box at all locations | Thread enabling every box | IW7 "magic wheel" (`interaction_magicwheel.gsc`) | H | UNK | INVESTIGATING |
+| Start with power | Thread turning power on | `level.power_on` exists (read by the wave loop); switch logic to be traced (`zombie_power.gsc`) | M | UNK | INVESTIGATING |
+| Weapon trade | `bo3_mc_playerweapontrade.gsc` (hold Use while looking at a player) | Use-button polling + `bullettrace` + `takeweapon`/`giveweapon` | M | RI | PLANNED |
+| Spectator respawn | Respawn dead spectators after 5 min | IW7 CP has its own death flow (afterlife arcade on `cp_zmb`) | M | UNK | INVESTIGATING |
+| No round delay | `zombie_between_round_time = 0` | Between-wave wait is internal to the wave loop (hashed helper `_id_7D00`) | M | PP | INVESTIGATING |
+| Round revive | Revive and heal everyone at round end | On `spawn_wave_done`: revive through `cp_laststand` (to be traced), restore health | M | PP | INVESTIGATING |
+| Disable locker & bank | Toggle | Applies once bank/locker exist | E | RI | PLANNED |
 
-### 3.3 Player / movement
+### 3.3 Player options
 
-| BO3 Feature | BO3 Implementation (provisional) | IW Equivalent | Diff. | Class | Status |
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Exo movement | BO3 exo port | Native in IW7 (boost jump, wallrun, slide): `allowdoublejump`, `allowwallrun`, `allowslide`; omni-movement via `bg_omnimovement` (develop only) | E | RI | PLANNED |
-| Disable sliding | Allow-slide toggle | `self allowslide(0)` | E | DP | PLANNED |
-| Change player health | maxhealth edit | `self.maxhealth` / `self.health`; CP regen interaction UNK | E | RI / UNK | PLANNED |
-| (new) Movement speed | – | `setmovespeedscale(f)` per player, or `g_speed` dvar (global) | E | RI | PLANNED |
-| (new) Gravity | – | `bg_gravity` dvar (iw7-mod, range 1–1000, replicated, global) | E | RI | PLANNED |
-| (new) Jump height | – | No verified dvar (`jump_height` not seen in stock scripts) | – | UNK | INVESTIGATING |
-| (new) Unlimited sprint / air control | – | `bg_sprintUnlimited`, `bg_airControl` (develop only, feature-detect) | E | PP | PLANNED |
-| (new) Fall damage toggle | – | `jump_enableFallDamage` dvar (iw7-mod) | E | RI | PLANNED |
-| (new) Third person | – | `setcamerathirdperson` (`_meth_845E`, per player, used by stock), or `cg_thirdPerson` (client, host only) | E | RI | PLANNED |
-| (new) God mode | – | `enableinvulnerability` / `_meth_80A1` (disable) | E | RI | PLANNED |
-| (new) Teleport / noclip-style fly | – | `setorigin`, `playerlinkto` a mover | M | RI | PLANNED |
+| Move-speed multiplier | `setdvar("g_speed", 190 × pct)` | **Same dvar** `g_speed` (iw7-mod, replicated), or per-player `setmovespeedscale` | E | DP | PLANNED (Phase 5) |
+| Starting points | `level.player_starting_points` | `scripts\cp\cp_persistence::set_player_currency(n)` on first spawn | E | RI | PLANNED |
+| Player health (1–5 hits) | `zombie_var player_base_health` | `self.maxhealth`/`self.health`; stock dvar `scr_player_maxhealth`; CP regen interaction UNK | E | RI / UNK | PLANNED |
+| EXO movement | `callback::on_connect` handler | IW7 is natively boost/wall-run; toggles `allowdoublejump`, `allowwallrun`; `bg_omnimovement` (develop) | E | N/A / RI | PLANNED (as toggles) |
+| No slide | `on_connect` handler | `self allowslide(0)` | E | DP | PLANNED |
+| Friendly fire (reflect/shared/knock-back/can't kill), one-team grief | `zm::register_player_friendly_fire_callback` | Wrap `level.callbackplayerdamage` (after map init); `scr_team_fftype`; grief: `setmovespeedscale` + `shellshock` | M | RI | PLANNED |
+| Rocket jump | Friendly-fire callback + push | Damage-callback wrapper + `setvelocity` on self-explosive damage | M | RI | PLANNED |
+| Player health bar (self/ally overhead) | LUI widgets | Self bar: GSC hudelem (`setshader` width). Ally bars: `setwaypoint` + `settargetent` (both compilers), NEEDS TESTING | M | PP | PLANNED |
+| Damage analysis / damage numbers | Wrapper on `level.callbackactordamage` + LUI | Wrap agent `on_damaged`; short-lived hudelems (budget risk L12) | M | PP | PLANNED |
+| No HUD | Option | `setclientdvar("cg_draw2d", 0)` (stock dvar); acceptance UNK | E | UNK | INVESTIGATING |
 
-### 3.4 Weapons
+### 3.4 Zombie options
 
-| BO3 Feature | BO3 Implementation (provisional) | IW Equivalent | Diff. | Class | Status |
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| (new) Infinite ammo | – | `player_sustainAmmo` dvar (iw7-mod, global), or a per-player `setweaponammoclip`/`givemaxammo` loop | E | RI | PLANNED |
-| (new) Rapid fire / fire-rate | – | `setfiretimescaleon(pct)` / `off` (`_meth_85C1` / `_meth_85C2`); stock uses 65 | M | RI / UNK | PLANNED (range UNK) |
-| (new) Recoil modifier | – | `player_recoilscaleon(0–100)`; off is `_meth_822C`; read is `_meth_85C0` | E | RI | PLANNED |
-| (new) Spread modifier | – | `setspreadoverride`; reset is `_meth_8263` | E | RI | PLANNED |
-| (new) Damage multiplier | – | Wrap `level.callbackplayerdamage` (players) and `level.agent_funcs[type]["on_damaged"]` (zombies) | M | RI | PLANNED |
-| (new) Give / take / info utilities | – | `giveweapon`, `takeweapon`, `getcurrentweapon`, `getweaponbasename`, `getweaponattachments`, `weaponclipsize` | E | RI | PLANNED |
-| (new) Quick weapon switch | – | `enablequickweaponswitch` (`_meth_84AF`), no stock usage | E | UNK | INVESTIGATING |
-| Camos from other titles | New assets | Needs fastfile assets (x64-zt) | H | NCP (script-only) | DEFERRED (asset pipeline) |
-| `no_inspect` | Modvar | IW7 inspect is added by iw7-mod's own `custom_scripts/cp_mp/inspect.gsc` and cannot be cleanly disabled from another script | E | NCP | N/A |
+| Zombie speed (default/sprint/super sprint) | dvar `zm_speed` → `set_zombie_run_cycle_override_value("super_sprint")` | `level.movemodefunc[agent_type]` → `"sprint"`; "super" = sprint + `self.moveratescale > 1` (stock uses 1.15) | M | RI | PLANNED (Phase 7) |
+| Disable super sprinters after round 40 | AAE makes all zombies super sprint from round 40 | Rule inside the same move-mode hook | E | RI | PLANNED |
+| Horrific zombies (double speed for all actions) | Thread | `moveratescale` / `generalspeedratescale` (fields seen in `zombie_agent.gsc`), NEEDS TESTING | M | PP / UNK | INVESTIGATING |
+| Weaker zombies / health-cap round | Patched stock `zombie_utility` health math | Scale or clamp `.maxhealth`/`.health` right after spawn | M | RI | PLANNED |
+| Max spawned zombies (24 → N) | `level.zombie_ai_limit`, `zombie_actor_limit`, `zombie_max_ai` | `level.max_static_spawned_enemies` (stock 24); engine agent cap unknown | H | PP / UNK | INVESTIGATING |
+| Extra points per kill / melee / headshot | `zombie_vars` score bonuses | Agent `on_killed` wrapper + `give_player_currency` | M | RI | PLANNED |
+| No spawn delay | Spawn-delay function | Spawn pacing internal to `zombies_spawning` (hashed `_id_8454`) | H | PP | INVESTIGATING |
+| Round size algorithm | Custom formula | `level.desired_enemy_deaths_this_wave` computed by hashed `_id_8455` | H | PP | INVESTIGATING |
+| Special-enemy modifiers | Round composition change | IW7 event waves per map | H | UNK | INVESTIGATING |
+| Zombie juke (BO1) | Custom spawn logic enabling BO3's built-in AI behaviour attributes `can_juke` / `spark_behavior` (stock animations) | IW7's zombie ASM has no juke behaviour or animations | H | NCP | BLOCKED — IW LIMITATION |
+| Zombies ignore a player (dev menu) | `self.ignoreme = 1` | **Same field** `self.ignoreme` (49 stock uses) | E | DP | PLANNED |
 
-### 3.5 HUD / visuals / debug
+### 3.5 Weapon and Mystery Box options
 
-| BO3 Feature | BO3 Implementation (provisional) | IW Equivalent | Diff. | Class | Status |
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Zombie counter | HUD element | `setvalue(level.desired_enemy_deaths_this_wave - level.current_enemy_deaths)` | E | RI | PLANNED |
-| Health bars / damage numbers | HUD | Crosshair-target readout (`bullettrace`), or short-lived hudelems (budget risk) | M | PP | PLANNED |
-| Hitmarker sounds | Custom sounds | Stock IW7 sounds only via `playlocalsound` (`_meth_8242`); new sounds need assets | M | PP | PLANNED |
-| HUD colour / HUD style swap | LUI / HUD assets | Own GSC HUD fully themeable; restyling the **stock** LUI HUD needs client Lua (`ui_scripts`) | H | PP | DEFERRED |
-| Night vision | Vision toggle | `nightvisionviewon/off` (`_meth_821A` / `_meth_8219`), no stock usage; or `visionsetnakedforplayer` | E | UNK | INVESTIGATING |
-| (new) FPS display | – | Server GSC cannot read client FPS; a client dvar toggle is UNK | – | NCP (GSC) | BLOCKED — IW LIMITATION |
-| (new) Coordinates / speed / weapon HUD | – | `self.origin`, `getvelocity`, `getcurrentweapon`, `getweaponammoclip` + `setvalue` | E | RI | PLANNED |
-| (new) Debug lines / 3D text | – | `line` / `print3d` are release stubs | – | NCP | BLOCKED — IW LIMITATION |
-| (new) Entity inspector / trace info | – | `bullettrace` (returns entity/position/normal), entity fields, `getentitynumber` | M | RI | PLANNED |
-| (new) Fast restart | – | `map_restart` function / `executecommand("fast_restart")` | E | RI / UNK | PLANNED |
-| (new) Timescale | – | `setslowmotion` (iw7-mod) / `timescale` dvar | E | RI | PLANNED |
+| Start with max ammo / extra start weapons / random start weapon | Spawn handlers | `givemaxammo`, `giveweapon` (`iw7_*_zm` names), curated random list | E | RI | PLANNED |
+| Weapon restore (disconnect/death) + clear after bleed-out | Host saves weapons/perks/points | Per-GUID store (`getguid`) in `level`; file I/O across sessions | M | RI | PLANNED |
+| Weapon roulette / gun game | Random weapon each round / kill progression | On `regular_wave_starting` / kill events: `takeweapon` + `giveweapon` | M | RI | PLANNED |
+| Keep kit camo / choose PaP camo | PaP hooks | IW7 PaP is `interaction_weapon_upgrade.gsc`; camo is a weapon-name suffix (`+camoN`) | M | PP | INVESTIGATING |
+| Random weapon kit (attachments/camo) | Random attachment build | Needs valid per-weapon attachment lists (`getweaponattachments`, tables) | H | PP | INVESTIGATING |
+| Box share / weapon limit / multiple wonder weapons | Box hooks | IW7 magic-wheel logic (to be traced) | H | PP | INVESTIGATING |
+| Box filters by source title | AAE's ported weapons (~800 assets) | Ported weapons need fastfiles (x64-zt) | – | NCP | BLOCKED — IW LIMITATION (script-only) |
+| Disable C4 buyable ending | AAE-specific ending | Not in IW7 | – | N/A | N/A |
+
+### 3.6 Perk, power-up, and GobbleGum options
+
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|---|
+| Spawn with Perkaholic / Quick Revive | Spawn handlers | `scripts\cp\zombies\zombies_perk_machines::give_zombies_perk(...)` per perk | E | RI | PLANNED |
+| Perk limit | `tfoption_no_perk_lim` | No perk cap found in IW7 CP scripts | – | N/A / UNK | INVESTIGATING |
+| Bigger Mule Kick (4 weapons) | `level.additionalprimaryweapon_limit = 4` | Mule Munchies (`perk_machine_more`) via `give_more_perk`; needs `replacefunc` | M | PP | INVESTIGATING |
+| Time-based perk decay when downed | Thread on down | `last_stand` notify + `take_zombies_perk` over time | M | RI | PLANNED |
+| Solo unlimited Quick Revive | Option | Up 'N Atoms (`perk_machine_revive`) solo logic to be traced | M | UNK | INVESTIGATING |
+| Power-up frequency | `zombie_powerup_drop_increment` / `_max_per_round` | `scripts\cp\loot` drop logic (`check_to_increase_powerup_drop_rates`, `update_power_up_drop_time`) via `replacefunc` | M | PP | INVESTIGATING |
+| BO4 Max Ammo (refill clips) | Swaps `grab_powerup` for `full_ammo` | Hook `ammo_max` in `scripts\cp\loot::process_loot_content`, then `setweaponammoclip(w, weaponclipsize(w))` | M | RI | PLANNED |
+| Improved Nuke / BO4 Carpenter | `grab_powerup` swaps | Hook `kill_50` / `board_windows` processing | M | PP | INVESTIGATING |
+| Perk-bottle power-up | `free_perk` drop function | No equivalent IW7 drop ref confirmed | M | UNK | INVESTIGATING |
+| GobbleGum options (disable/random/cost/limit) | `_zm_bgb*` patches | IW7 analogue is **Fate & Fortune cards** (deck + meter, no machines). Only "disable" and "unlimited" map (iw7-mod has `cg_unlimited_cards`) | M | PP | INVESTIGATING |
+
+### 3.7 Modes and fun options
+
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|---|
+| Roamer (intermission; ADS+Melee starts the next round) | Thread between rounds | Requires holding the wave loop (hashed internals) | H | PP | INVESTIGATING |
+| End-game challenge / finish on round N | Round-limit thread + endless round | `spawn_wave_done` counting + `exitlevel`/end flow (to be traced) | H | PP | INVESTIGATING |
+| Immortal snail | Scripted chaser | `spawn("script_model")` + `moveto` toward a player; damage on touch | M | RI | PLANNED |
+| Duck float (Quacknarok) | BO3 cosmetic asset | No duck model in IW7; any stock model is a substitute | M | PP | DEFERRED |
+| Rampage Inducer (instead of Gambler) | Spawn pacing | Spawn pacing internals (see 3.4) | H | PP | INVESTIGATING |
+| Gambler (random event) | `elmg_gambler*.gsc` | Scripted random events using verified APIs | M | RI | PLANNED |
+
+### 3.8 Client options and HUD
+
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|---|
+| UI colour / HUD format / scale / flat UI | LUI on the stock HUD | Our GSC HUD is themeable; restyling the **stock** IW7 LUI HUD needs client Lua | H | PP | DEFERRED |
+| Gun (arm) position | Client option | iw7-mod client dvars `cg_gun_x/y/z` via `setclientdvar` (acceptance UNK) | E | RI / UNK | PLANNED |
+| Back-of-head / third person | Keybind + LUI crosshair | `_meth_845E` (`setcamerathirdperson`, per player); 3rd-person crosshair (LUI) NCP | E | RI | PLANNED |
+| In-game timer / movement-speed stats / system time | LUI | GSC HUD (`settimer`, `getvelocity`, `gettime`); system time UNK | E | RI | PLANNED |
+| Low-ammo hint / grenade countdown | LUI | GSC: `getweaponammoclip` vs `weaponclipsize` + hudelem | E | RI | PLANNED |
+| "Disable X" visual toggles (hints, flashes, letterbox, subtitles, …) | LUI / client dvars | Mostly stock-LUI behaviour; only toggles backed by real client dvars are possible | – | PP | DEFERRED (per item) |
+| Potato graphics / force high LOD | Client dvars | Client graphics dvars are the player's own settings | – | N/A | N/A |
+| Grenade projection (line + timer) | LUI/CSC | Needs client-side rendering | – | NCP | BLOCKED — IW LIMITATION |
+| Player POV camera | LUI widget | Client render feature | – | NCP | BLOCKED — IW LIMITATION |
+
+### 3.9 Keybinds and chat commands
+
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|---|
+| Custom keybinds (flashlight, drop points, third person, map view, split door cost, …) | LUI key-binding UI | GSC cannot create new binds. Use `notifyonplayercommand` on **existing** commands, or chat commands players can bind (`bind <key> "say /cmd"`) | M | PP | PLANNED (as chat commands) |
+| Drop/share points | Keybind | Chat command `/share` + `give_player_currency` / `take_player_currency` | E | RI | PLANNED |
+| Overhead map view | Keybind | Link the player to a high script origin camera (`playerlinkto`) | M | PP / UNK | INVESTIGATING |
+| Chat commands (`/bal /dep /transfer /save /tp /ammo /ee /?`) | `self waittill("chat", msg)` | iw7-mod `say` notify (`level waittill("say", player, msg)`, v1.0.3+) | E | RI | PLANNED |
+| Weapon inspect / redraw | Third-party script | Already provided by iw7-mod (`startweaponinspection`, actionslot 8) | – | DP | N/A (exists) |
+
+### 3.10 Dev/cheat menu (`elmg_cheats`)
+
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|---|
+| God mode / unlimited ammo / refill | Menu toggles | `enableinvulnerability` / `_meth_80A1`; `player_sustainAmmo` or a refill loop | E | RI | PLANNED (Phase 4/6) |
+| UFO / noclip | Menu toggle | Link to a script mover, fly with button polling | M | RI | PLANNED (Phase 10) |
+| Teleport menu (save/load, crosshair, sky/ground, nearest zombie, teleport zombies) | Menu actions | `setorigin`, `bullettrace`, `getaliveagents` | E | RI | PLANNED |
+| Score / perks / power-ups / weapons / visions | Menu actions | Currency API; `give_zombies_perk`; `drop_loot`; `giveweapon`; `visionsetnakedforplayer` | E | RI | PLANNED |
+| Entity / forge tools | Spawn/place/rotate/delete models | `spawn("script_model")`, `setmodel`, `rotateto`, `delete` | M | RI | PLANNED (Phase 10) |
+| Lobby: super speed / gravity / timescale / no fall damage | dvars | `g_speed`, `bg_gravity`, `setslowmotion`/`timescale`, `jump_enableFallDamage` | E | RI | PLANNED |
+| Disable AI spawners | dvar | Stock dvar `debug_pause_spawning` (read by stock scripts), NEEDS TESTING | E | UNK | INVESTIGATING |
+| Clone player / fun effects | Menu actions | `_meth_8086` (`cloneplayer`); `earthquake`; `hide`/`show` | M | PP | PLANNED (Phase 10) |
+| Aimbot | Menu | Excluded by design (an MP cheating tool; not part of AAE's gameplay feature set) | – | – | NOT PLANNED |
+| Host verification levels | Per-player status | Host-only menu; per-player access list | E | RI | PLANNED (Phase 3) |
+
+### 3.11 Systems, content, and multiplayer
+
+| BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|---|
+| Bank / weapon locker (persistent) | `banks.gsc` + LUI save data | GSC file I/O keyed by `getguid()` (mod-folder install) | M | RI | PLANNED |
+| Career / stats screen | `aaecareer.lua` + saved stats | File I/O stats; GSC "Stats" page (LUI screen deferred) | M | PP | PLANNED (later) |
+| Easter-egg-count rewards | Saved EE counter + reward hooks | File I/O counter; per-reward hooks | H | PP | DEFERRED |
+| Solo Easter eggs / map fixes | ~90 map scripts for 17 BO3 maps | IW7 has 5 CP maps; per-map `replacefunc` work | H | PP | DEFERRED |
+| Offline bots | Scripted bot AI on `addtestclient()` | `addtestclient` exists; no IW7 CP bot AI, so a full AI would be needed | H | NCP / UNK | INVESTIGATING |
+| >4 players (up to 10) | `com_maxclients` via BOIII + AI-limit changes | IW7 CP is a 4-player mode; client cap unverified | H | NCP / UNK | BLOCKED — IW LIMITATION (pending test) |
+| Hot-join spawning | `hot_join_spawn.gsc` | IW7 CP join-in-progress behaviour to be observed | M | UNK | INVESTIGATING |
+| Version-mismatch kick | Version compare | Clients don't run our scripts (host-authoritative); not needed | – | N/A | N/A |
+| Ported weapons, camos, sounds, HUD art, movies | ~800 assets, 577 MB audio, 177 MB images | x64-zt fastfile work on Windows | H | NCP (script-only) | DEFERRED (asset pipeline) |
+| Discord invites / lobby ID / map download | LUI + SDK | iw7-mod has Discord RPC; the rest is client UI | – | N/A | N/A |
+
+### 3.12 Not in AAE but requested in the brief
+
+| Feature | IW Equivalent | Diff. | Class | Status |
+|---|---|---|---|---|
+| Gravity | `bg_gravity` (1–1000, global) | E | RI | PLANNED |
+| Jump height | No verified dvar | – | UNK | INVESTIGATING |
+| Unlimited sprint / air control / omni-movement | `bg_sprintUnlimited`, `bg_airControl`, `bg_omnimovement` (develop only) | E | PP | PLANNED (feature-detected) |
+| Fire-rate / rapid fire | `_meth_85C1(pct)` / `_meth_85C2()` | M | RI / UNK | PLANNED |
+| Recoil / spread | `player_recoilscaleon`, `_meth_822C`; `setspreadoverride`, `_meth_8263` | E | RI | PLANNED |
+| Damage multipliers | Damage-callback wrappers | M | RI | PLANNED |
+| Coordinates / speed / weapon HUD | `self.origin`, `getvelocity`, `getcurrentweapon` | E | RI | PLANNED |
+| FPS display | Not readable from server GSC | – | NCP | BLOCKED — IW LIMITATION |
+| 3D debug drawing | `line` / `print3d` are release stubs | – | NCP | BLOCKED — IW LIMITATION |
+| Entity inspector / trace info | `bullettrace` + entity fields | M | RI | PLANNED |
+| Fast restart | `map_restart` / `executecommand("fast_restart")` | E | RI / UNK | PLANNED |
 
 ---
 
-## 4. Decisions proposed for Phase 1 (pending the BO3 files)
+## 4. Decisions for Phase 1 and beyond
 
 1. **Target both iw7-mod v1.1.0 and develop.** Use only names the release compiler resolves correctly. Put every develop-only or mislabeled built-in behind `_meth_`/`_func_` ids in one `ix\core\compat` module. Enforce this with the dual-compile parity check.
-2. **Primary install is the mod-folder layout** (`mods/infinite_expansion`), which gives file-based persistence. Loose `iw7-mod/custom_scripts` installs still work, with dvar-only settings.
-3. **Primary menu is a GSC HUD menu** (server-side), which matches AAE's own GSC menu and works for every client on the host. A LUI menu is a later, optional client-side upgrade.
-4. **Zombies (CP) is the primary target**, MP second (host only), and SP out of scope.
-5. **Use one entry script per mode** (`custom_scripts/cp/ix_main.gsc`, `custom_scripts/mp/ix_main.gsc`), with modules under `custom_scripts/ix/`. CP-only modules (which reference `scripts\cp\…`) must never be referenced from the MP entry. Doing so would make MP try to load CP scripts.
-6. **The BO3 file analysis must be completed** (section 1.2) before the menu tree and option list are finalized in Phase 3.
+2. **Configuration model = AAE's model, adapted.**
+   - AAE uses a flat set of option keys (`tfoption_*`), saved by the UI, read by GSC at match start, and reset on a version change.
+   - Infinite Expansion uses the same flat model with `ix_*` dvars and an `ix_settings.cfg` file written from GSC.
+   - A settings-version key handles migration.
+   - Options are also applied **live**, not just at match start.
+3. **The primary UI is a GSC HUD menu.** AAE's main UX is LUI, but IW7 LUI menus would be client-side code that every player needs, and LUI↔GSC traffic is limited to integer notifies and predefined omnvars. The GSC menu works for every client of the host.
+   - It covers AAE's lobby options (3.2–3.7) as in-game pages plus the dev tools (3.10).
+   - A LUI front-end stays an optional later phase.
+4. **Hooks over file overrides.** AAE ships patched copies of stock scripts. Infinite Expansion uses iw7-mod's `replacefunc` and callback wrapping instead, which avoids redistributing modified stock code and survives game-script differences between maps.
+5. **Zombies (CP) is the primary target**, MP is secondary (host only), and SP is out of scope.
+6. **Use one entry script per mode** (`custom_scripts/cp/ix_main.gsc`, `custom_scripts/mp/ix_main.gsc`) with modules under `custom_scripts/ix/`. CP-only modules (which reference `scripts\cp\…`) are never referenced from the MP entry.
+7. **Asset-dependent AAE features are deferred to an optional asset phase** (x64-zt on Windows): ported weapons, camos, sounds, and HUD art.

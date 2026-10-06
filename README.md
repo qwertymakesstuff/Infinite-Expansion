@@ -4,8 +4,8 @@ A modular enhancement framework for **Call of Duty: Infinite Warfare** (IW7), wi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phase 0 (project forensics) — no playable build yet.**
-> The IW7 research is complete. Analysis of the BO3 reference files is **blocked**, because the archive can't be downloaded into the build environment (see `PROJECT_ANALYSIS.md` §1.1).
+> **Status: Phase 0 (project forensics) complete — no playable build yet.**
+> The IW7 research is complete, and the BO3 reference (AAE v3.9.5) has been analysed from its decompiled package (`PROJECT_ANALYSIS.md`).
 
 ## Requirements (for players, once Phase 1 ships)
 
@@ -38,7 +38,7 @@ Installing as a mod folder enables saving settings to disk. Loose installs into 
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 0 | Project forensics | **Partial**: IW7 complete; BO3 files blocked |
+| 0 | Project forensics | **Complete** |
 | 1 | Foundation (entry scripts, bootstrap, compat, check tooling) | Next |
 | 2 | Core systems (features, config, events, utilities) | Planned |
 | 3 | Main menu | Planned |
