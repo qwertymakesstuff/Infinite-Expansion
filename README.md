@@ -4,8 +4,8 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phase 2 (core systems) complete — not yet run in-game.**
-> Settings, chat commands, saving, the event bus and the feature manager are in place, on top of the character features of Phase 1.5, and the setup now adds a launcher, `Infinite Expansion.exe`. Everything passes every offline check with both iw7-mod compilers. The character menu has been confirmed in a real match; the rest has not: `TESTING.md` §4 lists the checks a tester can do.
+> **Status: Phase 3 (in-game menu) complete — not yet run in-game.**
+> The in-game menu (ADS + Melee) shows and changes every setting. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
 
 ## Requirements
 
@@ -73,21 +73,36 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.2.1 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.3.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 9 (0 changed from the default); features: 1; chat: !ix
+[IX] INFO: settings: 12 (0 changed from the default); features: 2; chat: !ix
 [IX] INFO: ready
 ```
 
 `fs_game=1` instead means the mod was loaded from the Mods menu.
 
+## The in-game menu
+
+In a match, **hold ADS (aim) and press Melee** to open the menu, or type `!ix menu` in chat. A line after your first spawn reminds you.
+
+| Button | In the menu |
+|--------|-------------|
+| ADS / Fire | Up / down (hold to keep moving) |
+| Use | Open a page, switch a setting on or off, run an action |
+| Frag / Tactical | Change a value: more / less |
+| Melee | Back; on the first page, close |
+
+While the menu is open your weapon, grenades, melee and Use are off, so those buttons only steer the menu; closing it gives them back. You can still move. The menu closes by itself if you go down.
+
+Its pages: **Characters**, **HUD** (the player card), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+
 ## Settings and chat commands
 
 Every option of the mod is a **setting** with a type, a default and a valid range. Change one in any of three ways:
 
+- **The in-game menu** (above).
 - **Chat** (press the chat key in a match): `!ix set character_announce 1`. Only the host can change settings; everyone can look.
 - **Console** (`~`): `set ix_character_announce 1`. It applies within half a second.
-- **The in-game menu**, once it exists (Phase 3).
 
 Changes are **saved** by themselves: the mod stores them in your game config (as `seta ix_<setting> <value>`, the way the CHARACTER menu saves your pick), so the next game starts with them. This works in the normal install, which friends can join; nothing is written anywhere else. Settings belong to the host: in someone else's match, theirs apply. A value outside a setting's range is refused (`!ix` says what is valid), and numbers are kept within their range.
 
@@ -100,6 +115,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `!ix on <setting>` / `!ix off <setting>` | Host: switches an on/off setting |
 | `!ix reset <setting>` / `!ix reset all` | Host: back to the default |
 | `!ix version` | The mod's version |
+| `!ix menu` | Opens the in-game menu |
 
 | Setting | Default | Range | Effect |
 |---------|---------|-------|--------|
@@ -112,6 +128,9 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `player_card_picture` | 1 | 0/1 | The character's picture on that card: their card from the current map, the one the HUD shows for teammates |
 | `player_card_x` | 16 | 0–600 | The card's distance from the right edge (640 × 480 screen) |
 | `player_card_y` | 96 | 0–440 | The card's distance from the bottom edge |
+| `menu` | 1 | 0/1 | The in-game menu; switching it off closes it for everyone |
+| `menu_access` | host | host, everyone | Who may change settings in the menu |
+| `menu_hint` | 1 | 0/1 | The line after your first spawn saying how to open the menu |
 
 These dvars are not settings, because they are not the host's to set:
 
@@ -125,6 +144,8 @@ These dvars are not settings, because they are not the host's to set:
 ## Choosing your character
 
 In the **Zombies** menu, choose **Solo Match** or **Custom Game**. In the lobby, press **CHARACTER** (under SELECT SHOW) and pick a character before you start the match. The menu shows a picture of the highlighted character, and locked special characters say how to unlock them. You keep that character for the whole match. There is no switching mid-match.
+
+Back in the lobby, the card of the character you picked stays on screen, in the place where the game itself shows a chosen special character's picture (lower middle, right of the buttons). A regular character shows their card from the selected show (from the [picture pack](#character-pictures-automatic-experimental); without it, their initials); a special character shows the game's own picture; Random shows nothing.
 
 To see what happened to your pick, open the console (`~`) in the match, or read `iw7-mod\logs\console.log` afterwards. The mod writes one line per player, for example `[IX] INFO: character: Alex -> Andre (ix_character)`, or the reason it gave you a random character.
 
@@ -145,6 +166,8 @@ The CHARACTER menu stores your pick in the dvar `ix_character`, applied on your 
 The game's menus only have pictures of the special characters, so the CHARACTER menu used to show big initials for Sally, Poindexter, Andre and A.J. The cards the HUD shows in a match exist only inside each map's own files, which the menus cannot reach while you are in the lobby (`KNOWN_LIMITATIONS.md` L28). So the setup copies those cards out of *your own* game files into a small picture pack. Nothing of the game's art ships with this mod.
 
 It happens **once, by itself**, the first time you click INSTALL (or UPDATE): after copying the mod, the window says BUILDING CHARACTER PICTURES and shows which map it is on. It takes a few minutes, and the game must be closed. After that the CHARACTER menu shows each character's card from the map selected in the lobby. The team card (the small picture the HUD shows for teammates) appears beside each name. Later updates keep the pack, so it is never built again.
+
+Pam Grier's only card is Shaolin Shuffle's, a New York ID card twice as wide as it is high; the menu draws it in that shape, as the game's HUD does.
 
 What it does:
 
@@ -182,8 +205,8 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 1 | Foundation (entry scripts, bootstrap, compat, check tooling) | **Complete** (in-game test pending) |
 | 1.5 | Characters: choose who you play as, per-map names, special characters, player card | **Complete** (in-game test pending) |
 | 2 | Core systems (settings, saving, chat commands, events, features, utilities) and the launcher | **Complete** (in-game test pending) |
-| 3 | Main menu | Next |
-| 4 | Player features | Planned |
+| 3 | In-game menu (ADS + Melee), the lobby's character card | **Complete** (in-game test pending) |
+| 4 | Player features | Next |
 | 5 | Movement | Planned |
 | 6 | Weapons | Planned |
 | 7 | Zombies | Planned |

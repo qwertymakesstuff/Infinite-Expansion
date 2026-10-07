@@ -36,6 +36,8 @@ local modelPath = "frontEnd.IXCharacter"
 -- characterSelect (cpprivatematchmenu.lua; KNOWN_LIMITATIONS.md L27).
 -- portrait: the stock lobby's picture of a special character; tall pictures
 -- are half as wide as they are high, The Hoff's is square.
+-- stock: the stock lobby's element that shows that picture when the special
+-- is chosen (cpprivatematchmenu.lua).
 local characters = {
     { key = "random", label = "Random", initials = "?", color = 0xC8C8C8,
       text = "The game picks your character, as usual." },
@@ -48,19 +50,19 @@ local characters = {
     { key = "aj", label = "A.J.", initials = "AJ", color = 0x73E659,
       text = "Spaceland: Jock. Rave: Hip-Hop. Shaolin: Sleaze Bag. Radioactive Thing: Rebel." },
     { key = "hoff", label = "The Hoff", select = 1, home = "Zombies in Spaceland", soulKey = "soul_key_1",
-      portrait = "zm_character_select_hoff", square = true, initials = "H", color = 0xFFD14D,
+      portrait = "zm_character_select_hoff", square = true, stock = "Hoff", initials = "H", color = 0xFFD14D,
       text = "Special character of Zombies in Spaceland." },
     { key = "willard", label = "Willard Wyler", select = 5, home = "Zombies in Spaceland", soulKey = "soul_key_5",
-      merit = "mt_dlc4_troll2", portrait = "zm_character_willard", initials = "W", color = 0xFFD14D,
+      merit = "mt_dlc4_troll2", portrait = "zm_character_willard", stock = "Willard", initials = "W", color = 0xFFD14D,
       text = "Special character of Zombies in Spaceland, earned in The Beast from Beyond." },
     { key = "kevin", label = "Kevin Smith", select = 2, home = "Rave in the Redwoods", soulKey = "soul_key_2",
-      portrait = "zm_character_select_smith", initials = "K", color = 0xFFD14D,
+      portrait = "zm_character_select_smith", stock = "Smith", initials = "K", color = 0xFFD14D,
       text = "Special character of Rave in the Redwoods." },
     { key = "pam", label = "Pam Grier", select = 3, home = "Shaolin Shuffle", soulKey = "soul_key_3",
-      portrait = "zm_character_select_pam", initials = "P", color = 0xFFD14D,
+      portrait = "zm_character_select_pam", stock = "Pam", initials = "P", color = 0xFFD14D,
       text = "Special character of Shaolin Shuffle." },
     { key = "elvira", label = "Elvira", select = 4, home = "Attack of the Radioactive Thing", soulKey = "soul_key_4",
-      portrait = "zm_character_select_elvira", initials = "E", color = 0xFFD14D,
+      portrait = "zm_character_select_elvira", stock = "Elvira", initials = "E", color = 0xFFD14D,
       text = "Special character of Attack of the Radioactive Thing." },
 }
 
@@ -227,11 +229,27 @@ end
 local portraitLeft, portraitTop, portraitSize = 1254, 216, 360
 local cardWidth = math.floor(portraitSize * 256 / 371)
 local iconSize = 256
+
+-- Cards drawn twice as wide as high. Pam Grier's only card is Shaolin
+-- Shuffle's, and that map's HUD draws its main cards as 2:1 New York ID cards
+-- (ui/ingame/cp/mainplayerinfodlc2.lua: 512 x 256), so hers is drawn that way.
+local wideCards = { ix_card_pam = true }
+
+-- The size of a main card from the pack, height high (wide cards: half that).
+local function cardSize(material, height)
+    if wideCards[material] then
+        return height, height / 2
+    end
+    return math.floor(height * 256 / 371), height
+end
 local listLeft, listTop, rowHeight, rowSpacing = 130, 216, 30, 10
 
 local function showPortrait(menu, character)
     menu.IXPortraitEdge:SetRGBFromInt(character.color, 0)
     local material, width, height = packedPicture("ix_card_", character), cardWidth, portraitSize
+    if material then
+        width, height = cardSize(material, portraitSize)
+    end
     if not material and character.portrait then
         material, width = character.portrait, character.square and portraitSize or portraitSize / 2
     elseif not material then
@@ -278,6 +296,70 @@ local function onHover(element, character)
     Engine.PlaySound(CoD.SFX.SPMinimap)
 end
 
+-- The lobby's card of the chosen character. The stock lobby shows a chosen
+-- special character's picture in the lower middle (cpprivatematchmenu.lua: The
+-- Hoff's 256 x 256 at 798-1054 x 714-970, the others 128 x 256 beside it);
+-- the card goes in that place for every character. A special character shows
+-- the stock element itself (so nothing is drawn twice); a regular character
+-- the main card of the selected map from the pack, as high as The Hoff's
+-- picture, else the team card, else the initials; Random shows nothing.
+local lobbyArea = { left = 798, top = 714, size = 256 }
+local lobbyMenu = nil
+
+local function placeLobbyElement(element, width, height)
+    local left = lobbyArea.left + (lobbyArea.size - width) / 2
+    local top = lobbyArea.top + (lobbyArea.size - height) / 2
+    element:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * (left + width),
+        _1080p * top, _1080p * (top + height))
+end
+
+local function refreshLobbyCard(menu)
+    local card = menu and menu.IXLobbyCard
+    if not card then
+        return
+    end
+    local character = characterFor(currentKey())
+    -- The stock special pictures follow the saved choice, not only characterSelect.
+    local stockShown = false
+    for i = 1, #characters do
+        local stock = characters[i].stock and menu[characters[i].stock]
+        if stock then
+            local chosen = character == characters[i]
+            stock:SetAlpha(chosen and 1 or 0, 0)
+            stockShown = stockShown or chosen
+        end
+    end
+    card.Image:SetAlpha(0, 0)
+    card.Panel:SetAlpha(0, 0)
+    card.Initials:SetAlpha(0, 0)
+    if not character or character.key == "random" or stockShown then
+        return
+    end
+    local material, width, height = packedPicture("ix_card_", character), nil, nil
+    if material then
+        width, height = cardSize(material, lobbyArea.size)
+    elseif character.portrait then
+        material = character.portrait
+        width, height = character.square and lobbyArea.size or lobbyArea.size / 2, lobbyArea.size
+    else
+        material = packedPicture("ix_icon_", character)
+        width, height = lobbyArea.size, lobbyArea.size
+    end
+    if material then
+        card.Image:setImage(RegisterMaterial(material), 0)
+        placeLobbyElement(card.Image, width, height)
+        card.Image:SetAlpha(1, 0)
+        return
+    end
+    width = cardSize(nil, lobbyArea.size)
+    placeLobbyElement(card.Panel, width, lobbyArea.size)
+    card.Panel:SetAlpha(0.45, 0)
+    placeLobbyElement(card.Initials, width, 120)
+    card.Initials:setText(character.initials, 0)
+    card.Initials:SetRGBFromInt(character.color, 0)
+    card.Initials:SetAlpha(1, 0)
+end
+
 local function writeLobbyField(value)
     -- iw7-mod writes coop stats the same way: setCoopPlayerData, then
     -- uploadstats (src/client/component/stats.cpp).
@@ -298,6 +380,8 @@ local function chooseCharacter(element, character)
     if menu and menu.IXSelected then
         menu.IXSelected:setText("Selected: " .. character.label, 0)
     end
+    -- The lobby is still open underneath; its card shows the new choice.
+    pcall(refreshLobbyCard, lobbyMenu)
     LUI.FlowManager.RequestLeaveMenu(element)
 end
 
@@ -595,6 +679,29 @@ local function restoreLobbyField(controllerIndex)
     end
 end
 
+local function addLobbyCard(menu)
+    local card = {}
+    card.Panel = newPanel("IXLobbyCardPanel", 0x000000, 0, 0, 0, 0, 0)
+    menu:addElement(card.Panel)
+    card.Initials = newText("IXLobbyCardInitials", 120, FONTS.MainMedium.File, 0, 0, 0, LUI.Alignment.Center)
+    card.Initials:SetAlpha(0, 0)
+    menu:addElement(card.Initials)
+    card.Image = LUI.UIImage.new()
+    card.Image.id = "IXLobbyCard"
+    card.Image:SetAlpha(0, 0)
+    menu:addElement(card.Image)
+    menu.IXLobbyCard = card
+    lobbyMenu = menu
+    refreshLobbyCard(menu)
+    -- Back from the CHARACTER menu or SELECT SHOW (the card shows the selected
+    -- map's card): iw7-mod's MPMainMenu refreshes on the same two events.
+    for _, event in ipairs({ "gain_focus", "restore_focus" }) do
+        menu:addEventHandler(event, function(element, eventArgs)
+            pcall(refreshLobbyCard, element)
+        end)
+    end
+end
+
 local function onLobbyBuilt(menu, controller)
     if not menu or menu.IXLobbyFieldRestored then
         return
@@ -608,7 +715,9 @@ local function onLobbyBuilt(menu, controller)
     -- Again once the menu is up, in case the stock reset runs then.
     menu:addEventHandler("menu_create", function(element, eventArgs)
         restoreLobbyField(controllerIndex)
+        pcall(refreshLobbyCard, element)
     end)
+    pcall(addLobbyCard, menu)
 end
 
 local lobbyDecorators = {

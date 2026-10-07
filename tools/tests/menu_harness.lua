@@ -15,6 +15,9 @@
 --                 build=direct      ... by calling MenuBuilder.m_types directly
 --                 boss=1            boss battles are on (BOSS BATTLE button)
 --   menu        the CHARACTER menu: hovers and clicks every row
+--   lobbycard   the lobby's card of the chosen character: opens the lobby,
+--               chooses row choose=<n> in the CHARACTER menu, then selects
+--               map2=<name> in SELECT SHOW and returns (restore_focus)
 --   mainmenu    the zombies main menu's button list (iw7-mod's replacement)
 --   name_default / name_custom / name_missing   the Steam name file
 -- Shared options:
@@ -357,6 +360,18 @@ local function stockPrivateMatchMenu(menu, controller)
     buttons:SetAnchorsAndPosition(0, 1, 0, 1, 131, 631, 200, 600)
     self:addElement(buttons)
     self.CPPrivateMatchButtons = buttons
+    -- The special characters' pictures (stock positions); the stock shows the
+    -- one characterSelect names (SecretCharacterSelection).
+    local pictures = { { "Willard", 5, 886, 1014, 689, 945 }, { "Elvira", 4, 886, 1014, 689, 945 },
+        { "Pam", 3, 886, 1014, 689, 945 }, { "Smith", 2, 872, 1000, 661.5, 917.5 }, { "Hoff", 1, 798, 1054, 714, 970 } }
+    for _, picture in ipairs(pictures) do
+        local image = LUI.UIImage.new()
+        image.id = picture[1]
+        image:SetAnchorsAndPosition(0, 1, 0, 1, picture[3], picture[4], picture[5], picture[6])
+        image:SetAlpha(stats.characterSelect == picture[2] and 1 or 0)
+        self:addElement(image)
+        self[picture[1]] = image
+    end
     -- PostLoadFunc: ACTIONS.CharacterSelect(self, controller, 0)
     stats.characterSelect = 0
     return self
@@ -432,6 +447,41 @@ if scenario == "lobby" then
     stats.characterSelect = 0
     reportList("second", openLobby().CPPrivateMatchButtons)
     print("field " .. stats.characterSelect)
+elseif scenario == "lobbycard" then
+    defineLobby("registered")
+    dofile(script)
+    local lobby = openLobby()
+    local function report(step)
+        local card = lobby.IXLobbyCard
+        local shown = "none"
+        if card.Image.alpha == 1 then
+            shown = "image=" .. card.Image.image .. " rect=" .. rectText(card.Image)
+        elseif card.Initials.alpha == 1 then
+            shown = string.format("initials=%s color=%06X panel=%s alpha=%g", card.Initials.text, card.Initials.color,
+                rectText(card.Panel), card.Panel.alpha)
+        end
+        local stock = {}
+        for _, id in ipairs({ "Hoff", "Willard", "Smith", "Pam", "Elvira" }) do
+            if lobby[id].alpha == 1 then
+                stock[#stock + 1] = id
+            end
+        end
+        print(string.format("%s card %s stock=%s", step, shown, table.concat(stock, ",")))
+    end
+    report("open")
+    if options.choose then
+        local menu = MenuBuilder.BuildRegisteredType("IXCharacterMenu", { controllerIndex = 0 })
+        local row = menu.IXCharacterList.dataSource:MakeDataSourceAtIndex(tonumber(options.choose), 0)
+        row.buttonOnClickFunction({ GetCurrentMenu = function()
+            return menu
+        end }, {})
+        report("chosen")
+    end
+    if options.map2 then
+        dvars.ui_mapname = options.map2
+        lobby:fire("restore_focus")
+        report("map")
+    end
 elseif scenario == "menu" then
     dofile(script)
     print("loaded " .. table.concat(execs, ";"))

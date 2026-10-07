@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Infinite Expansion
 
-> **Status: Phases 1 and 2 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — compiled and checked, in-game test pending). Sections 4.1–4.5 describe what exists; presets (§4.2), the menu (§5) and the HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
+> **Status: Phases 1–3 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — confirmed in a real match; Phase 3: the in-game menu — compiled and checked, in-game test pending). Sections 4 and 5 describe what exists; presets (§4.2) and the info HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
 
 ## 1. Constraints that shape the design
 
@@ -42,8 +42,8 @@ Infinite-Expansion/                          (repository)
 │               │   ├── features.gsc         on/off features, requirements, hooks           (Phase 2)
 │               │   └── chat.gsc             !ix chat commands                              (Phase 2)
 │               ├── ui/                      ≙ /scripts/ui/
-│               │   ├── menu.gsc             menu engine (pages, items, rendering, input)
-│               │   ├── menu_tree.gsc        menu definition (data only)
+│               │   ├── menu.gsc             menu engine (pages, items, rendering, input)   (Phase 3)
+│               │   ├── menu_tree.gsc        menu pages (data only)                       (Phase 3)
 │               │   ├── hud.gsc              info HUD (create-once/update)
 │               │   └── player_card.gsc      bottom-right character card              (Phase 1.5)
 │               ├── player/                  ≙ /scripts/player/
@@ -219,25 +219,36 @@ Typed in the game's chat; replies go only to the player who typed, with iw7-mod'
 
 Settings apply to the whole match, so only the host (`player ishost()`) may change them. A reply quotes typed text only when it is a plain word, because `tell()` sends the text inside a quoted server command.
 
-## 5. Menu design (`ix\ui\menu`)
+Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...` runs `player thread [[fn]](words)`, and `!ix` lists them. The menu adds `!ix menu`.
+
+## 5. Menu design (`ix\ui\menu`) — implemented in Phase 3
 
 - **Type:** a server-side **GSC HUD menu**, matching AAE's own approach and proven feasible in IW7 by an existing menu (S8).
-- **Model:** pages hold items. Item kinds are `page` (submenu), `toggle` (bool setting), `slider` (int/float setting), `select` (enum setting), and `action` (function). Item labels and help text come from the setting registry, so the menu never hardcodes values.
-- **Rendering:** a fixed set of HUD elements per player, **created once** on first open: background, title, a page breadcrumb, N visible rows (default 10), cursor bar, value column, help line, and footer. Opening, closing, and scrolling only change text, values, alpha, and positions. Elements are destroyed on disconnect.
-- **State indication:** toggles show ON/OFF in colour; sliders show their value with min/max; unavailable features are greyed and labelled.
-- **Controls** (AAE-style; avoids every CP action slot):
+- **Model:** pages hold rows (`menu_tree.gsc`, data only, built on the first opening when every module has registered):
+
+  ```text
+  add_page( id, title, parent )                    a page, linked from its parent
+  add_setting( page, setting, step )               a setting row; Frag / Tactical change numbers by step
+  add_action( page, label, help, fn, confirm, host_only )   confirm: Use twice
+  add_info( page, label, help, fn )                a read-out: fn returns a number or a short word
+  ```
+
+  A setting row takes its label, help, range and value from the setting registry (§4.2), so the menu never hardcodes them; a row for a missing setting is skipped and a page without rows is left out.
+- **Rendering:** a fixed set of HUD elements per player, **created once** on first open: panel, accent edge, title, breadcrumb, 10 rows (label and value), cursor bar, three help lines (the row's help and range, word-wrapped), and a two-line footer with the controls. Opening, closing, and scrolling only change text, values, alpha, and positions; numbers are shown with `setvalue`, so they never become new strings (L12). The panel is right of the screen's centre (`horzalign "center"`, x 96–320, y 96–342).
+- **State indication:** on/off settings show ON (green) / OFF (pink); numbers and words show their value, with the range in the help lines; a feature whose requirements are missing shows N/A in grey; values the player may not change are grey.
+- **Controls** (AAE-style; avoids every CP action slot), polled every 0.05 s with `adsbuttonpressed`, `attackbuttonpressed`, `usebuttonpressed`, `meleebuttonpressed`, `fragbuttonpressed` and `secondaryoffhandbuttonpressed` (all in both compilers), the way a working IW7 zombies menu reads them (IW_API_NOTES §8):
 
   | Action | Input |
   |--------|-------|
-  | Open | ADS + Melee |
-  | Scroll | ADS (up) / Fire (down) |
-  | Select / toggle | Use |
+  | Open | ADS + Melee (both released before the menu reacts), or `!ix menu` in chat |
+  | Up / down | ADS / Fire; held: repeats after 0.35 s, then every 0.1 s |
+  | Open a page, switch, step a word, run an action | Use |
+  | Change a value | Frag (more / next / on) / Tactical (less / previous / off) |
   | Back / close | Melee |
-  | Value change on sliders/selects | Frag (+) / Tactical (−) |
 
-  Weapons and offhands are disabled while the menu is open. Controls are polled with `adsbuttonpressed`, `attackbuttonpressed`, `usebuttonpressed`, `meleebuttonpressed`, `fragbuttonpressed`, and `secondaryoffhandbuttonpressed`, all present in both compilers.
-- **Access:** every player in the match can open the menu, but global options are host-only (setting `menu_global_access`).
-- **Top-level tree:** Player, Movement, Weapons, Zombies, HUD, Gameplay, Quality of Life, Visuals, Utilities, Debug (gated), Settings (presets, reset, save/load). The final tree is set after the BO3 menu analysis.
+  While it is open, weapons, grenades, melee and Use are off through the stock counters `scripts\engine\utility::allow_weapon`, `allow_offhand_weapons`, `allow_melee` and `allow_usability`, once each way, so closing never undoes what the game itself turned off. It closes on last stand, death, the match's end, and when the `menu` feature is switched off; it cannot open while down, in the afterlife arcade or before `ix_ready`.
+- **Access:** every player can open the menu; settings and host-only actions change only for the host, unless the setting `menu_access` is `everyone`.
+- **Tree (Phase 3):** Characters, HUD, Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Player, Movement, Weapons, Zombies, Quality of Life, Visuals, Utilities and presets.
 
 ## 6. HUD design (`ix\ui\hud`)
 
@@ -276,7 +287,8 @@ Multiplayer support was dropped on 2026-10-06; the mod targets the zombies mode 
    - `config::add_bool/add_int/add_float/add_enum(...)` for each option; read them with `config::get(id)`;
    - `features::add(...)` for each part that can be switched on and off, with `on_enable`/`on_disable` (global) or `on_player` (per player) and any `requires`;
    - `events::subscribe(...)` for what it reacts to;
-   - *(later)* add menu items to `menu_tree`.
+   - rows for its settings in `ix/ui/menu_tree.gsc` (`add_setting`, with a step for numbers), on an existing page or a new `add_page`;
+   - a chat command, if useful: `chat::add_command(name, fn, usage)` (the menu adds `!ix menu`).
 3. Implement `on_disable` / `on_player(0)` so that switching off fully **restores** the previous state.
 4. Use only APIs listed in `IW_API_NOTES.md`; raw ids go through `compat`.
 5. Run `python3 tools/check.py` until it passes; add rows to `FEATURE_STATUS.md` and `TESTING.md`.

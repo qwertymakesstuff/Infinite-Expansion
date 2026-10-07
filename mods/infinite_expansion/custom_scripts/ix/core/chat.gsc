@@ -11,13 +11,28 @@
 //   !ix off <setting>            ... off (host)
 //   !ix reset <setting> | all    back to the default (host)
 //   !ix version
+// Modules add their own with add_command (the menu: "!ix menu").
 //
 // Settings apply to the whole match, so only the host may change them. Values
 // go through config.gsc, which refuses anything outside a setting's range.
 
 setup()
 {
+    level.ix.chat = spawnstruct();
+    level.ix.chat.commands = [];
+    level.ix.chat.order = [];
     custom_scripts\ix\core\events::subscribe( "chat", ::on_chat );
+}
+
+// A command of a module: "!ix <name> ..." runs player thread [[ fn ]]( words ),
+// words being everything typed, split at spaces (words[1] is name).
+add_command( name, fn, usage )
+{
+    command = spawnstruct();
+    command.fn = fn;
+    command.usage = usage;
+    level.ix.chat.commands[name] = command;
+    level.ix.chat.order[level.ix.chat.order.size] = name;
 }
 
 prefix()
@@ -79,7 +94,11 @@ on_chat( player, message )
             player tell( "Infinite Expansion " + level.ix.version );
             break;
         default:
-            help( player );
+            if ( isdefined( level.ix.chat.commands[command] ) )
+                player thread [[ level.ix.chat.commands[command].fn ]]( words );
+            else
+                help( player );
+
             break;
     }
 }
@@ -90,6 +109,9 @@ help( player )
     player tell( prefix() + " list [word]  |  " + prefix() + " get <setting>" );
     player tell( prefix() + " set <setting> <value>  |  " + prefix() + " on/off <setting>" );
     player tell( prefix() + " reset <setting> | all  (changes: host only)" );
+
+    foreach ( name in level.ix.chat.order )
+        player tell( prefix() + " " + name + "  " + level.ix.chat.commands[name].usage );
 }
 
 // "id=value" pairs, a few per chat line.

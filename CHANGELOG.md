@@ -4,6 +4,25 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Phase 3: the in-game menu; the lobby's character card; Pam Grier's card (2026-10-08)
+
+**Added**
+- **In-game menu.** Hold ADS and press Melee in a match (or type `!ix menu`). ADS / Fire move, Use opens a page or switches a setting, Frag / Tactical change a value, Melee goes back and closes it. Pages: Characters, HUD, Menu, Settings (changed count, *Reset every setting*, version), Debug.
+  - Every row is a setting with its own label, value, range and help, the same ones the chat commands and the console use; a change made anywhere shows in an open menu.
+  - While it is open, your weapon, grenades, melee and Use are off, so the buttons only steer the menu. It uses the game's own counters for that, so closing it never undoes what the game turned off itself (last stand, traps). It closes when you go down and at the end of the match.
+  - Everyone can open it; only the host changes settings, unless `menu_access` is `everyone`.
+  - New settings: `menu` (the menu itself), `menu_access`, `menu_hint` (a line after the first spawn naming the controls).
+  - Modules can add chat commands (`chat::add_command`); the menu adds `!ix menu`.
+- **Lobby card.** The character picked in CHARACTER now shows in the lobby, where the game itself shows a chosen special character's picture: the game's own picture for a special character, the selected show's card (picture pack) or initials for a regular one. It follows a new pick and a new SELECT SHOW.
+- Version 0.3.0.
+
+**Fixed**
+- Pam Grier's card in the CHARACTER menu was squeezed: her only card is Shaolin Shuffle's New York ID card, which that map's HUD draws twice as wide as high. It is now drawn that way. The other cards are unchanged.
+- The setup sorted its file list by the PC's language rules; it now sorts by character code, the same everywhere.
+
+**Tests**
+- 3 new menu-script tests (13): the lobby card in every case above, and Pam's card shape; the lobby stand-in now has the stock lobby's five special pictures. `check.py` passes with the menu on both compilers (19 scripts).
+
 ### The player card shows the character's picture (2026-10-07)
 
 **Added**

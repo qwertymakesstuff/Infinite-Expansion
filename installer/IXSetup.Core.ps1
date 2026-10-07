@@ -112,7 +112,9 @@ function Get-IXPackageVersion {
     return $null
 }
 
-# Relative paths, with /, of every file the package installs, sorted.
+# Relative paths, with /, of every file the package installs, sorted by
+# character code: Sort-Object would sort by the PC's language rules, which put
+# "menu_tree.gsc" before "menu.gsc".
 function Get-IXPayloadFiles {
     param([string]$PackageRoot)
     $files = New-Object System.Collections.Generic.List[string]
@@ -129,7 +131,8 @@ function Get-IXPayloadFiles {
             $files.Add($file.Substring($root.Length + 1).Replace('\', '/'))
         }
     }
-    return @($files | Sort-Object)
+    $files.Sort([StringComparer]::Ordinal)
+    return @($files)
 }
 
 # ---------------------------------------------------------------------------

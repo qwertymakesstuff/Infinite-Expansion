@@ -67,7 +67,7 @@
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | CHARACTER button in the zombies lobby, under SELECT SHOW (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; in the lobby of Solo Match and Custom Game (moved there from the main menu after the second in-game report); saves `ix_character`, and for specials the stock lobby field `characterSelect`. Layout from the stock lobby (L35); R-UI1–R-UI6 |
-| Picture of the highlighted character in the CHARACTER menu | UI | 1.5 | TESTING | The game's own pictures of the five specials; colored initials for the regular characters, or their HUD cards with the picture pack (L28); R-UI2 |
+| Picture of the highlighted character in the CHARACTER menu (Pam Grier's card drawn 2:1, as the game's HUD draws it) | UI | 1.5 | TESTING | The game's own pictures of the five specials; colored initials for the regular characters, or their HUD cards with the picture pack (L28); R-UI2 |
 | Character pictures pack: the HUD's cards in the CHARACTER menu, a team card beside each row | UI | 1.5 | TESTING (experimental) | Built by the setup after the first INSTALL (or by hand with `Build Character Pictures.cmd`): x64-zt copies the cards from the player's own game files into `iw7-mod/zone/ix_portraits.ff`; the menu loads it with `loadzone` and picks the selected map's cards. `ix_pictures 0` turns it off (L28, L37); R-PK1–R-PK5 |
 | Locked special characters shown and refused in the menu | UI | 1.5 | TESTING | Reads the same zombies stats as the stock lobby (L27); setting `character_specials`; R-UI4 |
 | A chosen special survives the stock lobby's reset | UI | 1.5 | TESTING | The stock lobby clears `characterSelect` when it opens; the menu script writes the choice back; R-UI5 |
@@ -88,11 +88,13 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| GSC menu engine (pages, toggles, sliders, selects, actions) | UI | 3 | PLANNED | Create-once HUD elements |
-| Menu controls (open ADS+Melee, configurable) | UI | 3 | PLANNED | Avoids all CP action slots |
-| Settings pages mirroring AAE "Custom Mutations" categories | UI | 3 | PLANNED | Game / Player / Zombie / Weapon / Perk / Power-up / Modes |
-| Reset / defaults / presets from menu | UI | 3/11 | PLANNED | |
-| Host-only access + per-player access list | UI | 3 | PLANNED | AAE dev menu "verification" |
+| GSC menu engine (pages, on/off settings, numbers, words, actions, read-outs) | UI | 3 | TESTING | `ix/ui/menu.gsc`: create-once HUD elements, numbers with `setvalue`, help and range under the list, live refresh when a setting changes anywhere; the feature `menu`; R-M1–R-M8 |
+| Menu controls (open ADS + Melee or `!ix menu`; ADS/Fire, Use, Frag/Tactical, Melee) | UI | 3 | TESTING | Polled like a working IW7 zombies menu; weapon, grenades, melee and Use off while open through the stock counters (L41); R-M1, R-M2 |
+| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, HUD, Menu, Settings, Debug; later phases add theirs (Game / Player / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
+| Reset / defaults from menu | UI | 3 | TESTING | *Reset every setting* (confirm with a second Use, host only); presets come in Phase 11; R-M6 |
+| Host-only changes | UI | 3 | TESTING | Everyone can look; only the host changes, unless `menu_access` is `everyone`; R-M5 |
+| Per-player access list | UI | – | NOT PLANNED | `menu_access` covers host-only versus everyone |
+| Lobby card of the chosen character | UI | 3 | TESTING | The CHARACTER pick's card in the stock lobby, where the game shows a chosen special's picture: the stock picture for specials, the pack's card of the selected show for regular characters, else initials; follows a new pick and SELECT SHOW (L42); R-UI7 |
 | LUI front-end (lobby-style options) | UI | – | DEFERRED | Client Lua; optional later |
 | HUD: zombie counter (remaining + active) | HUD | 8 | PLANNED | AAE `_zm_counter` |
 | HUD: round, timer, coordinates, speed, weapon/ammo, health | HUD | 8 | PLANNED | |

@@ -342,7 +342,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Lobby options ("Custom Mutations") | LUI menus `tfoptions*.lua`; writes `modvar tfoption_*`; read once by `tfoption.gsc` | **In-game GSC HUD menu** ("Settings" pages) writing `ix_*` dvars, plus a settings file. Lobby LUI is a later optional client add-on (`ui_scripts/`) | M | RI | PLANNED (Phase 3) |
+| Lobby options ("Custom Mutations") | LUI menus `tfoptions*.lua`; writes `modvar tfoption_*`; read once by `tfoption.gsc` | **In-game GSC HUD menu** ("Settings" pages) writing `ix_*` dvars, plus a settings file. Lobby LUI is a later optional client add-on (`ui_scripts/`) | M | RI | TESTING (Phase 3: the GSC menu `ix\ui\menu`) |
 | Option persistence | LUI save data (`AAESavingDataUtility`), `exec AAECustomMutations` | Archived dvars: `executecommand("seta ix_<k> <v>")` into the host's config (`ix\core\persist`). Planned as `ix_settings.cfg` via GSC file I/O, which needs `fs_game` and so the install nobody can join (L9, L30) | M | RI | TESTING (Phase 2) |
 | Option-schema versioning | `tfoption_master_ver` vs `tfoption_tf_enabled`; reset on mismatch | `ix_settings_version` dvar with a migration hook; an invalid saved value falls back to the default | E | RI | TESTING (Phase 2) |
 | Console overrides | `modvar tfoption_<k> <v>`; plain dvars `zm_speed`, `elmg_cheats` | `set ix_<k> <v>` (iw7-mod console); watcher thread applies live; also `!ix set <k> <v>` in chat | E | RI | TESTING (Phase 2) |

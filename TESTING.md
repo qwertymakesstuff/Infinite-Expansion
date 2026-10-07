@@ -130,6 +130,17 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V73 | `python3 -m unittest discover -s tools/tests` | ✅ 83 tests OK: installer 54 (46 before; the launcher added 8), checker 12, character data 7 (V74 added 1), menu script 10 |
 | V74 | The player card's picture: each character's card on each map, as `character::card_material` names it, against aurora's asset listing | ✅ All 50 (25 characters on their maps × main and team card) are materials in the map's `techsets_<map>` zone and images in its zones (Willard's in `patch_cp_zmb`, Elvira's main card in `eng_cp_town`). `test_character_data.py` checks that the names follow the same rule as the setup's picture pack, and catches a changed suffix or a changed Willard name. `check.py` passes (17 scripts, 14,059 bytes) |
 
+### Phase 3 (in-game menu) and the lobby card
+
+| # | Check | Result |
+|---|-------|--------|
+| V75 | `python3 tools/check.py` with `ix/ui/menu.gsc` and `menu_tree.gsc` | ✅ PASS, 0 errors, 0 warnings: 38/38 compiled, 19/19 identical between the compilers, 398 built-in calls, 156 far references (14 into stock scripts, all loaded on every zombies map, `scripts\engine\utility` included), 21,573 bytes of custom-script memory |
+| V76 | The buttons, locks and HUD the menu uses (`IW_API_NOTES.md` §7–8) | ✅ The six polling methods, `disableweapons` / `enableweapons`, the offhand and usability pairs, `allowmelee` and `ishost` are named in both compilers' tables. The stock counters `allow_weapon`, `allow_offhand_weapons`, `allow_melee` and `allow_usability` keep a per-player count; `coop_powers::reset_grenades` polls the frag button with grenades off; `createbar` keeps its own fields on a HUD element. A working IW7 zombies menu polls the same buttons in the same scheme. Not run: the menu needs the game (R-M1–R-M8) |
+| V77 | Shaolin Shuffle's card shape and the lobby's special pictures, read from the game's compiled UI scripts as data (`IW_API_NOTES.md` §15–16) | ✅ `mainplayerinfodlc2.lua` puts the main card in a 512 × 256 element; `cpprivatematchmenu.lua` has the five special pictures (The Hoff's 798–1054 × 714–970), shown on `characterSelect == n` with no map check; iw7-mod's `MPMainMenu.lua` refreshes on `gain_focus` / `restore_focus` and adds two `menu_create` handlers to one menu |
+| V78 | Lobby card and Pam's card (`test_menu_script.py`, lobby stand-in with the five special pictures) | ✅ A regular character's card of the selected show at 838–1014 × 714–970; after SELECT SHOW and `restore_focus`, the new show's card; choosing a special in the CHARACTER menu shows the stock picture and nothing over it, also when the stock lobby has just reset `characterSelect`; Random shows nothing; initials without the pack; the team card when the pack has no main card. Pam's card 360 × 180 in the CHARACTER menu, the others unchanged |
+| V79 | The setup's file list | ✅ Found by the tests: `Sort-Object` sorted `menu_tree.gsc` before `menu.gsc` (language rules); the list is now sorted by character code, the same on every PC |
+| V80 | `python3 -m unittest discover -s tools/tests` | ✅ 86 tests OK: installer 54, checker 12, character data 7, menu script 13 |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -151,10 +162,10 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.2.1 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 9 (0 changed from the default); features: 1; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.3.0 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 12 (0 changed from the default); features: 2; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
 | R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
-| R-S3 | Menu opens (ADS + Melee) *(Phase 3)* | Menu visible; weapons/offhands disabled while open | not run | not run |
-| R-S4 | Menu closes (Melee at root) *(Phase 3)* | Menu hidden; weapons restored | not run | not run |
+| R-S3 | Menu opens (ADS + Melee) (R-M1) | Menu visible; weapons/offhands disabled while open | not run | not run |
+| R-S4 | Menu closes (Melee at root) (R-M1) | Menu hidden; weapons restored | not run | not run |
 | R-S5 | `map_restart` / fast restart | One `init` line per load; with `ix_debug_log 1`, one `player connected` line per player per load | not run | not run |
 | R-S6 | Module loading by reference (`custom_scripts/ix/...`) | Modules compile and load in-game (the `modules=` list in R-S1 is complete) | not run | not run |
 | R-S7 | `set ix_enabled 0`, then load a map | Only `[IX] INFO: disabled by dvar ix_enabled 0`; no other `[IX]` lines | not run | not run |
@@ -188,7 +199,7 @@ Chat commands are typed in the match's chat. The replies appear only for the pla
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-C1 | Type `!ix`, then `!ix list`, `!ix list card`, `!ix get player_card_x`, `!ix version` | The command list; all 9 settings with values (a few per line); only the four `player_card` ones; "Player card: right margin: player_card_x = 16 (default 16, a whole number from 0 to 600)" and its help line; "Infinite Expansion 0.2.1". A second player sees none of the replies | not run | not run |
+| R-C1 | Type `!ix`, then `!ix list`, `!ix list card`, `!ix get player_card_x`, `!ix version` | The command list (with `!ix menu`); all 12 settings with values (a few per line); only the four `player_card` ones; "Player card: right margin: player_card_x = 16 (default 16, a whole number from 0 to 600)" and its help line; "Infinite Expansion 0.3.0". A second player sees none of the replies | not run | not run |
 | R-C2 | Console: `set ix_player_card_y 140` | The card moves up within about half a second; the console shows `[IX] INFO: setting player_card_y = 140 (console)` | not run | not run |
 | R-C3 | Invalid values: console `set ix_player_card_y abc`; chat `!ix set player_card_y 9999`, `!ix set character_specials maybe`, `!ix on player_card_x`, `!ix get nothing` | `abc`: a warning, and `ix_player_card_y` is back at its value. 9999 becomes 440. "character_specials: 'maybe' is not a whole number from 0 to 2." "player_card_x is not an on/off setting …". "No setting 'nothing' …" | not run | not run |
 | R-C4 | Co-op: the guest types `!ix list`, then `!ix set player_card 0` | The list works; then "Only the host can change settings." and nothing changes | not run | not run |
@@ -228,6 +239,8 @@ Characters are chosen in the CHARACTER menu before a match (§4.6) and kept for 
 | R-UI3 | Pick Andre, then start the match | As R-CH13; after restarting the game the menu still says "Selected: Andre" and opens on Andre | not run | not run |
 | R-UI4 | Without the Spaceland soul key, highlight and press The Hoff; then `unlockallEE` and reopen | First "The Hoff (locked)", the status line "Locked: earn the soul key on Zombies in Spaceland.", and pressing it does nothing; afterwards it can be chosen | not run | not run |
 | R-UI5 | Pick The Hoff, back out to the main menu, open Solo Match again, run `getCoopPlayerData zombiePlayerLoadout characterSelect`; pick Sally and run it again | `1` (the stock lobby's reset was undone), then `0`; no console error from `setCoopPlayerData` or `uploadstats` | not run | not run |
+| R-UI7 | Pick Andre in CHARACTER; back in the lobby, change SELECT SHOW; then pick The Hoff (unlocked), then Random | Andre's card from the selected show appears in the lower middle of the lobby, right of the buttons (initials without the picture pack); after SELECT SHOW, the new show's card. The Hoff: the game's own picture of him there, nothing doubled. Random: nothing. Nothing overlaps the buttons or the player list on the right. A screenshot helps | not run | not run |
+| R-UI8 | With the picture pack, highlight Pam Grier in CHARACTER | Her Shaolin Shuffle ID card, twice as wide as high, not squeezed | not run | not run |
 | R-UI6 | Co-op: the guest opens CHARACTER in the host's lobby | The button is there for the guest too; an unlocked special picked there reaches the match (R-CH3) | not run | not run |
 
 ### 4.8 One-click Windows setup
@@ -241,7 +254,7 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I3 | INSTALL, then start a zombies match | Status INSTALLED; `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` and `iw7-mod\infinite-expansion.json` exist; *Settings → Apps* lists Infinite Expansion; the console shows `[IX] INFO: init` | not run |
 | R-I4 | With the old `mods\infinite_expansion` copy present | The yellow note shows; INSTALL removes that copy's files and says so | not run |
 | R-I5 | UNINSTALL | Status UNINSTALLED; the mod's files and the record are gone; other files in `iw7-mod` stay; the Settings entry is gone | not run |
-| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.2.1` | not run |
+| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.3.0` | not run |
 | R-I6 | Install, delete the download, then uninstall from *Settings → Apps* | The setup window opens and uninstalls by itself; after closing it, `%LOCALAPPDATA%\InfiniteExpansion` is gone | not run |
 | R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
 | R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
@@ -252,11 +265,24 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I13 | DOWNLOAD in the iw7-mod row | Only iw7-mod is downloaded; the status says to click INSTALL next | not run |
 | R-I14 | After INSTALL (status names your Steam name), start the game | The Zombies menu shows CHARACTER; your name is your Steam name instead of "Unknown Soldier". After `name Test` in the console and a restart, it stays "Test" | not run |
 
+### 4.11 In-game menu (Phase 3)
+
+| ID | Test | Expected | v1.1.0 | develop |
+|----|------|----------|--------|---------|
+| R-M1 | After spawning, hold ADS and press Melee; press Melee again; then type `!ix menu` | About 6 s after the first spawn a hint names the controls. The menu opens on the right of the screen (title "Infinite Expansion", rows Characters, HUD, Menu, Settings, Debug, Close), without the cursor jumping; Melee closes it; the chat command opens it too. A screenshot helps | not run | not run |
+| R-M2 | With the menu open: ADS, Fire (also held), Use, Frag, Tactical, Melee | ADS/Fire move the cursor (holding keeps moving); Use opens a page; Melee goes back; no shot, no aiming, no knife, no grenade, and Use near a wall buy or door buys nothing. After closing, all of those work again | not run | not run |
+| R-M3 | HUD page: switch *Player card* off and on with Use; change *Player card: right margin* with Frag and Tactical | The card disappears and comes back at once; the margin moves the card in steps of 8, and stops at 0 and 600; the help lines show the range | not run | not run |
+| R-M4 | Change a setting in the menu, then `!ix get` it in chat; change it in the console with the menu open | Chat shows the menu's value; the open menu shows the console's value within a moment. After a restart the value is still there (saved) | not run | not run |
+| R-M5 | Co-op: the guest opens the menu and tries to change a setting; the host sets *Menu: who changes settings* to everyone, and the guest tries again | First the values are grey, nothing changes, and the help says only the host can change it; then the guest's change works | not run | not run |
+| R-M6 | Settings page: *Reset every setting* with Use once, then move away; Use twice | The first Use asks to press Use again; moving away cancels; Use twice resets every setting (*Changed from the default* goes to 0) | not run | not run |
+| R-M7 | Open the menu, then get downed by zombies; open it during last stand | It closes when you go down, and your weapon works in last stand as usual; it does not open while down. After being revived, ADS + Melee opens it again | not run | not run |
+| R-M8 | Switch *In-game menu* off in the Menu page | The menu closes; ADS + Melee does nothing; `!ix on menu` brings it back | not run | not run |
+
 ### 4.10 The launcher
 
 | ID | Test | Expected | Result |
 |----|------|----------|--------|
-| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.2.1.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
+| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.3.0.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
 | R-L2 | Steam open and signed in: double-click the shortcut | The game starts within a few seconds, on its main menu; no other window appears. Report any Windows or antivirus warning about the launcher | not run |
 | R-L3 | Steam closed: double-click the shortcut; also once while Steam asks for your password | Steam starts; the game starts by itself a few seconds after Steam has signed in (with the password: after you sign in, within five minutes). No "Steam must be running" box | not run |
 | R-L4 | Double-click twice quickly; then once more while the game runs | One game; then "Infinite Warfare is already running." | not run |
