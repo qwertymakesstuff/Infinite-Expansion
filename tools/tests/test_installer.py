@@ -360,7 +360,7 @@ class SetupScriptWithoutWindow(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("character pictures", result.stdout.lower())
             log = (game / "fake_zonetool.log").read_text()
-            self.assertEqual(log.count("args -dds -unbuffered-io"), 5)
+            self.assertEqual(log.count("args -unbuffered-io"), 5)
             self.assertEqual(log.count("args -buildzone"), 1)
             # Uninstalling removes them with the mod.
             result = self.run_setup("-Uninstall", "-GameDir", str(game))
@@ -376,6 +376,8 @@ class SetupScriptWithoutWindow(unittest.TestCase):
             result = self.run_setup("-GameDir", str(game), "-ZoneTool", str(FAKE_ZONETOOL))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Character pictures could not be built: x64-zt copied none of the cards.", result.stdout)
+            # Two maps failing in a row stop the rest: no more error boxes.
+            self.assertEqual((game / "fake_zonetool.log").read_text().count("args -unbuffered-io"), 2)
             self.assertTrue((game / "iw7-mod" / "custom_scripts" / "cp" / "ix_main.gsc").is_file())
             for name in ("iw7-mod/zone/ix_portraits.ff", "ix-zonetool.exe", "dump", "zonetool", "zone_source"):
                 self.assertFalse((game / name).exists(), name)
@@ -830,6 +832,7 @@ $r.pack = Install-IXPicturePack $Game $built $prepared.Materials
 $r.builtLeft = [IO.File]::Exists($built)
 $r.list = [IO.File]::ReadAllText((Get-IXPictureListPath $Game))
 $r.sourceFiles = @(Get-IXZoneToolFiles $Game | ForEach-Object { $_.Substring($Game.Length + 1).Replace('\', '/') })
+$r.elvira = [IO.File]::ReadAllText((Join-IXPath $Game @('zonetool', 'ix_portraits', 'images', 'ix_card_elvira.iw7Image')))
 $r.removedWork = Remove-IXZoneToolWork $Game $before
 $r.uninstall = Uninstall-IX $Game $Package
 $r.packAfter = [IO.File]::Exists((Get-IXPicturePackPath $Game))
@@ -845,14 +848,14 @@ $ErrorActionPreference = 'Stop'
 $r = [ordered]@{}
 $seen = New-Object System.Collections.ArrayList
 $log = { param([string]$Line) [void]$seen.Add($Line) }
-$result = Invoke-IXZoneTool $Game $Exe @('-dds', '-unbuffered-io') @('loadzone ui_boot', 'dumpasset material zm_character_select_hoff', 'quit') $log
+$result = Invoke-IXZoneTool $Game $Exe @('-unbuffered-io') @('loadzone ui_boot', 'loadzone techsets_ui_boot', 'dumpasset material zm_character_select_hoff', 'quit') $log
 $r.exitCode = $result.ExitCode
 $r.lines = @($result.Lines)
 $r.logged = @($seen)
 [IO.File]::WriteAllText((Join-Path $Game 'fake_zonetool.json'), '{"hang": true}')
 $start = Get-Date
 try {
-    Invoke-IXZoneTool $Game $Exe @('-dds') @('quit') $null -IdleSeconds 3 | Out-Null
+    Invoke-IXZoneTool $Game $Exe @('-unbuffered-io') @('quit') $null -IdleSeconds 3 | Out-Null
     $r.hang = 'returned'
 }
 catch {
@@ -904,27 +907,29 @@ class CharacterPictures(unittest.TestCase):
         _steam, cls.game = make_game(root)
         (cls.game / "zone" / "english").mkdir(parents=True)
         (cls.game / "zone" / "french").mkdir()
-        for name in ("english/eng_cp_town.ff", "french/fre_cp_town.ff", "patch_cp_town.ff", "cp_town.ff"):
+        for name in ("english/eng_cp_town.ff", "english/eng_patch_cp_town.ff", "french/fre_cp_town.ff",
+                     "patch_cp_town.ff", "cp_town.ff"):
             (cls.game / "zone" / name).write_bytes(b"")
         # The player's own x64-zt work, which must stay.
         (cls.game / "dump" / "assets").mkdir(parents=True)
         (cls.game / "dump" / "assets" / "mine.json").write_text("{}")
         (cls.game / "zone_source").mkdir()
         (cls.game / "zone_source" / "mine.csv").write_text("material,mine\n")
-        stage = root / "stage" / "dump" / "assets"
-        write_template_dump(stage)
+        stage = root / "stage" / "dump"
+        write_template_dump(stage / "assets")
         names = picture_plan_names()
         cls.present = [source for source, _ in names if not source.startswith(("zm_main_plyr_6", "zm_team_plyr_6"))]
-        streamed = "zm_team_plyr_2_dlc1"
+        # As "dumpzone iw7 <zone> image" writes them: each card in its map's
+        # zone; Elvira's main card in the language zone and its patch.
+        zones = {"zm_pc": "cp_zmb", "dlc1": "cp_rave", "dlc2": "cp_disco", "dlc3": "cp_town", "dlc4": "cp_final"}
         for source in cls.present:
-            if source == streamed:
-                (stage / "streamed_images").mkdir(exist_ok=True)
-                (stage / "streamed_images" / f"{source}_stream0.dds").write_bytes(b"small")
-                (stage / "streamed_images" / f"{source}_stream2.dds").write_bytes(b"the biggest stream")
-                (stage / "streamed_images" / f"{source}_stream1.dds").write_bytes(b"middle stream")
+            if source == "zm_main_plyr_5_dlc3":
+                targets = ["eng_cp_town", "eng_patch_cp_town"]
             else:
-                (stage / "images").mkdir(exist_ok=True)
-                (stage / "images" / f"{source}.dds").write_bytes(b"DDS " + source.encode())
+                targets = [zone for key, zone in zones.items() if key in source]
+            for zone in targets:
+                (stage / zone / "images").mkdir(parents=True, exist_ok=True)
+                (stage / zone / "images" / f"{source}.iw7Image").write_text(f"IW7IMAGE {zone} {source}")
         out = root / "result.json"
         run_pwsh(SCENARIO_PICTURES, CORE, PICTURES_CORE, cls.game, root / "stage", PACKAGE, out, workdir=root)
         cls.r = json.loads(out.read_text(encoding="utf-8-sig"))
@@ -940,24 +945,27 @@ class CharacterPictures(unittest.TestCase):
                                                       "Attack of the Radioactive Thing", "The Beast from Beyond"])
         self.assertEqual([image for m in plan for image in m["images"]], [f"{a}={b}" for a, b in picture_plan_names()])
         self.assertEqual(plan[0]["zones"], ["cp_zmb", "patch_cp_zmb"])
-        # Without a game folder: English; with one: the language zones it has.
-        self.assertEqual(plan[3]["zones"], ["cp_town", "eng_cp_town"])
-        self.assertEqual(self.r["townZones"][0], "cp_town")
-        self.assertEqual(sorted(self.r["townZones"][1:]), ["eng_cp_town", "fre_cp_town"])
+        # Without a game folder: English; with one: the language zones it has,
+        # then their patches (not patch_cp_town, which is not a language zone).
+        self.assertEqual(plan[3]["zones"], ["cp_town", "eng_cp_town", "eng_patch_cp_town"])
+        town = self.r["townZones"]
+        self.assertEqual((town[0], sorted(town[1:3]), town[3:]), ("cp_town", ["eng_cp_town", "fre_cp_town"], ["eng_patch_cp_town"]))
 
     def test_one_run_per_map_waits_for_its_zones_then_quits(self):
         runs = self.r["runs"]
         self.assertEqual([run["map"] for run in runs], ["cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final"])
-        self.assertEqual(runs[0]["commands"][:6], ["loadzone ui_boot", "loadzone ui_boot",
-                                                   "dumpasset material zm_character_select_hoff",
-                                                   "loadzone cp_zmb", "loadzone patch_cp_zmb", "loadzone cp_zmb"])
-        self.assertEqual(runs[3]["commands"][:3], ["loadzone cp_town", "loadzone eng_cp_town", "loadzone cp_town"])
-        plan = {m["map"]: m for m in self.r["plan"]}
-        for run in runs:
-            dumps = [c.split(" ")[2] for c in run["commands"] if c.startswith("dumpasset image ")]
-            self.assertEqual(dumps, [image.split("=")[0] for image in plan[run["map"]]["images"]])
+        # The pattern material from its techsets zone, after waiting for both
+        # zones; then each zone's images while it loads ("dumpasset image"
+        # after a load crashed x64-zt on every map).
+        self.assertEqual(runs[0]["commands"], ["loadzone ui_boot", "loadzone techsets_ui_boot", "loadzone ui_boot",
+                                               "dumpasset material zm_character_select_hoff",
+                                               "dumpzone iw7 cp_zmb image", "dumpzone iw7 patch_cp_zmb image", "quit"])
+        self.assertEqual(runs[3]["commands"], ["dumpzone iw7 cp_town image", "dumpzone iw7 eng_cp_town image",
+                                               "dumpzone iw7 eng_patch_cp_town image", "quit"])
+        for run in runs[1:]:
+            self.assertFalse([c for c in run["commands"] if not c.startswith("dumpzone iw7 ") and c != "quit"], run)
             self.assertEqual(run["commands"][-1], "quit")
-            self.assertEqual(run["commands"].count("quit"), 1)
+        self.assertFalse([c for run in runs for c in run["commands"] if c.startswith("dumpasset image")])
 
     def test_no_pattern_material_is_a_clear_error(self):
         self.assertIn("did not dump the menu material zm_character_select_hoff", self.r["noTemplate"])
@@ -967,15 +975,17 @@ class CharacterPictures(unittest.TestCase):
         self.assertEqual(self.r["materials"], expected)
         self.assertEqual(self.r["missing"], ["zm_main_plyr_6_dlc4", "zm_team_plyr_6_dlc4"])
         rows = self.r["csv"].split("\r\n")
-        self.assertEqual(rows[1:3], ["require,ui_boot", "techset,,2d"])
-        self.assertEqual(rows[3:-1], [f"material,{name}" for name in expected])
+        self.assertEqual(rows[1:4], ["require,ui_boot", "require,techsets_ui_boot", "techset,,2d"])
+        self.assertEqual(rows[4:-1], [f"material,{name}" for name in expected])
         files = set(self.r["sourceFiles"])
         source = "zonetool/ix_portraits"
         for name in expected:
-            self.assertIn(f"{source}/images/{name}.dds", files)
+            self.assertIn(f"{source}/images/{name}.iw7Image", files)
             for ext in (".statebits", ".statebitsmap"):
                 self.assertIn(f"{source}/techsets/state/2d/{name}{ext}", files)
         self.assertIn(f"{source}/techsets/state/2d/zm_character_select_hoff.statebits", files)
+        # A later zone's image replaces an earlier one's: the patch's card.
+        self.assertEqual(self.r["elvira"], "IW7IMAGE eng_patch_cp_town zm_main_plyr_5_dlc3")
 
     def test_install_and_removal(self):
         self.assertTrue(self.r["built"].endswith("ix_portraits.ff"))
@@ -1013,11 +1023,12 @@ class ZoneToolConsole(unittest.TestCase):
             r = json.loads(out.read_text(encoding="utf-8-sig"))
             self.assertEqual(r["exitCode"], 0)
             self.assertEqual(r["lines"], ["ZoneTool is initializing...", "ZoneTool initialization complete!",
-                                          'Loading zone "ui_boot"...', "Dumped to dump/assets"])
+                                          'Loading zone "ui_boot"...', 'Loading zone "techsets_ui_boot"...',
+                                          "Dumped to dump/assets"])
             self.assertEqual(r["logged"], r["lines"])
             log = [line for line in (game / "fake_zonetool.log").read_text().splitlines() if not line.startswith("pid ")]
             # Plain "\n" line ends, and standard input still open at "quit".
-            self.assertEqual(log[:4], ["args -dds -unbuffered-io", repr("loadzone ui_boot\n"),
+            self.assertEqual(log[:5], ["args -unbuffered-io", repr("loadzone ui_boot\n"), repr("loadzone techsets_ui_boot\n"),
                                        repr("dumpasset material zm_character_select_hoff\n"), repr("quit\n")])
             self.assertNotIn("stdin closed before quit", log)
             self.assertNotIn("EOF before quit", log)
@@ -1124,24 +1135,26 @@ class PicturesScript(unittest.TestCase):
             run_pwsh("param([string]$Core, [string]$Game, [string]$Package)\n. $Core\nInstall-IX $Game $Package | Out-Null\n",
                      CORE, game, PACKAGE, workdir=tmp)
             missing = ["zm_main_plyr_6_dlc4", "zm_team_plyr_6_dlc4"]
-            result = self.run_pictures(game, {"missing": missing, "streamed": ["zm_team_plyr_1_dlc2"], "crash_on": ["cp_rave"]})
+            result = self.run_pictures(game, {"missing": missing, "crash_on": ["cp_rave"]})
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             pack = json.loads((game / "iw7-mod" / "zone" / "ix_portraits.ff").read_text())
             rave = {name for source, name in picture_plan_names() if "_dlc1" in source}
             expected = [name for source, name in picture_plan_names() if source not in missing and name not in rave]
             self.assertEqual([m["name"] for m in pack["materials"]], expected)
-            self.assertEqual(pack["rows"][1:3], ["require,ui_boot", "techset,,2d"])
+            self.assertEqual(pack["rows"][1:4], ["require,ui_boot", "require,techsets_ui_boot", "techset,,2d"])
             images = {m["name"]: m["image"] for m in pack["materials"]}
-            self.assertEqual(images["ix_card_zmb_sally"], "DDS zm_pc_score_main_plyr_1")
-            self.assertEqual(images["ix_icon_disco_sally"], "the largest stream zm_team_plyr_1_dlc2")
+            self.assertEqual(images["ix_card_zmb_sally"], "IW7IMAGE cp_zmb zm_pc_score_main_plyr_1")
+            self.assertEqual(images["ix_icon_disco_sally"], "IW7IMAGE cp_disco zm_team_plyr_1_dlc2")
+            self.assertEqual(images["ix_card_elvira"], "IW7IMAGE eng_patch_cp_town zm_main_plyr_5_dlc3")
             listed = (game / "iw7-mod" / "zone" / "ix_portraits.txt").read_text().split()
             self.assertEqual(listed, expected)
             # x64-zt's work files, its copy, and the zone it built in the game folder are gone.
             for name in ("dump", "zonetool", "zone_source", "ix-zonetool.exe", "zone/ix_portraits.ff"):
                 self.assertFalse((game / name).exists(), name)
             log = (game / "fake_zonetool.log").read_text()
-            self.assertEqual(log.count("args -dds -unbuffered-io"), 5)
+            self.assertEqual(log.count("args -unbuffered-io"), 5)
             self.assertIn("args -buildzone ix_portraits -unbuffered-io", log)
+            self.assertNotIn("dumpasset image", log)
             self.assertNotIn("closed", log)
             self.assertNotIn("EOF", log)
             self.assertIn("Rave in the Redwoods: x64-zt stopped early (exit code 3)", result.stdout)

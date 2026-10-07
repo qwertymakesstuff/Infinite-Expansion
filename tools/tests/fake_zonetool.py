@@ -7,11 +7,20 @@ then reads console commands from standard input until "quit"; with -buildzone it
 builds from zone_source/ and zonetool/ and exits. The "fastfile" it writes is
 JSON describing what it was given, so the tests can check the build input.
 
+Like the real one on a real install:
+  - a zone's images are the character cards the game's asset listing puts there
+    (ZONE_IMAGES), plus a few others; "dumpzone iw7 <zone> image" writes them to
+    dump/<zone>/images/<name>.iw7Image;
+  - the menu material is only found once techsets_ui_boot is loaded (IW7 keeps
+    materials in techsets_<zone>, and x64-zt's loadzone does not load it);
+  - "dumpasset image" crashes, as it did on every map on a player's PC: an
+    image's pixels are freed once its zone has loaded.
+
 fake_zonetool.json in the game folder sets what it does:
-    missing   images the "game" does not have ("Asset not found")
-    streamed  images dumped the streamed way (streamed_images/<name>_stream<n>.dds)
-    crash_on  zones whose loadzone makes it exit with code 3
-    hang      true: print the ready line, then never answer again
+    missing        images the "game" does not have
+    missing_zones  zones that are not installed ("could not be found")
+    crash_on       zones whose dumpzone makes it exit with code 3
+    hang           true: print the ready line, then never answer again
 Every command it receives is appended to fake_zonetool.log, as Python repr,
 after a "pid <n>" line, so a test can tell whether it was ended.
 """
@@ -24,6 +33,25 @@ import time
 CONFIG = "fake_zonetool.json"
 LOG = "fake_zonetool.log"
 STATE_KINDS = (("state", ".statebits"), ("state", ".statebitsmap"))
+
+
+def cards(main, team, main_slots, team_slots):
+    return [main.format(n) for n in main_slots] + [team.format(n) for n in team_slots]
+
+
+# Where the game's asset listing (aurora's iw7_asset_listing) puts each card.
+ZONE_IMAGES = {
+    "cp_zmb": cards("zm_pc_score_main_plyr_{0}", "zm_pc_score_team_plyr_{0}", range(1, 6), range(1, 6)),
+    "patch_cp_zmb": ["zm_main_plyr_6_dlc4", "zm_team_plyr_6_dlc4"],
+    "cp_rave": cards("zm_main_plyr_{0}_dlc1", "zm_team_plyr_{0}_dlc1", range(1, 6), range(1, 6)),
+    "cp_disco": cards("zm_main_plyr_{0}_dlc2", "zm_team_plyr_{0}_dlc2", range(1, 6), range(1, 6)),
+    "cp_town": cards("zm_main_plyr_{0}_dlc3", "zm_team_plyr_{0}_dlc3", range(1, 5), range(1, 6)),
+    "eng_cp_town": ["zm_main_plyr_5_dlc3"],
+    "eng_patch_cp_town": ["zm_main_plyr_5_dlc3"],
+    "cp_final": cards("zm_main_plyr_{0}_dlc4", "zm_team_plyr_{0}_dlc4", range(1, 5), range(1, 5)),
+    "ui_boot": ["zm_character_select_hoff"],
+    "techsets_ui_boot": [],
+}
 
 
 def say(text):
@@ -42,13 +70,17 @@ def write(path, data):
         handle.write(data)
 
 
+def zone_exists(zone, config):
+    return zone in ZONE_IMAGES and zone not in config.get("missing_zones", [])
+
+
 def dump_material(name):
     material = {
         "name": name,
         "techniqueSet->name": "2d",
         "gameFlags": 0,
         "sortKey": 41,
-        "textureTable": [{"image": name + "_img", "semantic": 2}],
+        "textureTable": [{"image": name, "semantic": 2}],
         "constantTable": [],
     }
     write(f"dump/assets/materials/{name}.json", json.dumps(material, indent=4).encode())
@@ -56,15 +88,14 @@ def dump_material(name):
         write(f"dump/assets/techsets/{kind}/2d/{name}{ext}", name.encode())
 
 
-def dump_image(name, config):
-    if name in config.get("missing", []):
-        say("Asset not found")
-        return
-    if name in config.get("streamed", []):
-        write(f"dump/assets/streamed_images/{name}_stream0.dds", b"small")
-        write(f"dump/assets/streamed_images/{name}_stream1.dds", b"the largest stream " + name.encode())
-        return
-    write(f"dump/assets/images/{name}.dds", b"DDS " + name.encode())
+def dump_zone(zone, config):
+    say(f'Dumping zone "{zone}"...')
+    images = ZONE_IMAGES[zone] + [f"{zone}_world_{n}" for n in range(3)]
+    for name in images:
+        if name not in config.get("missing", []):
+            write(f"dump/{zone}/images/{name}.iw7Image", f"IW7IMAGE {zone} {name}".encode())
+    write(f"dump/{zone}/{zone}.csv", "".join(f"image,{name}\n" for name in images).encode())
+    say(f'Zone "{zone}" dumped.')
 
 
 def stdin_closed():
@@ -95,16 +126,33 @@ def console(config):
             return 0
         if words[0] == "loadzone":
             zone = words[1]
-            if zone in config.get("crash_on", []):
+            if not zone_exists(zone, config):
+                say(f'Zone "{zone}" could not be found!')
+            elif zone in loaded:
+                say(f'zone "{zone}" is already loaded...')
+            else:
                 say(f'Loading zone "{zone}"...')
+                loaded.add(zone)
+        elif words[:2] == ["dumpasset", "material"]:
+            if "techsets_ui_boot" in loaded:
+                dump_material(words[2])
+                say("Dumped to dump/assets")
+            else:
+                say("Asset not found")
+        elif words[:2] == ["dumpasset", "image"]:
+            log("dumpasset image: crash")
+            return 5
+        elif words[0] == "dumpzone" and words[1:2] == ["iw7"] and words[3:] == ["image"]:
+            zone = words[2]
+            if zone in config.get("crash_on", []):
                 return 3
-            say(f'zone "{zone}" is already loaded...' if zone in loaded else f'Loading zone "{zone}"...')
-            loaded.add(zone)
-        elif words[0] == "dumpasset" and words[1] == "material":
-            dump_material(words[2])
-            say("Dumped to dump/assets")
-        elif words[0] == "dumpasset" and words[1] == "image":
-            dump_image(words[2], config)
+            if not zone_exists(zone, config):
+                say(f'Zone "{zone}" could not be found!')
+            elif zone in loaded:
+                say(f'zone "{zone}" is already loaded...')
+            else:
+                dump_zone(zone, config)
+                loaded.add(zone)
 
 
 def build(zone):
@@ -119,11 +167,11 @@ def build(zone):
         if [t["image"] for t in material["textureTable"]] != [name]:
             say(f"material {name} does not use the image {name}")
             return 2
-        for path in [f"{source}/images/{name}.dds"] + [f"{source}/techsets/{k}/2d/{name}{e}" for k, e in STATE_KINDS]:
+        for path in [f"{source}/images/{name}.iw7Image"] + [f"{source}/techsets/{k}/2d/{name}{e}" for k, e in STATE_KINDS]:
             if not os.path.isfile(path):
                 say(f"missing {path}")
                 return 2
-        materials.append({"name": name, "image": open(f"{source}/images/{name}.dds", "rb").read().decode()})
+        materials.append({"name": name, "image": open(f"{source}/images/{name}.iw7Image", "rb").read().decode()})
     target = f"zone/{zone}.ff" if os.path.isdir("zone") else f"{zone}.ff"
     write(target, json.dumps({"rows": rows, "materials": materials}).encode())
     say(f'Building fastfile "{zone}"')

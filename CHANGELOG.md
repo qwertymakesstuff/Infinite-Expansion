@@ -4,6 +4,18 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Character pictures: x64-zt no longer crashes on every map (2026-10-07)
+
+**Fixed**
+- Building the character pictures crashed x64-zt once per map ("ZoneTool ERROR: Fatal error (0xC0000005)"), so no pictures were built.
+  - x64-zt's own symbols place the crash in a memory copy reading freed memory. The game frees an image's pixels as soon as its map has loaded, and the build asked for the cards after that.
+  - The build now has x64-zt copy each map's images *while* the map loads (`dumpzone`), which is how x64-zt normally dumps. It then builds the pack from those copies (x64-zt's own `.iw7Image` files), renamed per card.
+- The stock menu picture that every card is patterned on was never loaded either: IW7 keeps materials in a separate `techsets_ui_boot` zone, which x64-zt's `loadzone ui_boot` skips. The build now loads both.
+- After two maps fail in a row, the build skips the rest instead of showing an error box for each.
+
+**Tests**
+- The stand-in for x64-zt now behaves the way the real one did on a real PC: it crashes on `dumpasset image`, needs `techsets_ui_boot` for the material, and dumps each zone's images with `dumpzone`. Elvira's card comes from the patched language zone.
+
 ### The setup builds the character pictures by itself (2026-10-06)
 
 **Changed**

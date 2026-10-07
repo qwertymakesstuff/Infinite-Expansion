@@ -110,7 +110,7 @@ What it does:
 - **Skips missing maps.** A map you do not have (DLC) is skipped, and those characters keep their initials.
 - **Logs.** Details go to `%TEMP%\InfiniteExpansionPictures.log`.
 
-If it cannot finish, the mod is still installed and the menu shows initials. The status line says why, and **REINSTALL** tries again; so does the game running during INSTALL. Closing the window during the build stops it cleanly.
+If it cannot finish, the mod is still installed and the menu shows initials. The status line says why, and **REINSTALL** tries again; so does the game running during INSTALL. Closing the window during the build stops it cleanly. If a "ZoneTool ERROR" box appears, click OK: that map is skipped, and after two in a row the rest are too. Please send the log and the newest `minidumps\zonetool-crash-*.zip` from the game folder.
 
 To build the pictures again (after a game update, for example), double-click **`Build Character Pictures.cmd`** with the game closed. `ix_pictures 0` hides them without deleting them, and UNINSTALL removes them. To install without them, start the setup with `-NoPictures` (`"Infinite Expansion Setup.cmd" -NoPictures` in a command prompt).
 

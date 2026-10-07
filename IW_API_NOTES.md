@@ -11,6 +11,7 @@ This is the working API reference for the project. **Nothing here is guessed.** 
 | `[DOCS]` | `auroramod/docs` | `236d8155` |
 | `[STOCK UI]` | The game's compiled menu scripts (`ui/frontend/cp/*.lua`, `ui/uieditor/*.lua`) in `TheUnknownCod3r/iw7-src`, read as data (§16) | `d1a226db` |
 | `[ZT]` | `Joelrau/x64-zt` (zonetool) source, for the character pictures pack (§18) | `3802db4d` |
+| `[LISTING]` | aurora's IW7 asset listing (`iw7_asset_listing.zip`, linked from `auroramod/docs`): every stock zone's assets (§18) | |
 | `[COMPILED]` | Compiled locally with **both** compilers during Phase 0 | |
 
 If an API is not listed here, verify it the same way before using it. The rule is in section 12.
@@ -371,43 +372,51 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
 - **Steam `[STEAM]`.** `steam://install/292730` opens Steam's install dialog for the game; `steam://open/main` starts Steam. iw7-mod exits with a message when Steam is not running (`steam_proxy.cpp`).
 - **Player name.** iw7-mod registers the `name` dvar with the default "Unknown Soldier" and the saved flag, and reports it as the local player's name (`get_login_username`, `live_get_local_client_name` in `patches.cpp`, the same in v1.1.0 and develop). Its Steam stand-in answers `GetPersonaName` with "1337" (`steam/interfaces/friends.cpp`), so the Steam name is never used. `name <new name>` in the console changes it, and it is saved. Steam keeps each account's display name in `<Steam>\config\loginusers.vdf` (`"PersonaName"`, with `"MostRecent" "1"` on the last account) `[STEAM]`, and the logged-in account's 32-bit id in `HKCU\Software\Valve\Steam\ActiveProcess\ActiveUser` (SteamID64 = 76561197960265728 + id) `[STEAM]`.
 
-## 18. Character pictures pack: x64-zt `[ZT]`
+## 18. Character pictures pack: x64-zt `[ZT]` `[LISTING]`
 
-The setup (and `installer/IXPictures.ps1`) builds `iw7-mod/zone/ix_portraits.ff` with x64-zt (README "Character pictures"). These facts come from x64-zt's source; R-PK1 confirms them on a real install.
+The setup (and `installer/IXPictures.ps1`) builds `iw7-mod/zone/ix_portraits.ff` with x64-zt (README "Character pictures"). `[ZT]` facts come from x64-zt's source. `[LISTING]` facts come from aurora's IW7 asset listing (`iw7_asset_listing.zip`, linked from `auroramod/docs` "zonetool-basics"), which lists every zone's assets. The first real run (2026-10-07) is under "What went wrong".
 
 - **The tool.**
   - One `zonetool.exe` serves several games and picks the game by the executable in the current folder: `iw7_ship.exe` means IW7 (`main.cpp`). It must run in the game folder, and its README lists IW7 as supported, "no custom maps".
   - It loads the game binary, answers Steam's API itself, and sets the game up without renderer, sound or menus. It then loads `code_pre_gfx`, `code_post_gfx` and `common`, and runs the game's command buffer every 5 ms (`component/iw7/zonetool.cpp`).
-  - Releases: the tag `latest`, asset "Release zonetool.zip" holding `zonetool.exe` (`.github/workflows/build.yml`).
+  - Releases: the tag `latest`, asset "Release zonetool.zip" (GitHub names it `Release.zonetool.zip`) holding `zonetool.exe` and its symbols, `zonetool.pdb` (`.github/workflows/build.yml`). `zonetool.exe` itself is based at `0x160000000`; the game is mapped at `0x140000000`.
+  - A crash shows "ZoneTool ERROR: Fatal error (<code>) at <address>" and saves `minidumps\zonetool-crash-<time>.zip` (`crash.dmp`, `info.txt`) in the game folder (`component/exception.cpp`). The address is the raw one; `llvm-symbolizer --obj=zonetool.exe <address>`, with the release's `zonetool.pdb` beside it, names the function.
+- **IW7's zones** `[LISTING]` `[ZT]`.
+  - A zone's materials, techsets and shaders are in a companion zone, `techsets_<zone>`. For example, `material,zm_character_select_hoff` is in `techsets_ui_boot`, its image in `ui_boot`. The game also loads `patch_<zone>` and the language zone (`eng_<zone>`) with a zone.
+  - x64-zt's and iw7-mod's `loadzone` set `DB_ZONE_CUSTOM`, which skips those companion zones ("Don't load extra zones with loadzone", `fastfiles.cpp`). Each one must be named.
+  - `techsets_ui_boot` holds no techsets of its own. The `2d` techset is in `code_post_gfx`, which is always loaded.
+  - Where the 50 character cards are: `cp_zmb` (Spaceland's ten), `patch_cp_zmb` (Willard's two), `cp_rave`, `cp_disco`, `cp_final` (their own), `cp_town` (all but Elvira's main card), `eng_cp_town` and `eng_patch_cp_town` (Elvira's main card). Each map zone has 4,300 to 5,400 images.
 - **Console** (`component/iw7/console.cpp`).
   - A thread reads standard input with `std::getline` and passes each non-empty line to the game's command buffer.
   - At the end of the input, `getline` fails without clearing the line, and the loop sends the last command again, endlessly. **The input must stay open** until x64-zt exits.
   - "ZoneTool initialization complete!" is printed once the setup is done, before the commands are registered and before the buffer runs, so commands typed after that line are not lost.
   - Messages are `printf` on standard output; `-unbuffered-io` turns off its buffering (`main.cpp`).
-  - Fatal errors show a message box.
 - **Commands** (`zonetool/iw7/zonetool.cpp`).
   - `loadzone <zone>` loads with `DB_ZONE_GAME | DB_ZONE_CUSTOM`, synchronously. It first waits for loads in progress (`wait_for_database`), then says `zone "<zone>" is already loaded...` for a loaded zone. That makes a repeated `loadzone` a wait for everything before it. A missing file gets `Zone "<zone>" could not be found!`, without waiting.
-  - `unloadzones` unloads them.
-  - `dumpasset <type> <name>` writes below `dump\assets\`, or prints "Asset not found".
-  - `quit` is `std::quick_exit(EXIT_SUCCESS)`.
-  - On the command line, `-buildzone <zone>` builds, then exits; `-dds` makes image dumps DDS files.
+  - `dumpzone <game> <zone> <types>` (for example `dumpzone iw7 cp_zmb image`) loads a zone that is not loaded yet and dumps its assets of those types *while it loads*, to `dump\<zone>\`. It returns when the load has finished (`dump_zone`).
+  - `dumpasset <type> <name>` dumps a loaded asset to `dump\assets\`, or prints "Asset not found".
+  - `quit` is `std::quick_exit(EXIT_SUCCESS)`. On the command line, `-buildzone <zone>` builds, then exits.
+- **What is safe to dump after a load.**
+  - An image's pixels are in the zone's temporary block (`XFILE_BLOCK_TEMP`; `gfx_image::write` puts them there), which the game frees once the zone has loaded. A material's data is in the permanent block (`XFILE_BLOCK_VIRTUAL`).
+  - So `dumpasset material` works after `loadzone`, and an image must be dumped with `dumpzone` while its zone loads.
+  - **What went wrong** on the first real run, 2026-10-07: `dumpasset image` after `loadzone` crashed x64-zt on every map, "Fatal error (0xC0000005) at 0x000000016064530D". With the release's symbols, that address is in `memmove` (`memcpy.asm`), at its first read from the source (`vmovdqu (%rdx)`): the copy read the freed pixels.
 - **Dumped files.**
   - A material gives `materials\<name>.json` (with `"techniqueSet->name"` and `textureTable[].image`). It also gives its per-material techset files, `techsets\<kind>\<techset>\<material>.<ext>` (`material.cpp`, `techset.cpp`).
-  - An image dumped with `-dds` is `images\<name>.dds`, or `streamed_images\<name>_stream<n>.dds` for a streamed image (`gfximage.cpp`). For a streamed image, `dumpasset` reads the stream table position left over from the last zone load, so that result is unreliable. The HUD's pictures are not expected to be streamed.
+  - `dumpzone … image` gives `images\<name>.iw7Image` per image, x64-zt's own format (`gfx_image::dump`): the image header, its name, then its pixels when the zone holds them, or its place in the game's `imagefile<n>.pak` when the game streams it. (`-dds` would also write a DDS of every image, reading the game's pak files for each one.)
 - **Building** (`zonetool.cpp` `parse_csv_file`, `material.cpp`, `gfximage.cpp`).
   - `zone_source\<zone>.csv` holds rows of these kinds:
     - `//` comments.
     - `require,<zone>`: loads a zone first and waits for it.
-    - `<type>,<name>`: an asset parsed from `zonetool\<zone>\`.
+    - `<type>,<name>`: an asset parsed from `zonetool\<zone>\` (searched first), then `zonetool\`.
     - `<type>,,<name>`: a reference to an asset of that name, resolved when the game loads the zone.
-  - A material comes from `materials\<name>.json`. Its images come from `images\<name>.dds` or `.tga`; they are stored in the zone, not streamed, so no `.pak` file is written.
+  - A material comes from `materials\<name>.json`. Its images come from `images\<name>.iw7Image` first, then `.dds` or `.tga`. The zone gets an image under the name the material asks for (`this->name()` in `gfx_image::write`), whatever name is inside the file, so a renamed copy of a dumped image works.
   - The material's techset is looked up among the loaded zones and added to the new zone, unless the zone already has it or a reference to it. Missing per-material techset files fall back to any file of that kind in the techset's folder (`get_parse_path`).
   - The zone is written to `zone\<zone>.ff` when the current folder has `zone\`, otherwise to the current folder (`zone_buffer::save`).
-- **Asset type names** come from the game's own table (`g_assetNames`, read at run time), which is not in the source. `material` and `techset` appear in x64-zt's README and the docs' zone source example (H1). That IW7 also names them `material`, `techset` and `image` is assumed, not verified:
-  - If `techset` were wrong, x64-zt would skip that row and copy the techset into the pack.
-  - If `material` or `image` were wrong, `dumpasset` gets no valid type (it does not check), and the runs would fail. The log of R-PK1 shows it.
+- **Asset type names** come from the game's own table (`g_assetNames`, read at run time), which is not in the source. `material` and `techset` appear in x64-zt's README and the docs' zone source example (H1), and the IW7 asset listing names `image`, `material` and `techset` the same way. If `techset` were wrong, x64-zt would skip that row and copy the techset into the pack.
 - **How the mod uses it.**
   - The setup runs the build once, after the first install, in a second runspace while its window shows the progress. `Build Character Pictures.cmd` runs the same function (`Invoke-IXPictureBuild`) in a console.
-  - `IXPictures.Core.ps1` runs x64-zt once per map: it loads the map's zones, names the first zone again to wait, dumps the 50 cards named in each map's `playercash_images` table (§16), then quits. When the build stops early (an error, or the window closing), x64-zt's process is ended and its files removed.
-  - Each card becomes a material patterned on the stock menu material `zm_character_select_hoff`, with `require,ui_boot` and a `techset,,<name>` reference, so the pack never replaces the game's shaders.
+  - `IXPictures.Core.ps1` runs x64-zt once per map. The first run loads `ui_boot` and `techsets_ui_boot`, waits for them and dumps the pattern material. Each run then sends `dumpzone iw7 <zone> image` for each zone holding the map's cards, and quits.
+  - Two failed maps in a row stop the remaining runs, so that one crash does not mean five error boxes. When the build stops early (an error, or the window closing), x64-zt's process is ended and its files removed.
+  - Each card becomes a material patterned on the stock menu material `zm_character_select_hoff`, with the card's `.iw7Image` renamed to match.
+  - The build input has `require,ui_boot`, `require,techsets_ui_boot` and a `techset,,<name>` reference, so the pack never replaces the game's shaders.
   - The menu loads the pack with iw7-mod's `loadzone` (§16).

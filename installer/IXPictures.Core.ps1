@@ -6,13 +6,16 @@
 # fastfile, iw7-mod\zone\ix_portraits.ff, from the player's own game files:
 #
 #   1. x64-zt (github.com/Joelrau/x64-zt), the fastfile tool iw7-mod's own
-#      documentation describes, runs in the game folder with -dds, once per
-#      map, and dumps through its console: one stock menu material as a
-#      pattern (zm_character_select_hoff, in ui_boot) and the map's character
-#      cards as DDS images.
+#      documentation describes, runs in the game folder once per map. Through
+#      its console it dumps one stock menu material as a pattern
+#      (zm_character_select_hoff, from techsets_ui_boot) and every image of
+#      the map's zones, in its own .iw7Image format, while the zones load.
+#      Images can only be dumped then: their pixels are freed once a zone has
+#      loaded (IW_API_NOTES.md section 18).
 #   2. Each card becomes a material of its own, named ix_card_* / ix_icon_*, so
-#      nothing clashes with the game's own names. The materials refer to the
-#      pattern's techset (its shaders) instead of copying it.
+#      nothing clashes with the game's own names, with the card's .iw7Image
+#      renamed to match. The materials refer to the pattern's techset (its
+#      shaders, in code_post_gfx) instead of copying it.
 #   3. x64-zt builds the zone (-buildzone ix_portraits), and the result goes to
 #      <game>\iw7-mod\zone\, where iw7-mod finds custom zones (fastfiles.cpp).
 #      The menu script loads it with iw7-mod's loadzone command.
@@ -23,7 +26,9 @@
 # compatible and ASCII only, like IXSetup.Core.ps1.
 
 $IXPictureTemplate = 'zm_character_select_hoff'
-$IXPictureTemplateZone = 'ui_boot'
+# The zone of its image, then the zone of the material itself: IW7 keeps
+# materials in techsets_<zone>, which x64-zt's loadzone does not load by itself.
+$IXPictureTemplateZones = @('ui_boot', 'techsets_ui_boot')
 $IXZoneToolReleaseApi = 'https://api.github.com/repos/Joelrau/x64-zt/releases/tags/latest'
 $IXZoneToolCopyName = 'ix-zonetool.exe'
 $IXZoneToolReady = 'initialization complete'
@@ -44,8 +49,9 @@ function Write-IXPictureLog {
 }
 
 # The language zones of a map: <xxx>_<map>.ff in the game's zone\ folder or a
-# language folder under it (eng_cp_town in English). eng_<map> when none is
-# found, which x64-zt reports as missing and skips.
+# language folder under it (eng_cp_town in English), then their patches
+# (<xxx>_patch_<map>), whose images replace the others. eng_<map> and
+# eng_patch_<map> when none is found; x64-zt reports a missing zone and skips it.
 function Get-IXLanguageZones {
     param([string]$GameDir, [string]$Map)
     $found = @()
@@ -55,17 +61,19 @@ function Get-IXLanguageZones {
     }
     if ($zoneDir -and [IO.Directory]::Exists($zoneDir)) {
         $folders = @($zoneDir) + @([IO.Directory]::GetDirectories($zoneDir))
-        foreach ($folder in $folders) {
-            foreach ($path in [IO.Directory]::GetFiles($folder, ('*_' + $Map + '.ff'))) {
-                $name = [IO.Path]::GetFileNameWithoutExtension($path)
-                if ($name -cmatch ('^[a-z]{3}_' + [regex]::Escape($Map) + '$') -and $found -notcontains $name) {
-                    $found += $name
+        foreach ($pattern in @(('^[a-z]{3}_' + [regex]::Escape($Map) + '$'), ('^[a-z]{3}_patch_' + [regex]::Escape($Map) + '$'))) {
+            foreach ($folder in $folders) {
+                foreach ($path in [IO.Directory]::GetFiles($folder, ('*_' + $Map + '.ff'))) {
+                    $name = [IO.Path]::GetFileNameWithoutExtension($path)
+                    if ($name -cmatch $pattern -and $found -notcontains $name) {
+                        $found += $name
+                    }
                 }
             }
         }
     }
     if ($found.Count -eq 0) {
-        $found = @('eng_' + $Map)
+        $found = @(('eng_' + $Map), ('eng_patch_' + $Map))
     }
     return $found
 }
@@ -75,8 +83,9 @@ function Get-IXLanguageZones {
 # the game's cp/zombies/<map>_playercash_images.csv: a team card ("icon") per
 # character, and the main card with "team" replaced by "main" (IW_API_NOTES.md
 # section 16). Regular characters get one card per map; special characters
-# only exist on their own map. Elvira's main card is in the language zone of
-# her map; $GameDir is where to look for it.
+# only exist on their own map. Zones are listed so that a later one replaces
+# an earlier one's image (patch_cp_zmb holds Willard's cards; Elvira's main card
+# is in the language zones of her map, found in $GameDir).
 function Get-IXPicturePlan {
     param([string]$GameDir)
     $cast = @('sally', 'poindexter', 'andre', 'aj')
@@ -112,10 +121,16 @@ function Get-IXPicturePlan {
 # The x64-zt runs that dump the pattern material and every card: one run per
 # map, so that a map that fails (not installed, or x64-zt stops) costs only its
 # own cards. Each run types its commands into x64-zt's console and quits.
-# loadzone waits for the zones loading before it (x64-zt load_zone and
-# wait_for_database), so the map's first zone is named once more after the
-# others: that returns once all of them are loaded, and the dumps that follow
-# find the cards. The first run also dumps the pattern material.
+#
+# The first run loads the pattern's zones, names the first one again (loadzone
+# waits for the loads before it: load_zone, wait_for_database) and dumps the
+# material, which lives in permanent zone memory. It must come before any
+# dumpzone, whose type filter stays set for the rest of the run
+# (asset_type_filter) and would keep a material from being dumped. Images cannot be dumped that
+# way: their pixels are in the zone's temporary block, freed after the load,
+# and "dumpasset image" then reads freed memory (x64-zt crashed on every map,
+# 2026-10-07). "dumpzone iw7 <zone> image" dumps a zone's images while it loads
+# and returns when it has (dump_zone), to dump\<zone>\images\<name>.iw7Image.
 function Get-IXPictureDumpRuns {
     param($Plan)
     $runs = @()
@@ -123,15 +138,14 @@ function Get-IXPictureDumpRuns {
     foreach ($map in @($Plan)) {
         $commands = @()
         if ($first) {
-            $commands += @(('loadzone ' + $IXPictureTemplateZone), ('loadzone ' + $IXPictureTemplateZone), ('dumpasset material ' + $IXPictureTemplate))
+            foreach ($zone in $IXPictureTemplateZones) {
+                $commands += 'loadzone ' + $zone
+            }
+            $commands += @(('loadzone ' + $IXPictureTemplateZones[0]), ('dumpasset material ' + $IXPictureTemplate))
             $first = $false
         }
         foreach ($zone in $map.Zones) {
-            $commands += 'loadzone ' + $zone
-        }
-        $commands += 'loadzone ' + @($map.Zones)[0]
-        foreach ($image in $map.Images) {
-            $commands += 'dumpasset image ' + $image.Source
+            $commands += 'dumpzone iw7 ' + $zone + ' image'
         }
         $commands += 'quit'
         $runs += [pscustomobject]@{ Map = $map.Map; Title = $map.Title; Commands = $commands }
@@ -139,39 +153,34 @@ function Get-IXPictureDumpRuns {
     return $runs
 }
 
-# The best DDS x64-zt dumped for a stock image: images\<name>.dds, or the
-# largest of the streamed sizes, streamed_images\<name>_stream<n>.dds.
+# The dumped image of a card: dump\<zone>\images\<name>.iw7Image from the last
+# of $Zones that has it, or $null.
 function Find-IXDumpedImage {
-    param([string]$DumpRoot, [string]$Name)
-    $plain = Join-IXPath $DumpRoot @('images', ($Name + '.dds'))
-    if ([IO.File]::Exists($plain)) {
-        return $plain
-    }
-    $folder = Join-IXPath $DumpRoot @('streamed_images')
-    if (-not [IO.Directory]::Exists($folder)) {
-        return $null
-    }
-    $best = $null
-    $bestSize = -1
-    foreach ($path in [IO.Directory]::GetFiles($folder, ($Name + '_stream*.dds'))) {
-        $size = (New-Object System.IO.FileInfo $path).Length
-        if ($size -gt $bestSize) {
-            $best = $path
-            $bestSize = $size
+    param([string]$GameDir, [string[]]$Zones, [string]$Name)
+    $found = $null
+    foreach ($zone in @($Zones)) {
+        $path = Join-IXPath $GameDir @('dump', $zone, 'images', ($Name + '.iw7Image'))
+        if ([IO.File]::Exists($path)) {
+            $found = $path
         }
     }
-    return $best
+    return $found
 }
 
 # Writes x64-zt's build input for the pack from what it dumped:
-# zonetool\ix_portraits\ (a material per card, its DDS image, the pattern's
-# techset state files) and zone_source\ix_portraits.csv. Returns the materials
-# written and the stock images that were not dumped.
+# zonetool\ix_portraits\ (a material per card, its image as .iw7Image, the
+# pattern's techset state files) and zone_source\ix_portraits.csv. Returns the
+# materials written and the stock images that were not dumped.
+#
+# x64-zt reads an image from images\<name>.iw7Image and writes it under that
+# name (gfx_image::parse, write), so a renamed copy of the dump becomes the
+# card's image: its pixels when the zone holds them, else its place in the
+# game's own imagefile*.pak, which the game streams from as for any zone.
 #
 # The pattern's techset (its shaders) is the game's own, so the pack refers to
 # it instead of carrying a copy that would replace the game's for every menu:
 # a "techset,,<name>" row, which x64-zt adds as a reference (zonetool.cpp
-# parse_csv_file). "require,ui_boot" loads the pattern's zone first, so that
+# parse_csv_file). The "require" rows load the pattern's zones first, so that
 # x64-zt finds that techset while it builds.
 function New-IXPictureSource {
     param([string]$GameDir, $Plan)
@@ -224,7 +233,10 @@ function New-IXPictureSource {
     }
 
     $utf8 = New-Object System.Text.UTF8Encoding $false
-    $rows = @('// Infinite Expansion character pictures, built by installer\IXPictures.ps1', ('require,' + $IXPictureTemplateZone))
+    $rows = @('// Infinite Expansion character pictures, built by installer\IXPictures.ps1')
+    foreach ($zone in $IXPictureTemplateZones) {
+        $rows += 'require,' + $zone
+    }
     if ($techset) {
         $rows += 'techset,,' + $techset
     }
@@ -232,12 +244,12 @@ function New-IXPictureSource {
     $missing = @()
     foreach ($map in @($Plan)) {
         foreach ($image in $map.Images) {
-            $dds = Find-IXDumpedImage $dump $image.Source
-            if (-not $dds) {
+            $dumped = Find-IXDumpedImage $GameDir $map.Zones $image.Source
+            if (-not $dumped) {
                 $missing += $image.Source
                 continue
             }
-            [IO.File]::Copy($dds, (Join-IXPath $images @($image.Name + '.dds')), $true)
+            [IO.File]::Copy($dumped, (Join-IXPath $images @($image.Name + '.iw7Image')), $true)
             $text = $templateText.Replace($quoted, '"' + $image.Name + '"')
             [IO.File]::WriteAllText((Join-IXPath $materials @($image.Name + '.json')), $text, $utf8)
             foreach ($state in $stateFiles) {
@@ -526,19 +538,32 @@ function Invoke-IXPictureBuild {
         $plan = Get-IXPicturePlan $GameDir
         $runs = @(Get-IXPictureDumpRuns $plan)
         $step = 0
+        $failedInARow = 0
         foreach ($run in $runs) {
             $step++
+            # Two maps failing in a row means x64-zt fails on every map; the
+            # rest would only fail too, each with its own error box.
+            if ($failedInARow -ge 2) {
+                $failed += $run.Title + ': skipped after two maps failed in a row'
+                & $report ('skipped ' + $run.Map + ': two maps failed in a row') $false
+                continue
+            }
             & $report ('Copying the character cards of ' + $run.Title + ' (' + $step + ' of ' + $runs.Count + ')') $true
             try {
-                $result = Invoke-IXZoneTool $GameDir $exe @('-dds', '-unbuffered-io') $run.Commands $lines
+                $result = Invoke-IXZoneTool $GameDir $exe @('-unbuffered-io') $run.Commands $lines
                 & $report ('x64-zt exit code: ' + $result.ExitCode) $false
                 if ($result.ExitCode -ne 0) {
                     $failed += $run.Title + ': x64-zt stopped early (exit code ' + $result.ExitCode + ')'
+                    $failedInARow++
+                }
+                else {
+                    $failedInARow = 0
                 }
             }
             catch {
                 $failed += $run.Title + ': ' + $_.Exception.Message
                 & $report ('x64-zt failed on ' + $run.Map + ': ' + $_.Exception.Message) $false
+                $failedInARow++
             }
         }
 
