@@ -8,14 +8,25 @@
 // names scripts cannot see, so the card has no picture (KNOWN_LIMITATIONS.md
 // L28); the stock portrait itself does follow the chosen character.
 //
-// Settings (unset = default):
-//   ix_player_card    1   0 hides the card
-//   ix_player_card_x  16  distance from the right edge  (640 x 480 virtual screen)
-//   ix_player_card_y  96  distance from the bottom edge, above the ammo counter
+// Settings (config.gsc; console: set ix_<id> <value>, chat: !ix set <id> <value>):
+//   player_card    1   feature (features.gsc): 0 hides the card at once
+//   player_card_x  16  distance from the right edge  (640 x 480 virtual screen)
+//   player_card_y  96  distance from the bottom edge, above the ammo counter
 
 register()
 {
-    level thread watch_spawns();
+    feature = custom_scripts\ix\core\features::add( "player_card", "hud", "Player card", "The card in the bottom-right corner naming your character.", 1 );
+    feature.on_player = ::apply_player_card;
+    custom_scripts\ix\core\config::add_int( "player_card_x", 16, 0, 600, "Player card: right margin", "Distance from the right edge of a 640 x 480 screen.", undefined );
+    custom_scripts\ix\core\config::add_int( "player_card_y", 96, 0, 440, "Player card: bottom margin", "Distance from the bottom edge of a 640 x 480 screen.", undefined );
+    custom_scripts\ix\core\events::subscribe( "player_spawn", ::on_spawn );
+}
+
+// Switched off: gone at once. Switched on: card_loop shows it within half a second.
+apply_player_card( enabled )
+{
+    if ( !enabled && isdefined( self.ix ) )
+        hide_card();
 }
 
 card_width()
@@ -28,17 +39,10 @@ card_height()
     return 34;
 }
 
-watch_spawns()
+on_spawn( player )
 {
-    level endon( "game_ended" );
-
-    for (;;)
-    {
-        level waittill( "ix_player_spawned", player );
-
-        if ( !isdefined( player.ix.card_running ) )
-            player thread card_loop();
-    }
+    if ( custom_scripts\ix\core\util::is_valid_player( player ) && isdefined( player.ix ) && !isdefined( player.ix.card_running ) )
+        player thread card_loop();
 }
 
 card_loop()
@@ -51,7 +55,7 @@ card_loop()
     {
         entry = custom_scripts\ix\player\character::entry_for_num( self.player_character_num );
 
-        if ( isdefined( entry ) && custom_scripts\ix\core\util::dvar_int( "ix_player_card", 1 ) != 0 )
+        if ( isdefined( entry ) && custom_scripts\ix\core\features::is_enabled( "player_card" ) )
             show_card( entry );
         else
             hide_card();
@@ -62,8 +66,8 @@ card_loop()
 
 show_card( entry )
 {
-    margin_x = custom_scripts\ix\core\util::dvar_int( "ix_player_card_x", 16 );
-    margin_y = custom_scripts\ix\core\util::dvar_int( "ix_player_card_y", 96 );
+    margin_x = custom_scripts\ix\core\config::get( "player_card_x" );
+    margin_y = custom_scripts\ix\core\config::get( "player_card_y" );
 
     if ( isdefined( self.ix.card ) && ( self.ix.card.margin_x != margin_x || self.ix.card.margin_y != margin_y ) )
         hide_card();

@@ -11,10 +11,12 @@ Run: python3 -m unittest discover -s tools/tests -v
 """
 import hashlib
 import http.server
+import importlib.util
 import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import tempfile
 import threading
@@ -33,6 +35,10 @@ PICTURES_CORE = INSTALLER / "IXPictures.Core.ps1"
 PICTURES = INSTALLER / "IXPictures.ps1"
 PICTURES_LAUNCHER = REPO / "Build Character Pictures.cmd"
 FAKE_ZONETOOL = Path(__file__).resolve().parent / "fake_zonetool.py"
+FAKE_CSC = Path(__file__).resolve().parent / "fake_csc.py"
+GAME_LAUNCHER_SOURCE = INSTALLER / "IXLauncher.cs"
+GAME_LAUNCHER_ICON = INSTALLER / "ix-launcher.ico"
+ICON_TOOL = REPO / "tools" / "make_launcher_icon.py"
 PACKAGE = REPO / "mods" / "infinite_expansion"
 LINT = Path(__file__).resolve().parent / "ps51_lint.ps1"
 
@@ -109,6 +115,11 @@ def run_pwsh(script_text, *args, workdir):
     return result
 
 
+def package_version():
+    text = (PACKAGE / "custom_scripts" / "ix" / "core" / "bootstrap.gsc").read_text()
+    return re.search(r'level\.ix\.version\s*=\s*"([^"]+)"', text).group(1)
+
+
 def payload_files():
     files = []
     for folder in ("custom_scripts", "ui_scripts"):
@@ -146,6 +157,62 @@ def make_game(root, vdf_style="new"):
     shutil.copytree(PACKAGE, old_copy)
     (old_copy / "notes.txt").write_text("the player's own file")
     return steam, game
+
+
+def make_windows(root, config=None):
+    """A Windows folder whose .NET Framework 4 holds the stand-in C# compiler
+    (fake_csc.py); returns the Windows folder and the compiler's folder."""
+    windows = Path(root) / "Windows"
+    framework = windows / "Microsoft.NET" / "Framework64" / "v4.0.30319"
+    framework.mkdir(parents=True)
+    shutil.copy(FAKE_CSC, framework / "csc.exe")
+    (framework / "csc.exe").chmod(0o755)
+    if config is not None:
+        (framework / "fake_csc.json").write_text(json.dumps(config))
+    return windows, framework
+
+
+def without_windows():
+    """This environment without WINDIR: no C# compiler to find."""
+    env = dict(os.environ)
+    env.pop("WINDIR", None)
+    return env
+
+
+def split_command_line(line):
+    """Splits a command line the way Windows programs do (CommandLineToArgvW)."""
+    args, current, in_arg, quoted, i = [], [], False, False, 0
+    while i < len(line):
+        c = line[i]
+        if c == "\\":
+            end = i
+            while end < len(line) and line[end] == "\\":
+                end += 1
+            count = end - i
+            if end < len(line) and line[end] == '"':
+                current.append("\\" * (count // 2))
+                if count % 2:
+                    current.append('"')
+                    end += 1
+            else:
+                current.append("\\" * count)
+            in_arg = True
+            i = end
+            continue
+        if c == '"':
+            quoted = not quoted
+            in_arg = True
+        elif c in " \t" and not quoted:
+            if in_arg:
+                args.append("".join(current))
+                current, in_arg = [], False
+        else:
+            current.append(c)
+            in_arg = True
+        i += 1
+    if in_arg:
+        args.append("".join(current))
+    return args
 
 
 @unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
@@ -318,9 +385,9 @@ class NewerFiles(unittest.TestCase):
 class SetupScriptWithoutWindow(unittest.TestCase):
     """installer/IXSetup.ps1 -NoWindow: the setup script itself, minus WPF."""
 
-    def run_setup(self, *args):
+    def run_setup(self, *args, env=None):
         return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(GUI), "-NoWindow", *args],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, env=env if env is not None else without_windows())
 
     def test_install_and_uninstall(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -330,11 +397,34 @@ class SetupScriptWithoutWindow(unittest.TestCase):
             self.assertIn(f"Installed {len(payload_files())} files", result.stdout)
             self.assertTrue((game / "iw7-mod" / "custom_scripts" / "cp" / "ix_main.gsc").is_file())
             self.assertTrue((game / "iw7-mod" / "infinite-expansion.json").is_file())
+            # No C# compiler here: the mod is installed all the same.
+            self.assertIn("The launcher could not be built: the C# compiler of .NET Framework 4 (csc.exe) was not found."
+                          " Start the game with iw7-mod.exe.", result.stdout)
+            self.assertFalse((game / "Infinite Expansion.exe").exists())
             result = self.run_setup("-Uninstall", "-GameDir", str(game))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(f"Removed {len(payload_files())} files", result.stdout)
             self.assertFalse((game / "iw7-mod" / "custom_scripts" / "cp" / "ix_main.gsc").exists())
             self.assertTrue((game / "iw7-mod" / "custom_scripts" / "cp" / "other_mod.gsc").is_file())
+
+    def test_install_builds_the_launcher(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            windows, framework = make_windows(Path(tmp))
+            env = dict(without_windows(), WINDIR=str(windows))
+            result = self.run_setup("-GameDir", str(game), "-NoPictures", env=env)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            launcher = game / "Infinite Expansion.exe"
+            self.assertIn(f"Launcher: {launcher}", result.stdout)
+            built = json.loads(launcher.read_bytes()[2:])
+            self.assertTrue(built["launcher"])
+            self.assertEqual(built["icon"], str(GAME_LAUNCHER_ICON))
+            self.assertEqual(built["version"], package_version() + ".0" * (3 - package_version().count(".")))
+            result = self.run_setup("-Uninstall", "-GameDir", str(game), env=env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Removed Infinite Expansion.exe.", result.stdout)
+            self.assertFalse(launcher.exists())
+            self.assertEqual(len((framework / "fake_csc.log").read_text().splitlines()), 1)
 
     def test_wrong_folder_fails_cleanly(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1171,6 +1261,203 @@ class PicturesScript(unittest.TestCase):
             self.assertFalse((game / "fake_zonetool.log").exists())
 
 
+SCENARIO_LAUNCHER_SOURCE = r"""
+param([string]$Source, [string]$Work, [string]$Out)
+$ErrorActionPreference = 'Stop'
+# The launcher is written for the C# 5 compiler of .NET Framework 4; PowerShell 7
+# compiles it here with C# 5 rules (the .NET 8 reference assemblies it needs
+# are all in mscorlib and System.dll on .NET Framework).
+$references = @('Microsoft.Win32.Registry', 'System.Diagnostics.Process', 'System.ComponentModel.Primitives',
+    'System.Threading', 'System.Threading.Thread')
+$dll = Join-Path $Work 'launcher.dll'
+Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -OutputAssembly $dll -OutputType Library -CompilerOptions '/langversion:5' -ReferencedAssemblies $references
+$type = [Reflection.Assembly]::LoadFrom($dll).GetType('InfiniteExpansion.Launcher')
+$result = [ordered]@{}
+$arguments = [string[]]@('+set', 'a b', '', 'x"y', 'C:\dir\', 'C:\my dir\', 'a\\"b', "tab`there")
+$result.line = $type.GetMethod('BuildArguments').Invoke($null, @(,$arguments))
+$result.empty = $type.GetMethod('BuildArguments').Invoke($null, @(,[string[]]@()))
+# /langversion:5 really refuses newer C#, so the compile above means something.
+try {
+    Add-Type -TypeDefinition 'public static class IXNewer { public static string F(string s) { return s?.Trim(); } }' -CompilerOptions '/langversion:5'
+    $result.newer = 'accepted'
+}
+catch {
+    $result.newer = 'refused'
+}
+ConvertTo-Json -InputObject $result | Set-Content -LiteralPath $Out
+"""
+
+SCENARIO_LAUNCHER = r"""
+param([string]$Core, [string]$Steam, [string]$Package, [string]$Installer, [string]$Windows, [string]$Temp, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$env:WINDIR = $Windows
+$env:TMPDIR = $Temp
+$result = [ordered]@{}
+$game = Find-IXGameDir -SteamRoots @($Steam)
+$result.compiler = Find-IXCSharpCompiler
+$result.versions = @(foreach ($v in @('0.2.0', '1.2.3.4', '7', '0.2.0-beta', '', '12345.1', '1.2.3.4.5')) { Get-IXLauncherVersion $v })
+Install-IX $game $Package | Out-Null
+$result.before = (Get-IXState $game $Package).LauncherFound
+$result.install = Install-IXLauncher $game $Installer '0.2.0'
+$result.after = (Get-IXState $game $Package).LauncherFound
+$exe = Get-IXLauncherPath $game
+$result.built = [IO.File]::ReadAllText($exe)
+$compilerDir = Split-Path -Parent $result.compiler
+# A compiler that refuses the icon: built again without it.
+[IO.File]::WriteAllText((Join-Path $compilerDir 'fake_csc.json'), '{"no_icon": true}')
+$result.noIcon = New-IXLauncher $game $Installer '0.2.0'
+$result.builtNoIcon = [IO.File]::ReadAllText($exe)
+# A failing compiler: its error line, and the launcher already there stays.
+[IO.File]::WriteAllText((Join-Path $compilerDir 'fake_csc.json'), '{"fail": true}')
+try {
+    New-IXLauncher $game $Installer '0.2.0' | Out-Null
+    $result.failure = 'none'
+}
+catch {
+    $result.failure = $_.Exception.Message
+}
+$result.keptAfterFailure = [IO.File]::Exists($exe)
+$result.leftovers = @(Get-ChildItem -LiteralPath $Temp -Force | ForEach-Object { $_.Name })
+$env:WINDIR = Join-Path $Temp 'nowhere'
+try {
+    New-IXLauncher $game $Installer '0.2.0' | Out-Null
+    $result.noCompiler = 'none'
+}
+catch {
+    $result.noCompiler = $_.Exception.Message
+}
+$result.uninstall = Uninstall-IX $game $Package
+$result.removed = -not [IO.File]::Exists($exe)
+$result.uninstallAgain = (Uninstall-IX $game $Package).LauncherRemoved
+ConvertTo-Json -InputObject $result -Depth 5 | Set-Content -LiteralPath $Out
+"""
+
+SCENARIO_LAUNCHER_IN_USE = r"""
+param([string]$Core, [string]$Steam, [string]$Package, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$game = Find-IXGameDir -SteamRoots @($Steam)
+Install-IX $game $Package | Out-Null
+[IO.File]::WriteAllText((Get-IXLauncherPath $game), 'MZ')
+# As on Windows while the launcher still waits for Steam: deleting it fails.
+function Remove-IXLauncher {
+    param([string]$GameDir)
+    throw [UnauthorizedAccessException]::new('Access to the path is denied.')
+}
+$result = Uninstall-IX $game $Package
+$result | Add-Member -NotePropertyName After -NotePropertyValue (Get-IXState $game $Package)
+ConvertTo-Json -InputObject $result -Depth 4 | Set-Content -LiteralPath $Out
+"""
+
+SCENARIO_START = r"""
+param([string]$Core, [string]$Game, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$log = Join-Path $Game 'started.log'
+function Wait-IXStarted([int]$Lines) {
+    for ($i = 0; $i -lt 100; $i++) {
+        if ([IO.File]::Exists($log) -and @([IO.File]::ReadAllLines($log)).Count -ge $Lines) {
+            return
+        }
+        Start-Sleep -Milliseconds 100
+    }
+}
+$result = [ordered]@{}
+$result.withoutLauncher = Start-IXGame $Game
+Wait-IXStarted 1
+[IO.File]::WriteAllText((Get-IXLauncherPath $Game), "#!/bin/sh`necho launcher `"`$PWD`" >> started.log`n")
+& chmod 755 (Get-IXLauncherPath $Game)
+$result.withLauncher = Start-IXGame $Game
+Wait-IXStarted 2
+$result.started = @([IO.File]::ReadAllLines($log))
+ConvertTo-Json -InputObject $result | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class GameLauncher(unittest.TestCase):
+    """installer/IXLauncher.cs and how the setup builds, starts and removes it.
+    The C# compiler of .NET Framework 4 only exists on Windows; here a stand-in
+    (fake_csc.py) takes its place, and PowerShell 7 compiles the source itself
+    with C# 5 rules."""
+
+    def test_source_compiles_as_csharp_5(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out.json"
+            run_pwsh(SCENARIO_LAUNCHER_SOURCE, GAME_LAUNCHER_SOURCE, tmp, out, workdir=tmp)
+            result = json.loads(out.read_text())
+            self.assertEqual(result["newer"], "refused")
+            self.assertEqual(result["empty"], "")
+            self.assertEqual(split_command_line(result["line"]),
+                             ["+set", "a b", "", 'x"y', "C:\\dir\\", "C:\\my dir\\", 'a\\\\"b', "tab\there"])
+
+    def test_source_has_no_mode_flag_and_one_placeholder(self):
+        source = GAME_LAUNCHER_SOURCE.read_text()
+        # -zombies / -cpMode only work on a dedicated server (IW_API_NOTES section 14).
+        self.assertNotIn('"-zombies', source)
+        self.assertNotIn('"-cpMode', source)
+        self.assertEqual(source.count('AssemblyVersion("0.0.0.0")'), 1)
+        self.assertIn('FindWindowW(null, "Steam")', source)
+
+    def test_build_replace_and_remove(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            steam, game = make_game(Path(tmp))
+            windows, framework = make_windows(Path(tmp))
+            temp = Path(tmp) / "temp"
+            temp.mkdir()
+            out = Path(tmp) / "out.json"
+            run_pwsh(SCENARIO_LAUNCHER, CORE, steam, PACKAGE, INSTALLER, windows, temp, out, workdir=tmp)
+            r = json.loads(out.read_text())
+            self.assertEqual(r["compiler"], str(framework / "csc.exe"))
+            self.assertEqual(r["versions"], ["0.2.0.0", "1.2.3.4", "7.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0", "0.0.0.0"])
+            self.assertFalse(r["before"])
+            self.assertTrue(r["after"])
+            self.assertEqual(r["install"]["Path"], str(game / "Infinite Expansion.exe"))
+            self.assertTrue(r["install"]["Icon"])
+            self.assertIsNone(r["install"]["Shortcut"])  # no desktop outside Windows
+            built = json.loads(r["built"][2:])
+            self.assertEqual(built, {"target": "winexe", "optimize": True, "references": ["System.dll"], "noconfig": True,
+                                     "icon": str(GAME_LAUNCHER_ICON), "icon_is_file": True, "version": "0.2.0.0",
+                                     "launcher": True})
+            self.assertFalse(r["noIcon"]["Icon"])
+            self.assertIsNone(json.loads(r["builtNoIcon"][2:])["icon"])
+            self.assertRegex(r["failure"], r"^the C# compiler failed: .*IXLauncher\.cs\(70,13\): error CS1002: ; expected$")
+            self.assertTrue(r["keptAfterFailure"])
+            self.assertEqual(r["leftovers"], [])
+            self.assertEqual(r["noCompiler"], "the C# compiler of .NET Framework 4 (csc.exe) was not found")
+            self.assertTrue(r["uninstall"]["LauncherRemoved"])
+            self.assertTrue(r["removed"])
+            self.assertFalse(r["uninstallAgain"])
+            runs = [json.loads(line) for line in (framework / "fake_csc.log").read_text().splitlines()]
+            # Built, then refused with the icon and built without, then failed twice.
+            self.assertEqual(["win32icon" in run["options"] for run in runs], [True, True, False, True, False])
+
+    def test_uninstall_survives_a_launcher_in_use(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            steam, game = make_game(Path(tmp))
+            out = Path(tmp) / "out.json"
+            run_pwsh(SCENARIO_LAUNCHER_IN_USE, CORE, steam, PACKAGE, out, workdir=tmp)
+            r = json.loads(out.read_text())
+            self.assertEqual(r["Removed"], len(payload_files()))
+            self.assertFalse(r["LauncherRemoved"])
+            self.assertEqual(r["LauncherLeft"], str(game / "Infinite Expansion.exe"))
+            self.assertFalse(r["After"]["Installed"])
+
+    def test_start_prefers_the_launcher(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            client = game / "iw7-mod.exe"
+            client.write_text('#!/bin/sh\necho client "$PWD" >> started.log\n')
+            client.chmod(0o755)
+            out = Path(tmp) / "out.json"
+            run_pwsh(SCENARIO_START, CORE, game, out, workdir=tmp)
+            r = json.loads(out.read_text())
+            self.assertEqual(r["withoutLauncher"], str(client))
+            self.assertEqual(r["withLauncher"], str(game / "Infinite Expansion.exe"))
+            self.assertEqual(r["started"], [f"client {game}", f"launcher {game}"])
+
+
 def xaml_tree():
     return ET.parse(XAML).getroot()
 
@@ -1181,9 +1468,35 @@ def local(tag):
 
 class SetupFiles(unittest.TestCase):
     def test_scripts_are_ascii(self):
-        for path in (CORE, GUI, LINT, LAUNCHER, PICTURES_CORE, PICTURES, PICTURES_LAUNCHER):
+        for path in (CORE, GUI, LINT, LAUNCHER, PICTURES_CORE, PICTURES, PICTURES_LAUNCHER, GAME_LAUNCHER_SOURCE):
             data = path.read_bytes()
             self.assertTrue(all(b < 128 for b in data), f"{path.name} has non-ASCII bytes")
+
+    def test_launcher_icon_is_classic_bitmaps(self):
+        # The C# 5 compiler may refuse PNG images in /win32icon (tools/make_launcher_icon.py).
+        data = GAME_LAUNCHER_ICON.read_bytes()
+        reserved, kind, count = struct.unpack_from("<HHH", data, 0)
+        self.assertEqual((reserved, kind), (0, 1))
+        sizes = []
+        for index in range(count):
+            width, height, _, _, planes, bits, size, offset = struct.unpack_from("<BBBBHHII", data, 6 + 16 * index)
+            header = struct.unpack_from("<IiiHH", data, offset)
+            self.assertEqual(header, (40, width, height * 2, 1, 32), f"image {index}")
+            self.assertEqual((planes, bits), (1, 32))
+            self.assertEqual(size, 40 + width * height * 4 + ((width + 31) // 32) * 4 * height)
+            sizes.append(width)
+        self.assertEqual(sizes, [16, 24, 32, 48, 64, 128])
+
+    def test_launcher_icon_matches_ix_ico(self):
+        try:
+            import PIL  # noqa: F401
+        except ImportError:
+            self.skipTest("Pillow is not installed")
+        spec = importlib.util.spec_from_file_location("make_launcher_icon", ICON_TOOL)
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        self.assertEqual(tool.build((INSTALLER / "ix.ico").read_bytes()), GAME_LAUNCHER_ICON.read_bytes(),
+                         "run python3 tools/make_launcher_icon.py")
 
     def test_launcher_uses_crlf(self):
         for path, script in ((LAUNCHER, b"installer\\IXSetup.ps1"), (PICTURES_LAUNCHER, b"installer\\IXPictures.ps1")):

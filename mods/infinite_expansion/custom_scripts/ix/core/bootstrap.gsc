@@ -34,20 +34,31 @@ start( modules )
     }
 
     level.ix = spawnstruct();
-    level.ix.version = "0.1.1";
+    level.ix.version = "0.2.0";
     level.ix.map = getdvar( "mapname" );
     level.ix.ready = 0;
     level.ix.modules = [];
     setdvar( "ix_version", level.ix.version );
 
+    // Core, in dependency order: settings need the event bus (features listen
+    // for spawns) and saving; the chat commands need settings.
     custom_scripts\ix\core\log::setup();
     custom_scripts\ix\core\compat::setup();
+    custom_scripts\ix\core\events::setup();
+    custom_scripts\ix\core\config::setup();
+    custom_scripts\ix\core\persist::setup();
+    custom_scripts\ix\core\features::setup();
+    custom_scripts\ix\core\chat::setup();
+    custom_scripts\ix\core\config::add_bool( "debug_log", 0, "Debug log", "Extra [IX] DEBUG lines in the console and iw7-mod/logs/console.log.", undefined );
 
     foreach ( module_register in modules )
         [[ module_register ]]();
 
+    custom_scripts\ix\core\config::start();
+
     custom_scripts\ix\core\log::info( "init " + level.ix.version + " map=" + level.ix.map + " modules=" + custom_scripts\ix\core\util::join( level.ix.modules, "," ) );
     custom_scripts\ix\core\log::info( "client " + custom_scripts\ix\core\compat::describe() );
+    custom_scripts\ix\core\log::info( "settings: " + level.ix.config.order.size + " (" + custom_scripts\ix\core\config::changed_count() + " changed from the default); features: " + level.ix.features.order.size + "; chat: " + custom_scripts\ix\core\chat::prefix() );
 
     level thread wait_until_ready();
     level thread watch_players();

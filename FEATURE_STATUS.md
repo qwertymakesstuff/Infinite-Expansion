@@ -31,13 +31,15 @@
 | One-click setup window (install / update / uninstall) | Installer | 1.5 | TESTING | `Infinite Expansion Setup.cmd` → `installer/IXSetup.ps1` (WPF, Windows PowerShell 5.1); 80s neon art; R-I1, R-I3, R-I5, R-I8 |
 | Finds the game through Steam (registry, every library, app manifest) | Installer | 1.5 | TESTING | BROWSE as fallback; R-I2, R-I7 |
 | Installs the iw7-mod client when it is missing | Installer | 1.5 | TESTING | Latest GitHub release (SHA-256 digest when listed), iw7-mod's update server as fallback (SHA-1); progress in the window; R-I10, R-I13 |
-| PLAY: starts iw7-mod (opens Steam first if needed); desktop shortcut | Installer | 1.5 | TESTING | R-I10, R-I11 |
+| PLAY: starts the game through the launcher (without it: iw7-mod, opening Steam first if needed) | Installer | 1.5 | TESTING | R-I11 |
+| Launcher `Infinite Expansion.exe` in the game folder, with a desktop shortcut: waits for Steam, starts iw7-mod from the game folder, passes arguments on | Installer | 2 | TESTING | Compiled on the player's PC from `installer/IXLauncher.cs` by the C# compiler of .NET Framework 4, so the download has no program file; built again by every install, removed by UNINSTALL; a failed build leaves the install working. Opens on the main menu: `-zombies` works on dedicated servers only (V68); R-L1–R-L7 |
 | Game not installed: Steam's install dialog, then automatic re-detection | Installer | 1.5 | TESTING | `steam://install/292730`; checks again every 4 s; R-I12 |
 | Uninstall from Windows Settings → Apps | Installer | 1.5 | TESTING | Per-user entry; a setup copy in `%LOCALAPPDATA%`; R-I6 |
 | Removes exactly what it installed; removes the old Mods-menu copy | Installer | 1.5 | TESTING | Record `iw7-mod/infinite-expansion.json`; R-I4, R-I5 |
 | Offers UPDATE when the download's files differ from the installed ones, even with the same version number | Installer | 1.5 | TESTING | Compares each file's SHA-256; every build up to 0.1.0 kept that number; R-I15 |
 | Builds the character pictures pack once, by itself, after installing (downloads x64-zt, one run per map, cleans up after itself) | Installer | 1.5 | TESTING (experimental) | In the background with progress in the window; skipped while the game runs (REINSTALL then builds it); closing the window stops it cleanly; `-NoPictures` skips it. `installer/IXPictures.Core.ps1`; `Build Character Pictures.cmd` rebuilds by hand; UNINSTALL removes the pack; R-PK1, R-PK3–R-PK5 |
-| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks, downloads against a local fake server, the picture pack against a stand-in for x64-zt) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (46 tests), `tools/tests/ps51_lint.ps1`, `tools/tests/fake_zonetool.py` |
+| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks, downloads against a local fake server, the picture pack against a stand-in for x64-zt, the launcher against a stand-in C# compiler) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (54 tests), `tools/tests/ps51_lint.ps1`, `tools/tests/fake_zonetool.py`, `tools/tests/fake_csc.py` |
+| Launcher source compiled with C# 5 rules; its icon as classic bitmaps | Tooling | 2 | COMPLETE | `GameLauncher`, `SetupFiles`; `tools/make_launcher_icon.py` makes `installer/ix-launcher.ico` from `ix.ico` |
 | Signed installer (no Windows warning) | Installer | – | NOT PLANNED | Needs a paid certificate (L31) |
 
 ## Core (Phases 1–2)
@@ -52,13 +54,13 @@
 | Lifecycle notifies (`ix_ready`, `ix_player_connected`, `ix_player_spawned`, `ix_shutdown`) | Core | 1 | TESTING | One connect/spawn watcher per player; R-S9 |
 | Compatibility module (raw ids, feature detection) | Core | 1 | TESTING | Fixes the v1.1.0 mislabels (C1, C2); wrappers are exercised by Phases 4 and 6; R-S8 |
 | Logging (`[IX]` console lines, `ix_debug_log`, ring buffer) | Core | 1 | TESTING | R-S1, R-S9 |
-| Feature manager | Core | 2 | PLANNED | |
-| Configuration manager (flat keys, like AAE's `tfoption_*`) | Core | 2 | PLANNED | `ix_*` dvars; live apply |
-| Settings file + schema version (AAE: save data + `tfoption_master_ver`) | Core | 2 | PLANNED | `ix_settings.cfg`; needs the Mods-menu install (L9), which cannot be joined (L30), so dvars stay the main store |
-| Live console overrides (`set ix_x v`) | Core | 2 | PLANNED | Replaces AAE `modvar` / `/d` (L3) |
-| Event bus | Core | 2 | PLANNED | Real IW7 notifies only |
-| Utility library | Core | 2 | IN PROGRESS | `util.gsc` so far: `is_valid_player`, `is_human`, `join` |
-| Chat-command router (`say` notify) | Core | 2 | PLANNED | AAE `chatnotify.gsc` equivalent |
+| Feature manager (on/off features, requirements, global and per-player hooks) | Core | 2 | TESTING | `ix/core/features.gsc`; first user: `player_card`; R-C7 |
+| Configuration manager (bool/int/float/enum settings with defaults and ranges, like AAE's `tfoption_*`) | Core | 2 | TESTING | `ix/core/config.gsc`; 8 settings so far; invalid values refused, numbers clamped; R-C1, R-C3, R-C6 |
+| Saved settings + layout version (AAE: save data + `tfoption_master_ver`) | Core | 2 | TESTING | `ix/core/persist.gsc`: archived dvars (`seta ix_<id>`) in the host's config, so it works in the install friends can join; `ix_settings_version` with a migration hook (L38); R-C5 |
+| Live console overrides (`set ix_x v`) | Core | 2 | TESTING | Watcher every 0.5 s; replaces AAE `modvar` / `/d` (L3); R-C2 |
+| Event bus | Core | 2 | TESTING | `ix/core/events.gsc`: 12 events from real IW7 notifies, one listener per source; R-C9, R-Z1 |
+| Utility library | Core | 2 | TESTING | `util.gsc`: player checks, `join`, `parse_bool`, `is_number`, `array_contains`, `starts_with` |
+| Chat commands (`!ix …` on iw7-mod's `say` notify) | Core | 2 | TESTING | `ix/core/chat.gsc`: list, get, set, on/off, reset, version; changes host-only; replies with `tell()`; R-C1, R-C4, R-C8 |
 
 ## Characters (Phase 1.5)
 
@@ -67,19 +69,19 @@
 | CHARACTER button in the zombies lobby, under SELECT SHOW (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; in the lobby of Solo Match and Custom Game (moved there from the main menu after the second in-game report); saves `ix_character`, and for specials the stock lobby field `characterSelect`. Layout from the stock lobby (L35); R-UI1–R-UI6 |
 | Picture of the highlighted character in the CHARACTER menu | UI | 1.5 | TESTING | The game's own pictures of the five specials; colored initials for the regular characters, or their HUD cards with the picture pack (L28); R-UI2 |
 | Character pictures pack: the HUD's cards in the CHARACTER menu, a team card beside each row | UI | 1.5 | TESTING (experimental) | Built by the setup after the first INSTALL (or by hand with `Build Character Pictures.cmd`): x64-zt copies the cards from the player's own game files into `iw7-mod/zone/ix_portraits.ff`; the menu loads it with `loadzone` and picks the selected map's cards. `ix_pictures 0` turns it off (L28, L37); R-PK1–R-PK5 |
-| Locked special characters shown and refused in the menu | UI | 1.5 | TESTING | Reads the same zombies stats as the stock lobby (L27); `ix_character_specials`; R-UI4 |
+| Locked special characters shown and refused in the menu | UI | 1.5 | TESTING | Reads the same zombies stats as the stock lobby (L27); setting `character_specials`; R-UI4 |
 | A chosen special survives the stock lobby's reset | UI | 1.5 | TESTING | The stock lobby clears `characterSelect` when it opens; the menu script writes the choice back; R-UI5 |
 | Steam name instead of "Unknown Soldier" | Player | 1.5 | TESTING | The setup copies the Steam name; the menu script sets iw7-mod's `name` while it is the default (L34); R-I14 |
-| Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied when the stock code asks for the player's character, by replacing `zombies_loadout::get_player_character_num` (iw7-mod `replacefunc`). Second and third in-game reports: the pick did not apply (connect notify too late, then the loadout wrapper), now replaced at the source (L36). Host: `ix_character`. Every player: specials through `characterSelect`. Toggle `ix_character_select`; every outcome logged; R-CH1–R-CH3, R-CH13 |
+| Choose your character before the match (no switching mid-match) | Player | 1.5 | TESTING | `ix/player/character.gsc`; applied when the stock code asks for the player's character, by replacing `zombies_loadout::get_player_character_num` (iw7-mod `replacefunc`). Second and third in-game reports: the pick did not apply (connect notify too late, then the loadout wrapper), now replaced at the source (L36). Host: `ix_character`. Every player: specials through `characterSelect`. Setting `character_select` (from the next map); every outcome logged; R-CH1–R-CH3, R-CH13 |
 | A guest's special-character pick in someone else's match | Player | 1.5 | TESTING | Travels in the guest's stats (`characterSelect`); works on the special's own map even without the mod on the host; R-CH3, R-CH8 |
 | A guest's regular-character pick in someone else's match | Player | 1.5 | BLOCKED | No verified channel (L29); the guest gets a random character; R-CH4, probe R-CH12 |
-| "<player> is playing as <character>" line after the intro | HUD | 1.5 | TESTING | Off by default; `ix_character_announce 1` shows it to everyone, once per player; R-CH10 |
+| "<player> is playing as <character>" line after the intro | HUD | 1.5 | TESTING | Off by default; the setting `character_announce` shows it to everyone, once per player; R-CH10 |
 | Per-map cast names | Player | 1.5 | TESTING | Actor names verified from stock VO code; outfit labels made from each map's model names |
 | One character per player (no duplicates) | Player | 1.5 | TESTING | Keeps the stock random pool consistent; also stops two players getting the same special, which the stock game allows; R-CH5 |
-| Special characters gated by unlocks | Player | 1.5 | TESTING | The stock lobby's stats: soul keys, and for Willard also the merit (L27); checked in the menu and for every pick in the match; `ix_character_specials` 0/1/2; R-CH6 |
-| Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in `ix_character_crossmap 1`; their models may not exist on other maps (L26); R-CH7 |
+| Special characters gated by unlocks | Player | 1.5 | TESTING | The stock lobby's stats: soul keys, and for Willard also the merit (L27); checked in the menu and for every pick in the match; setting `character_specials` 0/1/2; R-CH6 |
+| Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in setting `character_crossmap`; their models may not exist on other maps (L26); R-CH7 |
 | Stock HUD portrait follows the chosen character | HUD | 1.5 | TESTING | Stock `setmodelfromcustomization` → `zm_player_character` |
-| Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: name and outfit; `ix_player_card`, `_x`, `_y`; R-CH9 |
+| Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: name and outfit; the feature `player_card` (off hides it at once) and the settings `player_card_x` / `_y`; R-CH9, R-C7 |
 | Player card picture (in a match) | HUD | 1.5 | BLOCKED | L28 |
 
 ## UI (Phase 3) / HUD (Phase 8)
@@ -181,7 +183,7 @@
 | Chat commands (bank, share, save, tp, ammo, help) | QoL | 9 | PLANNED | iw7-mod `say` notify |
 | Fast restart | QoL | 9 | PLANNED | `map_restart` / `fast_restart` |
 | Timescale | Utilities | 9 | PLANNED | `setslowmotion` / `timescale` |
-| Presets (Default/Classic/Enhanced/Testing/Developer/Custom) | Config | 11 | PLANNED | |
+| Presets (Default/Classic/Enhanced/Testing/Developer/Custom) | Config | 11 | PLANNED | Data maps applied through `config::set`; R-C10 |
 | Feature reset (all / per category) | Config | 9/11 | PLANNED | |
 | Vision presets | Visuals | 9 | PLANNED | `visionsetnakedforplayer` |
 | Night vision | Visuals | 9 | INVESTIGATING | `_meth_821A` |

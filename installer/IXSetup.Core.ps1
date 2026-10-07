@@ -27,13 +27,18 @@ $IXClientReleaseApi = 'https://api.github.com/repos/auroramod/iw7-mod/releases/l
 $IXClientUpdateServer = 'https://iw7-mod.auroramod.dev/'
 $IXSteamInstallUrl = 'steam://install/292730'
 $IXSteamStoreUrl = 'https://store.steampowered.com/app/292730/'
-$IXShortcutName = 'IW7-Mod (Infinite Warfare).lnk'
 # The player's Steam name, for the mod's menu script, which sets iw7-mod's "name"
 # setting from it while that is still iw7-mod's default "Unknown Soldier".
 $IXPlayerNameFile = 'ui_scripts/InfiniteExpansion/steam-name.txt'
 # Character pictures for the CHARACTER menu, a zone built on the player's PC
 # (IXPictures.Core.ps1) and kept where iw7-mod finds custom zones.
 $IXPictureZone = 'ix_portraits'
+# The launcher in the game folder, compiled on the player's PC from the
+# installer folder's IXLauncher.cs, with ix-launcher.ico built in.
+$IXLauncherName = 'Infinite Expansion.exe'
+$IXLauncherSource = 'IXLauncher.cs'
+$IXLauncherIcon = 'ix-launcher.ico'
+$IXLauncherShortcutName = 'Infinite Expansion.lnk'
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -365,11 +370,13 @@ function Get-IXState {
         GameRunning      = (Test-IXGameRunning)
         PicturesBuilt    = $false
         FilesDiffer      = $false
+        LauncherFound    = $false
     }
     if ($state.GameFound) {
         $target = Get-IXTarget $GameDir
         $state.ClientFound = [IO.File]::Exists((Join-Path $GameDir $IXClientExe))
         $state.PicturesBuilt = [IO.File]::Exists((Get-IXPicturePackPath $GameDir))
+        $state.LauncherFound = [IO.File]::Exists((Get-IXLauncherPath $GameDir))
         $state.HasRecord = [IO.File]::Exists((Join-Path $target $IXRecordName))
         $state.Installed = $state.HasRecord -or [IO.File]::Exists((Join-IXPath $target @('custom_scripts', 'cp', 'ix_main.gsc')))
         if ($state.Installed) {
@@ -535,7 +542,8 @@ function Remove-IXPicturePack {
 }
 
 # Removes the recorded files (or, without a record, the package's own file list),
-# the record, the character pictures zone, and the Mods-menu copy.
+# the record, the character pictures zone, the Mods-menu copy, and the launcher
+# with its desktop shortcut.
 function Uninstall-IX {
     param([string]$GameDir, [string]$PackageRoot)
     $target = Get-IXTarget $GameDir
@@ -557,12 +565,24 @@ function Uninstall-IX {
         $removed++
     }
     $old = Remove-IXOldCopy $GameDir $files
+    # A launcher still waiting for Steam cannot be deleted; that is no reason
+    # to fail (or to ask for administrator rights).
+    $launcher = $false
+    $launcherLeft = $null
+    try {
+        $launcher = Remove-IXLauncher $GameDir
+    }
+    catch {
+        $launcherLeft = Get-IXLauncherPath $GameDir
+    }
     return [pscustomobject]@{
-        Target         = $target
-        Removed        = $removed
-        OldCopyRemoved = $old.Removed
-        OldCopyLeft    = $old.Left
-        OldCopyPath    = $old.Path
+        Target          = $target
+        Removed         = $removed
+        OldCopyRemoved  = $old.Removed
+        OldCopyLeft     = $old.Left
+        OldCopyPath     = $old.Path
+        LauncherRemoved = $launcher
+        LauncherLeft    = $launcherLeft
     }
 }
 
@@ -777,9 +797,9 @@ function Install-IXClient {
     throw ('iw7-mod could not be downloaded (' + ($failures -join '; ') + ').')
 }
 
-# A desktop shortcut that starts iw7-mod from the game folder. Windows only; returns its path or $null.
-function New-IXShortcut {
-    param([string]$GameDir)
+# The desktop shortcut called $Name, or $null where there is no desktop (not Windows).
+function Get-IXDesktopShortcutPath {
+    param([string]$Name)
     if ($env:OS -ne 'Windows_NT') {
         return $null
     }
@@ -787,14 +807,23 @@ function New-IXShortcut {
     if (-not $desktop) {
         return $null
     }
-    $path = Join-Path $desktop $IXShortcutName
-    $exe = Join-Path $GameDir $IXClientExe
+    return Join-Path $desktop $Name
+}
+
+# A desktop shortcut to $Target, started in $GameDir, with $Target's own icon.
+# Windows only; returns its path or $null.
+function Save-IXShortcut {
+    param([string]$Name, [string]$Target, [string]$GameDir, [string]$Description)
+    $path = Get-IXDesktopShortcutPath $Name
+    if (-not $path) {
+        return $null
+    }
     $shell = New-Object -ComObject WScript.Shell
     $link = $shell.CreateShortcut($path)
-    $link.TargetPath = $exe
+    $link.TargetPath = $Target
     $link.WorkingDirectory = $GameDir
-    $link.IconLocation = $exe + ',0'
-    $link.Description = 'Call of Duty: Infinite Warfare with the iw7-mod client'
+    $link.IconLocation = $Target + ',0'
+    $link.Description = $Description
     $link.Save()
     return $path
 }
@@ -811,14 +840,193 @@ function Test-IXSteamRunning {
     return @(Get-Process -Name 'steam' -ErrorAction SilentlyContinue).Count -gt 0
 }
 
-# Starts iw7-mod.exe the way its install guide says: from the game folder.
+# Starts the game from the game folder: with the launcher when the setup built
+# it (it waits for Steam), else iw7-mod.exe the way its install guide says.
+# Returns the program it started.
 function Start-IXGame {
     param([string]$GameDir)
     $exe = Join-Path $GameDir $IXClientExe
     if (-not [IO.File]::Exists($exe)) {
         throw "$IXClientExe is not in the game folder."
     }
+    $launcher = Get-IXLauncherPath $GameDir
+    if ([IO.File]::Exists($launcher)) {
+        $exe = $launcher
+    }
     Start-Process -FilePath $exe -WorkingDirectory $GameDir | Out-Null
+    return $exe
+}
+
+# ---------------------------------------------------------------------------
+# The launcher: "Infinite Expansion.exe" in the game folder (IXLauncher.cs says
+# what it does). It is compiled here, on the player's PC, by the C# compiler
+# that Windows 10 and 11 come with (.NET Framework 4: csc.exe, C# 5), so the
+# download carries no program file and Windows has no downloaded program to
+# warn about.
+
+function Get-IXLauncherPath {
+    param([string]$GameDir)
+    return Join-IXPath $GameDir @($IXLauncherName)
+}
+
+# The .NET Framework 4 C# compiler, or $null.
+function Find-IXCSharpCompiler {
+    $windows = $env:WINDIR
+    if (-not $windows) {
+        return $null
+    }
+    foreach ($framework in @('Framework64', 'Framework')) {
+        $path = Join-IXPath $windows @('Microsoft.NET', $framework, 'v4.0.30319', 'csc.exe')
+        if ([IO.File]::Exists($path)) {
+            return $path
+        }
+    }
+    return $null
+}
+
+# The launcher's AssemblyVersion, which takes up to four numbers: "0.2.0" is
+# "0.2.0.0"; anything else is "0.0.0.0".
+function Get-IXLauncherVersion {
+    param([string]$Version)
+    if ($Version -notmatch '^\d{1,4}(\.\d{1,4}){0,3}$') {
+        return '0.0.0.0'
+    }
+    $parts = @($Version.Split('.'))
+    while ($parts.Count -lt 4) {
+        $parts += '0'
+    }
+    return ($parts -join '.')
+}
+
+# Runs the compiler without a window. Returns its exit code and output.
+function Invoke-IXCSharpCompiler {
+    param([string]$Compiler, [string[]]$Arguments, [int]$TimeoutSeconds = 120)
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = $Compiler
+    $info.Arguments = ($Arguments -join ' ')
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true
+    $process = [Diagnostics.Process]::Start($info)
+    try {
+        $output = $process.StandardOutput.ReadToEndAsync()
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            $process.Kill()
+            throw 'The C# compiler did not finish.'
+        }
+        $process.WaitForExit()
+        return [pscustomobject]@{ ExitCode = $process.ExitCode; Output = $output.Result }
+    }
+    finally {
+        $process.Dispose()
+    }
+}
+
+# The compiler's first error line, for a status message.
+function Get-IXCompilerError {
+    param([string]$Output)
+    $lines = @(([string]$Output) -split "`r?`n" | Where-Object { $_.Trim() })
+    foreach ($line in $lines) {
+        if ($line -match 'error') {
+            return $line.Trim()
+        }
+    }
+    if ($lines.Count -gt 0) {
+        return $lines[$lines.Count - 1].Trim()
+    }
+    return 'no output'
+}
+
+# Compiles <game>\Infinite Expansion.exe from $InstallerDir\IXLauncher.cs, with
+# the package version filled in. The icon goes in when the compiler takes it,
+# else the launcher is built without it. $Compiler: csc.exe, found by
+# Find-IXCSharpCompiler when not given. Returns the launcher's path and whether
+# it has the icon.
+function New-IXLauncher {
+    param([string]$GameDir, [string]$InstallerDir, [string]$Version, [string]$Compiler)
+    if (-not $Compiler) {
+        $Compiler = Find-IXCSharpCompiler
+    }
+    if (-not $Compiler) {
+        throw 'the C# compiler of .NET Framework 4 (csc.exe) was not found'
+    }
+    $sourcePath = Join-IXPath $InstallerDir @($IXLauncherSource)
+    if (-not [IO.File]::Exists($sourcePath)) {
+        throw ($IXLauncherSource + ' is missing next to the setup')
+    }
+    $placeholder = 'AssemblyVersion("0.0.0.0")'
+    $source = [IO.File]::ReadAllText($sourcePath).Replace($placeholder, 'AssemblyVersion("' + (Get-IXLauncherVersion $Version) + '")')
+    $iconPath = Join-IXPath $InstallerDir @($IXLauncherIcon)
+    $work = Join-IXPath ([IO.Path]::GetTempPath()) @('ix-launcher-' + [Guid]::NewGuid().ToString('N'))
+    [IO.Directory]::CreateDirectory($work) | Out-Null
+    try {
+        $sourceFile = Join-IXPath $work @($IXLauncherSource)
+        $built = Join-IXPath $work @($IXLauncherName)
+        [IO.File]::WriteAllText($sourceFile, $source, (New-Object System.Text.UTF8Encoding $false))
+        $arguments = @('/nologo', '/noconfig', '/target:winexe', '/optimize+', '/reference:System.dll', ('/out:"' + $built + '"'))
+        $icon = [IO.File]::Exists($iconPath)
+        $result = $null
+        if ($icon) {
+            $result = Invoke-IXCSharpCompiler $Compiler ($arguments + @(('/win32icon:"' + $iconPath + '"'), ('"' + $sourceFile + '"')))
+            if ($result.ExitCode -ne 0 -or -not [IO.File]::Exists($built)) {
+                $icon = $false
+                if ([IO.File]::Exists($built)) {
+                    [IO.File]::Delete($built)
+                }
+            }
+        }
+        if (-not $icon) {
+            $result = Invoke-IXCSharpCompiler $Compiler ($arguments + @('"' + $sourceFile + '"'))
+        }
+        if ($result.ExitCode -ne 0 -or -not [IO.File]::Exists($built)) {
+            throw ('the C# compiler failed: ' + (Get-IXCompilerError $result.Output))
+        }
+        $path = Get-IXLauncherPath $GameDir
+        [IO.File]::Copy($built, $path, $true)
+        return [pscustomobject]@{ Path = $path; Icon = $icon }
+    }
+    finally {
+        try {
+            [IO.Directory]::Delete($work, $true)
+        }
+        catch {
+        }
+    }
+}
+
+# Builds the launcher and its desktop shortcut. A shortcut that cannot be made
+# is left out. Returns the launcher's path, whether it has the icon, and the
+# shortcut's path ($null without one).
+function Install-IXLauncher {
+    param([string]$GameDir, [string]$InstallerDir, [string]$Version, [string]$Compiler)
+    $launcher = New-IXLauncher $GameDir $InstallerDir $Version $Compiler
+    $shortcut = $null
+    try {
+        $shortcut = Save-IXShortcut $IXLauncherShortcutName $launcher.Path $GameDir 'Call of Duty: Infinite Warfare with Infinite Expansion (iw7-mod)'
+    }
+    catch {
+    }
+    return [pscustomobject]@{ Path = $launcher.Path; Icon = $launcher.Icon; Shortcut = $shortcut }
+}
+
+# Deletes the launcher, and its desktop shortcut while that still points at it.
+# $true when the launcher was there.
+function Remove-IXLauncher {
+    param([string]$GameDir)
+    $path = Get-IXLauncherPath $GameDir
+    $found = [IO.File]::Exists($path)
+    if ($found) {
+        [IO.File]::Delete($path)
+    }
+    $shortcut = Get-IXDesktopShortcutPath $IXLauncherShortcutName
+    if ($shortcut -and [IO.File]::Exists($shortcut)) {
+        $shell = New-Object -ComObject WScript.Shell
+        $target = $shell.CreateShortcut($shortcut).TargetPath
+        if (Test-IXSamePath $target $path) {
+            [IO.File]::Delete($shortcut)
+        }
+    }
+    return $found
 }
 
 # ---------------------------------------------------------------------------

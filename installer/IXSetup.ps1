@@ -4,10 +4,11 @@ Infinite Expansion - setup window.
 Start it with "Infinite Expansion Setup.cmd", next to the installer folder. It finds
 Infinite Warfare through Steam (or offers Steam's install dialog), downloads the iw7-mod
 client when the game folder has none, installs or uninstalls the mod with one click, and
-then starts the game (the logic is in IXSetup.Core.ps1). The first install also builds
-the character pictures from the player's own game files (IXPictures.Core.ps1), once.
-After installing, Windows Settings > Apps lists the mod, and uninstalling there runs this
-script with -Uninstall.
+then starts the game (the logic is in IXSetup.Core.ps1). Each install also builds the
+launcher, "Infinite Expansion.exe" in the game folder (IXLauncher.cs), with a desktop
+shortcut, and the first one builds the character pictures from the player's own game
+files (IXPictures.Core.ps1), once. After installing, Windows Settings > Apps lists the
+mod, and uninstalling there runs this script with -Uninstall.
 
 Switches:
   -GameDir <folder>   use this game folder instead of looking in Steam
@@ -16,8 +17,9 @@ Switches:
   -NoPictures         do not build the character pictures
   -ZoneTool <file>    build them with this zonetool.exe instead of downloading x64-zt
   -NoWindow           no window: install (downloading iw7-mod if needed, then building the
-                      character pictures), or uninstall with -Uninstall; print the result
-                      and exit with 0 or 1 (1 only when the mod itself was not installed)
+                      launcher and the character pictures), or uninstall with -Uninstall;
+                      print the result and exit with 0 or 1 (1 only when the mod itself
+                      was not installed)
 
 Windows PowerShell 5.1 runs this file, so it stays ASCII and avoids PowerShell 7 syntax
 (tools/tests/test_installer.py checks both).
@@ -35,6 +37,7 @@ $ErrorActionPreference = 'Stop'
 $SetupRoot = Split-Path -Parent $PSScriptRoot
 $PackageRoot = Join-Path (Join-Path $SetupRoot 'mods') 'infinite_expansion'
 $ScriptPath = $PSCommandPath
+$InstallerDir = $PSScriptRoot
 $CorePath = Join-Path $PSScriptRoot 'IXSetup.Core.ps1'
 $PicturesCorePath = Join-Path $PSScriptRoot 'IXPictures.Core.ps1'
 $LogPath = Join-Path ([IO.Path]::GetTempPath()) 'InfiniteExpansionSetup.log'
@@ -115,6 +118,12 @@ if ($NoWindow) {
             $result = Uninstall-IX $dir $PackageRoot
             Unregister-IXUninstaller $SetupRoot | Out-Null
             Write-Output ('Removed {0} files from {1}.' -f $result.Removed, $result.Target)
+            if ($result.LauncherRemoved) {
+                Write-Output ('Removed {0}.' -f $IXLauncherName)
+            }
+            if ($result.LauncherLeft) {
+                Write-Output ('{0} is in use; close it, then delete it: {1}' -f $IXLauncherName, $result.LauncherLeft)
+            }
         }
         else {
             if (-not [IO.File]::Exists((Join-Path $dir $IXClientExe))) {
@@ -127,6 +136,17 @@ if ($NoWindow) {
             Write-Output ('Installed {0} files into {1}.' -f $result.Copied, $result.Target)
             if ($player) {
                 Write-Output ('In-game name: {0} (from Steam).' -f $player)
+            }
+            # The launcher. Without it the mod works the same; iw7-mod.exe starts the game.
+            try {
+                $launcher = Install-IXLauncher $dir $InstallerDir (Get-IXPackageVersion $PackageRoot)
+                Write-Output ('Launcher: {0}' -f $launcher.Path)
+                if ($launcher.Shortcut) {
+                    Write-Output ('Desktop shortcut: {0}' -f $launcher.Shortcut)
+                }
+            }
+            catch {
+                Write-Output ('The launcher could not be built: ' + $_.Exception.Message + '. Start the game with ' + $IXClientExe + '.')
             }
             # The character pictures, the first time. A failure here leaves the
             # mod installed: the menu shows initials instead.
@@ -371,10 +391,10 @@ function Set-IXReadyStatus {
         Set-IXStatus 'UPDATE READY' 'Click UPDATE to replace the installed files.' $Colors.Warn
     }
     elseif (-not $state.ClientFound) {
-        Set-IXStatus 'READY' 'Click INSTALL. It downloads the iw7-mod client from its official GitHub page, puts it in the game folder with a desktop shortcut, installs Infinite Expansion, then builds its character pictures from your game files (a few minutes, once).' $Colors.Ok
+        Set-IXStatus 'READY' 'Click INSTALL. It downloads the iw7-mod client from its official GitHub page into the game folder, installs Infinite Expansion with its launcher and a desktop shortcut, then builds its character pictures from your game files (a few minutes, once).' $Colors.Ok
     }
     else {
-        Set-IXStatus 'READY' 'Click INSTALL. It copies the mod into the game''s iw7-mod folder, adds an uninstall entry to Windows Settings, then builds the character pictures from your game files (a few minutes, once).' $Colors.Ok
+        Set-IXStatus 'READY' 'Click INSTALL. It copies the mod into the game''s iw7-mod folder, adds its launcher with a desktop shortcut and an uninstall entry to Windows Settings, then builds the character pictures from your game files (a few minutes, once).' $Colors.Ok
     }
 }
 
@@ -479,11 +499,30 @@ function Invoke-IXInstall {
         if ($registered) {
             $text = $text + ' Uninstall here or in Windows Settings > Apps.'
         }
+        $text = $text + (Get-IXLauncherText)
         Update-IXView
         Complete-IXInstall $text
     }
     catch {
         Invoke-IXFailure $_ 'install'
+    }
+}
+
+# Builds "Infinite Expansion.exe" in the game folder, with its desktop shortcut,
+# and says so. A failure leaves the install as it is: PLAY and iw7-mod.exe start
+# the game the same way, without the launcher's wait for Steam.
+function Get-IXLauncherText {
+    try {
+        $launcher = Install-IXLauncher $script:GameDir $InstallerDir (Get-IXPackageVersion $PackageRoot)
+        Write-IXLog ('launcher: ' + $launcher.Path + ', icon: ' + $launcher.Icon + ', shortcut: ' + $launcher.Shortcut)
+        if ($launcher.Shortcut) {
+            return ' Added ' + $IXLauncherName + ' to the game folder, and its shortcut to the desktop.'
+        }
+        return ' Added ' + $IXLauncherName + ' to the game folder.'
+    }
+    catch {
+        Write-IXLog ('launcher failed: ' + $_.Exception.ToString())
+        return ' ' + $IXLauncherName + ' could not be built (' + $_.Exception.Message + '); PLAY still works.'
     }
 }
 
@@ -536,6 +575,12 @@ function Invoke-IXUninstall {
         $script:RemoveCopyOnExit = Unregister-IXUninstaller $SetupRoot
         Write-IXLog ('removed ' + $result.Removed + ' files from ' + $result.Target)
         $text = 'Removed ' + $result.Removed + ' files from ' + $result.Target + '.' + (Get-IXOldCopyText $result)
+        if ($result.LauncherRemoved) {
+            $text = $text + ' Removed ' + $IXLauncherName + '.'
+        }
+        if ($result.LauncherLeft) {
+            $text = $text + ' ' + $IXLauncherName + ' is in use; close it, then delete it from the game folder.'
+        }
         Update-IXView
         Set-IXStatus 'UNINSTALLED' ($text + ' The iw7-mod client stays. Infinite Expansion has been laid to rest.') $Colors.Bad
     }
@@ -687,7 +732,8 @@ function Stop-IXJob {
     $job.Shell.Dispose()
 }
 
-# What a finished iw7-mod download did, for the status line; also makes the desktop shortcut.
+# What a finished iw7-mod download did, for the status line. The desktop
+# shortcut comes with the launcher, after installing.
 function Complete-IXClient {
     param($Client)
     Write-IXLog ('iw7-mod.exe ' + $Client.Version + ' from ' + $Client.Source + ', verified: ' + $Client.Verified)
@@ -695,22 +741,13 @@ function Complete-IXClient {
     if ($Client.Verified) {
         $text = $text + ' (checksum verified)'
     }
-    $text = $text + '.'
-    try {
-        $shortcut = New-IXShortcut $script:GameDir
-        if ($shortcut) {
-            $text = $text + ' Desktop shortcut: ' + [IO.Path]::GetFileNameWithoutExtension($shortcut) + '.'
-        }
-    }
-    catch {
-        Write-IXLog ('shortcut: ' + $_.Exception.Message)
-    }
-    return $text + ' Its first start downloads the rest of its files. '
+    return $text + '. Its first start downloads the rest of its files. '
 }
 
 function Invoke-IXPlay {
     try {
-        if (-not (Test-IXSteamRunning)) {
+        # The launcher waits for Steam by itself.
+        if (-not $script:State.LauncherFound -and -not (Test-IXSteamRunning)) {
             try {
                 Start-Process 'steam://open/main'
             }
@@ -719,8 +756,8 @@ function Invoke-IXPlay {
             Set-IXStatus 'STARTING STEAM' 'iw7-mod needs Steam running. Click PLAY again once Steam is open.' $Colors.Warn
             return
         }
-        Start-IXGame $script:GameDir
-        Write-IXLog 'started iw7-mod'
+        $started = Start-IXGame $script:GameDir
+        Write-IXLog ('started ' + $started)
         $window.Close()
     }
     catch {

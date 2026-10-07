@@ -25,7 +25,8 @@ error( message )
     write( "ERROR", message );
 }
 
-// Printed only while the ix_debug_log dvar is non-zero.
+// Printed only while the setting debug_log is on (config.gsc mirrors it to the
+// dvar ix_debug_log, which works before the settings exist too).
 debug( message )
 {
     if ( getdvarint( "ix_debug_log", 0 ) == 0 )

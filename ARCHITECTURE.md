@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Infinite Expansion
 
-> **Status: Phase 1 implemented** (entry scripts, bootstrap, logging, compat, first utilities, `tools/check.py`). Sections 4–6 remain the plan for Phases 2–8. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
+> **Status: Phases 1 and 2 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — compiled and checked, in-game test pending). Sections 4.1–4.5 describe what exists; presets (§4.2), the menu (§5) and the HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
 
 ## 1. Constraints that shape the design
 
@@ -12,7 +12,7 @@
 | 1 MiB custom bytecode budget, fatal if exceeded | Keep modules small; `tools/check.py` reports the total (limit 512 KiB) |
 | An unresolved reference in any loaded script is a `script link error` that drops the match (L23) | Every script must pass `tools/check.py` (compile, calls) before a release |
 | v1.1.0 compiler mislabels/lacks many method names | Every raw `_meth_` / `_func_` id lives in **one** module (`ix\core\compat`) |
-| File I/O only with `fs_game` | Persistence layer with a dvar-only fallback |
+| File I/O only with `fs_game` | Settings are saved as archived dvars (`seta`, through iw7-mod's `executecommand`), which needs no file access |
 | Players cannot join a host whose `fs_game` is set unless the mod ships a `mod.ff` (L30) | Installed into `<game>/iw7-mod/`, without `fs_game`; settings must work from dvars alone |
 | Another player's menu choice reaches the host's match only through that player's stats (L29) | Choices made in the frontend apply when the stock code asks for the player's character (`replacefunc` of `zombies_loadout::get_player_character_num`, L36), never mid-match |
 | A zombies match links only the stock scripts its map and the gametype reference; 126 are common to all five maps | Stock calls target only those; map-specific code is reached through the pointers maps assign, never by path (§7) |
@@ -35,11 +35,12 @@ Infinite-Expansion/                          (repository)
 │               │   ├── bootstrap.gsc        init order, duplicate-init guard, lifecycle   (Phase 1)
 │               │   ├── compat.gsc           raw-id wrappers + client feature detection    (Phase 1)
 │               │   ├── log.gsc              console logging, levels, ring buffer          (Phase 1)
-│               │   ├── util.gsc             player/entity/array/string/timing helpers     (Phase 1: first helpers)
-│               │   ├── events.gsc           event bus over real IW7 notifies
-│               │   ├── features.gsc         feature registry (register/enable/disable)
-│               │   ├── config.gsc           setting registry, get/set/reset, presets
-│               │   └── persist.gsc          file I/O (fs_game) with dvar fallback
+│               │   ├── util.gsc             player/array/string/number helpers            (Phases 1–2)
+│               │   ├── events.gsc           event bus over real IW7 notifies               (Phase 2)
+│               │   ├── config.gsc           settings: types, ranges, get/set/reset, console (Phase 2)
+│               │   ├── persist.gsc          saving settings (seta) + layout version        (Phase 2)
+│               │   ├── features.gsc         on/off features, requirements, hooks           (Phase 2)
+│               │   └── chat.gsc             !ix chat commands                              (Phase 2)
 │               ├── ui/                      ≙ /scripts/ui/
 │               │   ├── menu.gsc             menu engine (pages, items, rendering, input)
 │               │   ├── menu_tree.gsc        menu definition (data only)
@@ -60,6 +61,8 @@ Infinite-Expansion/                          (repository)
 ├── Build Character Pictures.cmd             double-click: builds the picture pack again (the setup builds it once)
 ├── installer/                               one-click setup: IXSetup.ps1 (WPF window), IXSetup.Core.ps1
 │                                            (install logic, tested on Linux), IXSetup.xaml (layout + art), ix.ico;
+│                                            launcher: IXLauncher.cs + ix-launcher.ico, compiled on the player's PC
+│                                            into <game>\Infinite Expansion.exe (tested with a stand-in compiler);
 │                                            picture pack: IXPictures.Core.ps1 (x64-zt runs, build input, install;
 │                                            run by the setup after installing, and by IXPictures.ps1, the
 │                                            console version; tested with a stand-in for x64-zt)
@@ -73,7 +76,7 @@ Phase 1 also created one placeholder per feature area (`ui/ui.gsc`, `player/play
 
 ## 3. Initialization flow
 
-Implemented in Phase 1 unless marked *(Phase 2+)*.
+Implemented in Phases 1 and 2 unless marked *(later)*.
 
 ```text
 iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
@@ -86,17 +89,22 @@ iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
         ├─ guard: level.ix already exists → log a warning, return      (no double init)
         ├─ master switch: dvar ix_enabled "0" → log, return           (mod fully off)
         ├─ level.ix = { version, map, ready = 0, modules = [] }; dvar ix_version
-        ├─ core setup():  log → compat (client feature flags)
-        ├─ (Phase 2+) events → features → config: register settings, load file or dvars
+        ├─ core setup():  log → compat (client feature flags) → events → config
+        │     → persist (saved-settings layout check) → features → chat; setting debug_log
         ├─ modules' register(), in entry-script order: player, weapons, zombies, debug, ui
-        ├─ log "init <version> map=… modules=…" and "client fs_game=… omnimovement=…"
+        │     (each adds its settings and features; a setting takes its saved ix_<id> value)
+        ├─ config::start(): console watcher thread (ix_<id> dvars, every 0.5 s)
+        ├─ log "init <version> map=… modules=…", "client fs_game=… omnimovement=…",
+        │     "settings: N (M changed from the default); features: K; chat: !ix"
         ├─ thread wait_until_ready: first "connected" + waittillframeend
         │     → level.ix.ready = 1, notify "ix_ready"
-        │     (Phase 2+) wrap map-owned callbacks, apply enabled global features
+        │     → features: global features that are on start (on_enable)
+        │     (later) wrap map-owned callbacks
         ├─ thread watch_players: every "connected"
         │     → self.ix = { spawn_count }, notify "ix_player_connected"
         │     → spawn watcher thread: notify "ix_player_spawned" on every "spawned_player"
-        │     (Phase 2+) menu input watcher; re-apply per-player features on spawn
+        │     → features: on_player( 1 ) for each feature that is on, on every spawn
+        │     (later) menu input watcher
         └─ thread watch_shutdown: "game_ended" → notify "ix_shutdown"
 ```
 
@@ -104,7 +112,8 @@ iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
 
 - Only entry scripts define `init()` or `main()`, because iw7-mod runs those in every file it auto-loads ✓. Feature modules expose `register()`; core files expose `setup()`.
 - `register()` and `setup()` run synchronously and must not wait. Waiting work runs in its own thread.
-- Modules take connect, spawn, ready, and shutdown from the `ix_*` notifies above instead of waiting on `connected` / `spawned_player` themselves, so that plumbing lives in one place. The Phase 2 event bus (§4.3) builds on it.
+- Modules take connect, spawn, ready, and shutdown from the `ix_*` notifies above, or better from the event bus (§4.3) built on them, instead of waiting on `connected` / `spawned_player` themselves, so that plumbing lives in one place.
+- Modules read options with `config::get(id)`, never with `getdvar`, so that every option has one type, one range and one default.
 
 **Shutdown.**
 - On `game_ended`, threads end through `level endon("game_ended")`.
@@ -115,59 +124,75 @@ iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
 
 ## 4. Core systems (interfaces)
 
+Implemented in Phase 2. Modules call them by path, for example `custom_scripts\ix\core\config::get( "player_card_x" )`; below, `config::` stands for that path.
+
 ### 4.1 Feature manager (`ix\core\features`)
 
+A feature is something that can be switched on and off while playing. It is backed by an on/off setting with the same id, so the console, the chat commands and later the menu switch it the same way.
+
 ```text
-register(id, category, scope, fn_enable, fn_disable, fn_player_apply, requires[])
-enable(id) / disable(id) / is_enabled(id) / toggle(id)
+feature = features::add(id, category, label, help, default_on)   in a module's register()
+feature.on_enable  = ::fn        global; runs once when switched on (after ix_ready)
+feature.on_disable = ::fn        global; must undo everything on_enable did
+feature.on_player  = ::fn        self = player, argument 1/0: on every player when
+                                 switched, and on each spawn while on
+feature.requires[feature.requires.size] = "dvar:<name>" | "fs_game"
+features::is_enabled(id) / enable(id, source) / disable(id, source) / toggle(id, source)
 ```
 
-- **Duplicate-registration guard.** Registering the same `id` twice is logged and ignored.
-- **Compatibility gating.** Every entry in `requires` (such as `"dvar:bg_omnimovement"` or `"fs_game"`) must be satisfied, otherwise the feature is shown as *unavailable* and cannot be enabled.
-- **Scope.** `global` features have enable/disable functions. `player` features have a per-player apply function that runs on enable and on every spawn.
+- **Duplicate-registration guard.** Adding the same `id` twice is logged and ignored (the first stays).
+- **Requirements.** `"dvar:<name>"` needs a dvar the client has (`compat::has_dvar`); `"fs_game"` needs the mod loaded from the Mods menu. A feature with a missing requirement stays off, switching it on is refused and logged, and `is_enabled` is 0.
+- **Timing.** Nothing is applied before `ix_ready`, because the stock maps set their callbacks up first. A switch before then only changes the setting.
+- `player_card` (`ui\player_card.gsc`) is the first feature: `on_player(0)` hides the card at once.
 
 ### 4.2 Configuration manager (`ix\core\config`)
 
 ```text
-register_setting(id, type, default, min, max, step, options[], label, help, scope, on_change)
-get(id) / set(id, value) / reset(id) / reset_all() / apply_preset(name)
+config::add_bool(id, default, label, help, on_change)
+config::add_int(id, default, min, max, label, help, on_change)
+config::add_float(id, default, min, max, label, help, on_change)
+config::add_enum(id, default, "word1 word2 …", label, help, on_change)
+config::get(id) / set(id, value, source) / reset_default(id, source) / reset_all(source)
+config::find(id) / exists(id) / changed_count() / to_text(setting, value) / describe_range(setting)
 ```
 
-- **Types:** `bool`, `int`, `float`, `enum`.
-- **Validation.** Values are clamped to `[min, max]`; enum values are validated against `options`.
-- **Source of truth at runtime:** `level.ix.settings[id]`.
-- **Live console overrides.** Every setting is mirrored to dvar `ix_<id>`. A watcher thread polls these dvars about every 0.5 s and applies changes, so `set ix_<id> <value>` in the console works live. This replaces AAE's `/d name value`.
-- **Persistence (`ix\core\persist`).** With `fs_game`, settings are stored in `ix_settings.cfg` inside the mod folder, as human-editable `id = value` lines with `//` comments. Without `fs_game`, the dvars are the only store (session-only), and the menu says so.
-- **Schema version.** A `settings_version` key works like AAE's `tfoption_master_ver` guard: when it changes, known keys are migrated and unknown or invalid ones fall back to defaults.
-- **Presets.** Default, Classic, Enhanced, Testing, Developer, and Custom are defined as data (`id → value` maps).
+- **Types:** `bool` (1/0; also true/false, on/off, yes/no), `int`, `float`, `enum` (lower-case words).
+- **Validation.** A value that means nothing for the type is refused (`set` returns 0); numbers are clamped to `[min, max]`.
+- **Source of truth at runtime:** `level.ix.config.settings[id]` (`.value`, `.text`, `.default_value`, `.type`, range, `.label`, `.help`); `level.ix.config.order` keeps registration order.
+- **Live console overrides.** Every setting is mirrored to dvar `ix_<id>`. A watcher thread polls these dvars every 0.5 s and applies changes, so `set ix_<id> <value>` in the console works live; an invalid value is logged and the dvar put back, and a cleared dvar means the default. This replaces AAE's `/d name value`.
+- **Change notification.** Each change logs `setting <id> = <value> (<source>)`, notifies `level "ix_setting_changed", id`, and runs `level thread [[on_change]](value, old_value, id)`. The value found at registration does not count as a change.
+- **Persistence (`ix\core\persist`).** Every change is saved as an archived dvar: `executecommand("seta ix_<id> <value>")`, the way the CHARACTER menu saves `ix_character`. iw7-mod keeps archived dvars in the host's config, so the next game starts with them, and registration reads them back. This needs neither `fs_game` nor file access, so it works in the install friends can join (L9, L30). Only values made of letters, digits, `_`, `.` and `-` (at most 64) are ever written, so no value can add a console command.
+- **Layout version.** `ix_settings_version` (now 1) records which layout of settings was saved; `persist::migrate(from)` converts old values once when a later version renames or changes a setting. An invalid saved value is replaced by the default at registration, and saved again.
+- **Presets** *(later)*: Default, Classic, Enhanced, Testing, Developer and Custom as data (`id → value` maps), applied with `set`.
 
 ### 4.3 Event bus (`ix\core\events`)
 
 ```text
-subscribe(event, fn)        dispatches level thread [[fn]](args…)
+events::subscribe(event, fn)   level events:  level thread [[fn]](arg)
+                               player events: level thread [[fn]](player, arg)
 ```
 
 Only real IW7 sources are used:
 
-| Bus event | Source (verified) |
-|-----------|-------------------|
-| `player_connect` | `level waittill("connected", p)` (Phase 1: `ix_player_connected`) |
-| `player_spawn` | `self waittill("spawned_player")` (Phase 1: `ix_player_spawned`) |
-| `player_death` | `self waittill("death")` |
-| `player_disconnect` | `self waittill("disconnect")` |
-| `player_laststand` | `self waittill("last_stand")` |
-| `weapon_change` / `weapon_fired` / `reload` | `self waittill("weapon_change" / "weapon_fired" / "reload")` |
-| `round_start` | `level waittill("regular_wave_starting")` and `"event_wave_starting"` |
-| `round_end` | `level waittill("spawn_wave_done")` |
-| `game_end` | `level waittill("game_ended")` |
-| `chat` | `level waittill("say", p, msg)` (iw7-mod ≥ 1.0.3) |
+| Bus event | Source (verified) | Argument |
+|-----------|-------------------|----------|
+| `player_connect` | level `ix_player_connected` (bootstrap, from `connected`) | — |
+| `player_spawn` | level `ix_player_spawned` (bootstrap, from `spawned_player`) | — |
+| `player_death` | player `death` | — |
+| `player_disconnect` | player `disconnect` | — |
+| `player_laststand` | player `last_stand` (`scripts\cp\cp_laststand`) | weapon |
+| `weapon_change` / `weapon_fired` / `reload` | player `weapon_change` / `weapon_fired` / `reload` | weapon (`weapon_change`) |
+| `round_start` | level `regular_wave_starting` and `event_wave_starting` | `level.wave_num` |
+| `round_end` | level `spawn_wave_done` | `level.wave_num` |
+| `game_end` | level `game_ended` | — |
+| `chat` | level `say`, player, message (iw7-mod `logprint.cpp`; in zombies team chat arrives as `say` too) | message |
 
-One listener thread exists per source notify (per player where relevant), never one per subscriber.
+One listener thread exists per source notify (per player for player events), started by the first subscriber, never one per subscriber. A `player_disconnect` handler gets the player as it leaves.
 
 ### 4.4 Utilities (`ix\core\util`, `ix\core\log`, `ix\core\compat`)
 
-- **util:** player iteration and validation (`isdefined`, `isalive`, `isplayer`, not bot), array helpers, string formatting (`va`), clamps, rounding, timing helpers.
-- **log:** `ix\core\log::info/warn/error/debug(msg)`, which calls `print("[IX] LEVEL: …")` (iw7-mod console) and keeps the last 32 lines in `level.ix.log` (`log::recent()`). Debug output is gated by dvar `ix_debug_log` (the future setting `debug_log`).
+- **util:** `is_valid_player`, `is_human`, `dvar_string`, `join(items, separator)`, `parse_bool(text)`, `is_number(text, allow_fraction)`, `array_contains(items, value)`, `starts_with(text, prefix)`. Single characters are taken with `getsubstr(text, i, i + 1)`, as the stock scripts do.
+- **log:** `ix\core\log::info/warn/error/debug(msg)`, which calls `print("[IX] LEVEL: …")` (iw7-mod console) and keeps the last 32 lines in `level.ix.log` (`log::recent()`). Debug output is gated by the setting `debug_log` (dvar `ix_debug_log`).
 - **compat:** the **only** place raw ids appear, each with its real name in a comment:
   - `god_off()` → `_meth_80A1`
   - `local_sound(a)` → `_meth_8242`
@@ -177,6 +202,22 @@ One listener thread exists per source notify (per player where relevant), never 
   - `spread_reset()` → `_meth_8263`; `has_perk(p)` → `_meth_8181`
 
   It also provides feature detection: `has_dvar(name)` is implemented as `getdvar(name) != ""`. `setup()` stores the results in `level.ix.client` (`has_fs_game`, `has_omnimovement`, `has_sprint_unlimited`, `has_air_control`), and `describe()` formats them for the init log.
+
+### 4.5 Chat commands (`ix\core\chat`)
+
+Typed in the game's chat; replies go only to the player who typed, with iw7-mod's `tell()`.
+
+| Command | Who | Does |
+|---------|-----|------|
+| `!ix` | everyone | the list of commands |
+| `!ix list [word]` | everyone | settings and their values, optionally only ids containing `word` |
+| `!ix get <setting>` | everyone | value, default, valid values, help |
+| `!ix set <setting> <value>` | host | changes a setting (through `config::set`, so the range applies) |
+| `!ix on <setting>` / `!ix off <setting>` | host | switches an on/off setting |
+| `!ix reset <setting>` / `!ix reset all` | host | back to the default |
+| `!ix version` | everyone | the mod's version |
+
+Settings apply to the whole match, so only the host (`player ishost()`) may change them. A reply quotes typed text only when it is a plain word, because `tell()` sends the text inside a quoted server command.
 
 ## 5. Menu design (`ix\ui\menu`)
 
@@ -220,7 +261,7 @@ Multiplayer support was dropped on 2026-10-06; the mod targets the zombies mode 
 | Thing | Convention | Example |
 |-------|-----------|---------|
 | Mod prefix | `ix` (checked: no collision with any IW7 token, stock field, or stock dvar) | |
-| Level state | `level.ix.*` | `level.ix.settings` |
+| Level state | `level.ix.*` | `level.ix.config.settings` |
 | Player state | `self.ix.*` | `self.ix.menu` |
 | Dvars | `ix_<setting_id>` | `ix_movement_speed` |
 | Notifies | `ix_<event>` | `ix_menu_closed` |
@@ -228,16 +269,27 @@ Multiplayer support was dropped on 2026-10-06; the mod targets the zombies mode 
 | Functions | `snake_case`; module-qualified calls | `custom_scripts\ix\core\config::get("x")` |
 | Entry points | `init()` in entry scripts only; `register()` in feature modules; `setup()` in core files | `custom_scripts\ix\ui\ui::register` |
 
-## 9. Adding a feature (extension guide, to be finalized in Phase 2)
+## 9. Adding a feature (extension guide)
 
-1. Pick the module by category, or add a new file under `ix/<area>/`.
+1. Pick the module by category, or add a new file under `ix/<area>/` and its `register` to the entry script's module list.
 2. In that module's `register()`:
-   - `config::register_setting(...)` for each option;
-   - `features::register(...)` with enable/disable/apply functions;
-   - add menu items to `menu_tree`.
-3. Implement enable/disable so that disable fully **restores** the previous state.
+   - `config::add_bool/add_int/add_float/add_enum(...)` for each option; read them with `config::get(id)`;
+   - `features::add(...)` for each part that can be switched on and off, with `on_enable`/`on_disable` (global) or `on_player` (per player) and any `requires`;
+   - `events::subscribe(...)` for what it reacts to;
+   - *(later)* add menu items to `menu_tree`.
+3. Implement `on_disable` / `on_player(0)` so that switching off fully **restores** the previous state.
 4. Use only APIs listed in `IW_API_NOTES.md`; raw ids go through `compat`.
 5. Run `python3 tools/check.py` until it passes; add rows to `FEATURE_STATUS.md` and `TESTING.md`.
+
+```text
+register()
+{
+    feature = custom_scripts\ix\core\features::add( "player_card", "hud", "Player card", "The card in the bottom-right corner naming your character.", 1 );
+    feature.on_player = ::apply_player_card;
+    custom_scripts\ix\core\config::add_int( "player_card_x", 16, 0, 600, "Player card: right margin", "Distance from the right edge of a 640 x 480 screen.", undefined );
+    custom_scripts\ix\core\events::subscribe( "player_spawn", ::on_spawn );
+}
+```
 
 ## 10. Mapping from AAE's architecture (BO3) to Infinite Expansion (IW7)
 
@@ -245,12 +297,12 @@ Multiplayer support was dropped on 2026-10-06; the mod targets the zombies mode 
 |------------------------------------------|--------------------|----------------|
 | `autoexec` functions + `system::register(name, __init__, __main__, deps)` | One entry script (zombies) → `ix\core\bootstrap` calls each module's `register()` in a fixed order | IW7 has no `system::` manager; iw7-mod runs only `main()`/`init()` of auto-loaded files |
 | `tfoption.gsc` reads ~80 `tfoption_*` modvars **once** at match start | `ix\core\config`: flat `ix_*` keys, applied at start **and live** | Same flat-key model; live apply because the menu is in-game |
-| LUI save data + `exec AAECustomMutations` + `tfoption_master_ver` reset | `ix\core\persist`: `ix_settings.cfg` via GSC file I/O + `settings_version` | GSC can write files in IW7 (with `fs_game`); BO3 GSC could not |
+| LUI save data + `exec AAECustomMutations` + `tfoption_master_ver` reset | `ix\core\persist`: archived dvars (`seta ix_<id>`, via iw7-mod's `executecommand`) + `ix_settings_version` | GSC file I/O needs `fs_game`, which the joinable install has none of (L30); the host's config needs nothing |
 | LUI "Custom Mutations" lobby menus (`tfoptions*.lua`) | GSC HUD menu, Settings pages | A LUI front-end would be client code every player needs (L22) |
 | `_clientid.gsc` dev menu (`elmg_cheats`, host verification, Stance+Reload) | Debug pages gated by `ix_dev` + host + confirmation | Same idea; never reachable by accident |
 | `callback::on_connect/on_spawned`, `zm::register_*_callback`, `level._custom_powerups[..].grab_powerup`, `level.round_wait_func` | `ix\core\events` over IW7 notifies; wrappers around `level.callbackplayerdamage` / `level.agent_funcs[..]`; `level.movemodefunc`; `replacefunc` | Use the hooks IW7 actually has |
 | Patched **copies** of stock scripts (e.g. `zombie_utility`) | `replacefunc` detours of single functions | No redistribution of modified stock code; smaller surface |
-| `chatnotify.gsc` (`chat` notify, `/bal`, `/dep`, …) | Chat-command router on iw7-mod's `say` notify | Equivalent mechanism |
+| `chatnotify.gsc` (`chat` notify, `/bal`, `/dep`, …) | `ix\core\chat`: `!ix` commands on iw7-mod's `say` notify, replies with `tell()` | Equivalent mechanism |
 | Client sys-state "set client dvar" bridge; `luinotifyevent` score popups | `setclientdvar(s)`; GSC HUD text | Native in IW7 |
 | 48 custom CSV tables, 1,678 localized strings | Inline GSC data; plain `settext` labels | New tables/strings need a fastfile (L21) |
 | ~800 ported assets, sound banks, movies | Not ported (optional future asset phase, x64-zt) | Script-only scope |

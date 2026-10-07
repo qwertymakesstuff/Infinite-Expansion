@@ -4,6 +4,31 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Phase 2: settings, chat commands, saving; the launcher (2026-10-07)
+
+**Added**
+- **Settings.** Every option of the mod is now a setting with a type, a default and a valid range (`ix\core\config`). Eight so far: `debug_log`, the four character settings, `player_card` and its two margins.
+  - Change one in chat (`!ix set character_announce 1`) or in the console (`set ix_character_announce 1`, applied within half a second). A value that means nothing is refused, and numbers are kept within their range.
+  - Changes are **saved** by themselves, as archived dvars in the host's own config (`seta`, the way the CHARACTER menu saves your pick), so they also work in the install friends can join. `ix_settings_version` records the layout, for later migrations.
+- **Chat commands** (`ix\core\chat`): `!ix`, `!ix list [word]`, `!ix get`, `!ix set`, `!ix on` / `off`, `!ix reset <setting>` / `all`, `!ix version`. Everyone can look; only the host can change settings. Replies go only to the player who typed.
+- **Event bus** (`ix\core\events`): modules subscribe to 12 events (connect, spawn, death, disconnect, last stand, weapon change, fire, reload, round start and end, game end, chat), each from a real IW7 notify, with one listener per source.
+- **Feature manager** (`ix\core\features`): on/off features with requirements and global or per-player hooks. The player card is the first: `!ix off player_card` hides it at once.
+- More utilities: `parse_bool`, `is_number`, `array_contains`, `starts_with`.
+- The init log has a third line: `settings: 8 (0 changed from the default); features: 1; chat: !ix`.
+- **Launcher.** INSTALL, UPDATE and REINSTALL now build `Infinite Expansion.exe` in the game folder, with an **Infinite Expansion** shortcut on the desktop. It checks that iw7-mod and the mod are there, starts Steam if needed and waits until you are signed in (iw7-mod refuses to start without Steam), then starts iw7-mod from the game folder. Arguments given to it go on to iw7-mod.
+  - It is compiled on your PC by the C# compiler that comes with Windows, from `installer\IXLauncher.cs`, so the download carries no program file. If it cannot be built, the install still succeeds and PLAY works as before.
+  - The game opens on its main menu: iw7-mod's `-zombies` switch only works on dedicated servers (its own docs say otherwise).
+  - PLAY now starts the launcher. UNINSTALL removes it and its shortcut.
+- Version 0.2.0.
+
+**Changed**
+- The character and player-card dvars (`ix_character_select`, `ix_character_specials`, `ix_character_crossmap`, `ix_character_announce`, `ix_player_card`, `_x`, `_y`) are now settings. The dvar names are the same, so earlier values still apply.
+- The setup no longer adds an "IW7-Mod (Infinite Warfare)" desktop shortcut when it downloads iw7-mod; the Infinite Expansion shortcut replaces it.
+
+**Tests**
+- 8 new installer tests (54): the launcher's source compiles with C# 5 rules and passes arguments on intact; building it against a stand-in for Windows' C# compiler (arguments, version, icon refused, compiler failing or missing, nothing left in the temp folder); PLAY prefers it; UNINSTALL removes it, and finishes when it is in use; its icon is bitmap-only and matches `ix.ico`.
+- `check.py` passes with the five new core scripts on both compilers (17 scripts, 13,374 bytes).
+
 ### Character pictures: x64-zt no longer crashes on every map (2026-10-07)
 
 **Fixed**

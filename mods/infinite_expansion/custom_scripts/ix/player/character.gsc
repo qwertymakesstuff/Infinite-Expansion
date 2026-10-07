@@ -33,20 +33,27 @@
 // A choice the rules below refuse gets a random character, as in the stock
 // game, and a message after the first spawn says why.
 //
-// Settings (unset = default):
-//   ix_character_select    1   0 = off: the game picks characters as usual
-//   ix_character           ""  the host's character
-//   ix_character_specials  1   0 = no special characters,
-//                              1 = specials the player has unlocked, 2 = all
-//   ix_character_crossmap  0   1 = special characters on other maps too
-//                              (experimental: KNOWN_LIMITATIONS.md L26). Read once,
-//                              while the map loads, because their models can only
-//                              be precached then.
-//   ix_character_announce  0   1 = a "<player> is playing as <character>" line
-//                              for everyone after a player's first spawn
+// Settings (config.gsc; console: set ix_<id> <value>, chat: !ix set <id> <value>):
+//   character_select    1   0 = off: the game picks characters as usual. From the
+//                           next map: the stock function is replaced, or not, while
+//                           the map loads
+//   character_specials  1   0 = no special characters,
+//                           1 = specials the player has unlocked, 2 = all
+//   character_crossmap  0   1 = special characters on other maps too
+//                           (experimental: KNOWN_LIMITATIONS.md L26). From the next
+//                           map, because their models can only be precached while
+//                           it loads
+//   character_announce  0   1 = a "<player> is playing as <character>" line
+//                           for everyone after a player's first spawn
+// ix_character (the host's pick) is not a setting: the CHARACTER menu sets it.
 
 register()
 {
+    custom_scripts\ix\core\config::add_bool( "character_select", 1, "Character selection", "Players start as the character they chose in the lobby. Takes effect from the next map.", undefined );
+    custom_scripts\ix\core\config::add_int( "character_specials", 1, 0, 2, "Special characters", "0 = none, 1 = the ones each player has unlocked, 2 = all of them.", undefined );
+    custom_scripts\ix\core\config::add_bool( "character_crossmap", 0, "Special characters on any map", "Experimental: their models may be missing on other maps. Takes effect from the next map.", undefined );
+    custom_scripts\ix\core\config::add_bool( "character_announce", 0, "Announce characters", "A line for everyone saying who each player is playing as.", undefined );
+
     level.ix.character = spawnstruct();
     level.ix.character.cast = build_cast( level.ix.map );
 
@@ -57,7 +64,7 @@ register()
     }
 
     // Precaching is only allowed while the level loads, which is now.
-    level.ix.character.crossmap = custom_scripts\ix\core\util::dvar_int( "ix_character_crossmap", 0 ) != 0;
+    level.ix.character.crossmap = custom_scripts\ix\core\config::get( "character_crossmap" );
 
     if ( crossmap_enabled() )
         precache_crossmap_models();
@@ -78,12 +85,12 @@ register()
 
 enabled()
 {
-    return custom_scripts\ix\core\util::dvar_int( "ix_character_select", 1 ) != 0;
+    return custom_scripts\ix\core\config::get( "character_select" );
 }
 
 specials_mode()
 {
-    return custom_scripts\ix\core\util::dvar_int( "ix_character_specials", 1 );
+    return custom_scripts\ix\core\config::get( "character_specials" );
 }
 
 crossmap_enabled()
@@ -93,7 +100,7 @@ crossmap_enabled()
 
 announce_enabled()
 {
-    return custom_scripts\ix\core\util::dvar_int( "ix_character_announce", 0 ) != 0;
+    return custom_scripts\ix\core\config::get( "character_announce" );
 }
 
 // ---------------------------------------------------------------------------

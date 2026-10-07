@@ -115,6 +115,20 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V63 | The first real picture build (2026-10-07): five "ZoneTool ERROR: Fatal error (0xC0000005) at 0x000000016064530D" boxes, one per map | ✅ Explained. The address, symbolized with the release's own `zonetool.pdb`, is in `memmove` at its first read from the source. Image pixels are in the zone's temporary block (`gfx_image::write`), freed once the zone has loaded, and `dumpasset image` after `loadzone` copied them. The stock menu material is in `techsets_ui_boot`, which `loadzone ui_boot` does not load (`[LISTING]`, `skip_extra_zones_stub`), so the build would have failed there too (`IW_API_NOTES.md` §18) |
 | V64 | The new dump, against a stand-in that behaves as V63 found (`CharacterPictures`, `PicturesScript`, `SetupScriptWithoutWindow`, `BackgroundPictures`) | ✅ Each map's run sends `dumpzone iw7 <zone> image` for its zones and never `dumpasset image` (the stand-in crashes on it). The pattern material comes after `techsets_ui_boot` is loaded. Each card's `.iw7Image` is renamed into the build input, and a later zone's image replaces an earlier one's (Elvira's patched card). Both pattern zones are `require` rows. Two failed maps in a row stop the rest: the setup started x64-zt twice, not five times. Only the real x64-zt can confirm it (R-PK1) |
 
+### Phase 2 (core systems) and the launcher
+
+| # | Check | Result |
+|---|-------|--------|
+| V65 | `python3 tools/check.py` with the Phase 2 scripts (`events`, `config`, `persist`, `features`, `chat`) | ✅ PASS, 0 errors, 0 warnings: 34/34 compiled, 17/17 identical between the compilers, 271 built-in calls, 113 far references (10 into stock scripts), 17 scripts load in a zombies match, 13,374 bytes of custom-script memory (1.28% of 1 MiB) |
+| V66 | iw7-mod's chat and script functions, read at v1.1.0 and develop (`IW_API_NOTES.md` §19) | ✅ `logprint.cpp` notifies level `"say"` (player, message) and the player `"say"` (message) for every chat line, team chat in zombies included; `executecommand` queues a console command; `tell` sends a quoted chat line to one player. The same in both versions |
+| V67 | Single characters of a string in the stock scripts | ✅ Taken with `getsubstr(s, i, i + 1)` (`cp_disco_song_quest.gsc`, `disco_mpq.gsc`, `cp_final_venomx_quest.gsc`); none indexes a string. `util::is_number` and `persist::is_safe` do the same |
+| V68 | iw7-mod's `-zombies` / `-cpMode`, read at v1.1.0 and develop | ⚠️ They work on a dedicated server only: the client returns from `dedicated.cpp`'s `post_unpack` before reading them, although iw7-mod's `commandlineargs.md` lists them for the client. The launcher passes no mode flag (§14) |
+| V69 | iw7-mod's Steam check (`steam_proxy.cpp`) | ✅ The client loads Steam only when `FindWindowA(0, "Steam")` finds Steam's window, else it shows "Steam must be running to play this game!" and exits. The launcher waits for that window and for `ActiveUser` (§19) |
+| V70 | `installer/IXLauncher.cs` compiled by PowerShell 7's C# compiler with `/langversion:5` (`GameLauncher`) | ✅ Compiles; the same flag refuses C# 6 (`?.`), so the source is C# 5 as the compiler of .NET Framework 4 needs. Arguments passed on to iw7-mod split back exactly, by CommandLineToArgvW's rules, for spaces, empty arguments, quotes, backslashes before a quote or at the end, and tabs. The compiled launcher was not run (Windows only: R-L1 to R-L6) |
+| V71 | Building, starting and removing the launcher with a stand-in compiler (`GameLauncher`, `SetupScriptWithoutWindow`; `tools/tests/fake_csc.py`) | ✅ `csc.exe` is found under `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319`; it gets `/target:winexe /optimize+ /noconfig /reference:System.dll` and the icon, and the source the package version (0.2.0 → 0.2.0.0). A compiler that refuses the icon: built without it. A failing compiler: its error line, and the launcher already there stays. No compiler (Linux): the install succeeds and says the launcher could not be built. No work folder is left in the temp folder. UNINSTALL deletes it, and a launcher that cannot be deleted (in use) is reported instead of failing the uninstall; PLAY's `Start-IXGame` starts the launcher when it exists, else `iw7-mod.exe`, from the game folder (stand-ins record which ran) |
+| V72 | `installer/ix-launcher.ico` (`tools/make_launcher_icon.py`, `SetupFiles`) | ✅ The six sizes of `ix.ico` up to 128 px as 32-bit bitmaps with transparency masks, because the C# 5 compiler may refuse PNG images; Pillow and ImageMagick read it back, pixel for pixel equal to `ix.ico` |
+| V73 | `python3 -m unittest discover -s tools/tests` | ✅ 82 tests OK: installer 54 (46 before; the launcher added 8), checker 12, character data 6, menu script 10 |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -123,9 +137,9 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 4. Launch with `+set developer_script 1`. Without it, script runtime errors are not printed at all (`KNOWN_LIMITATIONS.md` L24).
 5. Logs: the iw7-mod console (`~`) and `iw7-mod/logs/console.log`, available since iw7-mod v1.0.3. Report every line starting with `[IX]` and any `script compile error`, `script link error`, or `script runtime error` block.
 6. **No `[IX]` lines at all?** Check that `<Infinite Warfare>/iw7-mod/custom_scripts/cp/ix_main.gsc` exists. Then try the Mods-menu install, check that the console's `----- FS_Startup -----` list includes `mods/infinite_expansion`, and report which install worked.
-7. Mod dvars for testing:
+7. Settings for testing (README "Settings and chat commands"): in a match, `!ix list` in chat shows them all; `set ix_<setting> <value>` in the console or `!ix set <setting> <value>` in chat changes one, and it is saved for the next game.
    - `ix_debug_log 1`: extra `[IX] DEBUG:` lines (player connect and spawn). Takes effect immediately.
-   - `ix_enabled 0`: turns the whole mod off from the next map load.
+   - `ix_enabled 0` (a dvar, not a setting): turns the whole mod off from the next map load.
    - `ix_version`: set by the mod, shows the loaded version.
 
 ## 4. Runtime checklist
@@ -136,7 +150,7 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.1.1 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.2.0 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
 | R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
 | R-S3 | Menu opens (ADS + Melee) *(Phase 3)* | Menu visible; weapons/offhands disabled while open | not run | not run |
 | R-S4 | Menu closes (Melee at root) *(Phase 3)* | Menu hidden; weapons restored | not run | not run |
@@ -167,16 +181,22 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 | R-Z4 | Player death / bleed-out | No script errors; menu and HUD recover | not run | not run |
 | R-Z5 | Restart | State reset; no leaked HUD elements | not run | not run |
 
-### 4.4 Configuration
+### 4.4 Settings and chat commands (Phase 2)
+
+Chat commands are typed in the match's chat. The replies appear only for the player who typed; everyone sees the command itself, as any chat line.
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-C1 | Change a setting in the menu | Applied live; `ix_<id>` dvar updated | not run | not run |
-| R-C2 | `set ix_<id> <value>` in the console | Applied within ~0.5 s; menu reflects it | not run | not run |
-| R-C3 | Reset one / reset all | Defaults restored | not run | not run |
-| R-C4 | Presets | All values match the preset table | not run | not run |
-| R-C5 | Persistence (mod-folder install) | `ix_settings.cfg` written; values restored next load | not run | not run |
-| R-C6 | Persistence without fs_game (loose install) | No script error; menu reports session-only | not run | not run |
+| R-C1 | Type `!ix`, then `!ix list`, `!ix list card`, `!ix get player_card_x`, `!ix version` | The command list; all 8 settings with values (a few per line); only the three `player_card` ones; "Player card: right margin: player_card_x = 16 (default 16, a whole number from 0 to 600)" and its help line; "Infinite Expansion 0.2.0". A second player sees none of the replies | not run | not run |
+| R-C2 | Console: `set ix_player_card_y 140` | The card moves up within about half a second; the console shows `[IX] INFO: setting player_card_y = 140 (console)` | not run | not run |
+| R-C3 | Invalid values: console `set ix_player_card_y abc`; chat `!ix set player_card_y 9999`, `!ix set character_specials maybe`, `!ix on player_card_x`, `!ix get nothing` | `abc`: a warning, and `ix_player_card_y` is back at its value. 9999 becomes 440. "character_specials: 'maybe' is not a whole number from 0 to 2." "player_card_x is not an on/off setting …". "No setting 'nothing' …" | not run | not run |
+| R-C4 | Co-op: the guest types `!ix list`, then `!ix set player_card 0` | The list works; then "Only the host can change settings." and nothing changes | not run | not run |
+| R-C5 | Saving: `!ix set character_announce 1`, quit the game, start it again and a new match | The init line says `1 changed from the default`, and `!ix get character_announce` says 1. Search the files in `iw7-mod\players2` for `ix_character_announce` and report which file holds it | not run | not run |
+| R-C6 | `!ix reset character_announce`; then change two settings and `!ix reset all`; restart the game | Each back to its default ("… (default)", "Every setting is back to its default."); after the restart the init line says `0 changed` | not run | not run |
+| R-C7 | `!ix off player_card`; `!ix on player_card`; die or bleed out and respawn | The card disappears at once; it comes back within half a second; it is still there after the respawn | not run | not run |
+| R-C8 | Odd chat: `!ix set player_card_x 1;quit`, `!ix get "x`, `!IX LIST` | The first is refused (not a whole number) and the game keeps running; the second answers "No setting that …"; upper case works like lower case | not run | not run |
+| R-C9 | `set ix_debug_log 1`, then a new match; `!ix off debug_log` | `[IX] DEBUG:` lines (player connected / spawned), then none | not run | not run |
+| R-C10 | Presets *(Phase 11)* | All values match the preset table | not run | not run |
 
 ### 4.5 Characters (Phase 1.5)
 
@@ -220,16 +240,28 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I3 | INSTALL, then start a zombies match | Status INSTALLED; `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` and `iw7-mod\infinite-expansion.json` exist; *Settings → Apps* lists Infinite Expansion; the console shows `[IX] INFO: init` | not run |
 | R-I4 | With the old `mods\infinite_expansion` copy present | The yellow note shows; INSTALL removes that copy's files and says so | not run |
 | R-I5 | UNINSTALL | Status UNINSTALLED; the mod's files and the record are gone; other files in `iw7-mod` stay; the Settings entry is gone | not run |
-| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.1.1` | not run |
+| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.2.0` | not run |
 | R-I6 | Install, delete the download, then uninstall from *Settings → Apps* | The setup window opens and uninstalls by itself; after closing it, `%LOCALAPPDATA%\InfiniteExpansion` is gone | not run |
 | R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
 | R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
 | R-I9 | Game in a folder Windows protects (if available) | INSTALL offers to retry as administrator, and that works | not run |
-| R-I10 | Move `iw7-mod.exe` out of the game folder, then INSTALL | The status line shows "Downloading iw7-mod.exe from GitHub: x of y MB"; `iw7-mod.exe` is back; a desktop shortcut **IW7-Mod (Infinite Warfare)** exists; then ALL SET and the button reads PLAY. Report the version and whether it says "checksum verified" | not run |
-| R-I11 | PLAY, with Steam closed and then open | Closed: Steam opens and the window says to click PLAY again. Open: iw7-mod starts (first time: its updater runs), and the setup closes | not run |
+| R-I10 | Move `iw7-mod.exe` out of the game folder, then INSTALL | The status line shows "Downloading iw7-mod.exe from GitHub: x of y MB"; `iw7-mod.exe` is back; then ALL SET and the button reads PLAY. Report the version and whether it says "checksum verified" | not run |
+| R-I11 | PLAY, with Steam closed and then open | The setup closes and the launcher starts the game: with Steam closed, after Steam has started and signed in (R-L3). Without the launcher (R-L1 failed): Steam opens and the window says to click PLAY again | not run |
 | R-I12 | No game installed (another PC, or a Steam account without the game) | GAME NOT FOUND; STEAM opens Steam's install dialog or the store page; after Steam installs the game, the window finds it within a few seconds | not run |
 | R-I13 | DOWNLOAD in the iw7-mod row | Only iw7-mod is downloaded; the status says to click INSTALL next | not run |
 | R-I14 | After INSTALL (status names your Steam name), start the game | The Zombies menu shows CHARACTER; your name is your Steam name instead of "Unknown Soldier". After `name Test` in the console and a restart, it stays "Test" | not run |
+
+### 4.10 The launcher
+
+| ID | Test | Expected | Result |
+|----|------|----------|--------|
+| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.2.0.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
+| R-L2 | Steam open and signed in: double-click the shortcut | The game starts within a few seconds, on its main menu; no other window appears. Report any Windows or antivirus warning about the launcher | not run |
+| R-L3 | Steam closed: double-click the shortcut; also once while Steam asks for your password | Steam starts; the game starts by itself a few seconds after Steam has signed in (with the password: after you sign in, within five minutes). No "Steam must be running" box | not run |
+| R-L4 | Double-click twice quickly; then once more while the game runs | One game; then "Infinite Warfare is already running." | not run |
+| R-L5 | Rename `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` to `.bak`, double-click; rename it back; then UNINSTALL | It asks whether to start iw7-mod without the mod (No: nothing starts). UNINSTALL deletes the launcher and its shortcut and says "Removed Infinite Expansion.exe." | not run |
+| R-L6 | Add ` +set ix_debug_log 1` at the end of the shortcut's *Target*, start a match | `[IX] DEBUG:` lines in the console: the launcher passed the argument on | not run |
+| R-L7 | Optional experiment: add ` +cpMode` at the end of the shortcut's *Target* | Report whether the game opens straight into Zombies, opens normally, or misbehaves (`-zombies` does nothing in the client, V68) | not run |
 
 ### 4.9 Character pictures (optional)
 

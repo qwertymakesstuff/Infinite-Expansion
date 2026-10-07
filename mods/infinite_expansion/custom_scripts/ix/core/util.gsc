@@ -14,16 +14,7 @@ is_human( player )
     return is_valid_player( player ) && !isbot( player );
 }
 
-// Integer setting: the dvar's value, or fallback while the dvar is unset.
-dvar_int( name, fallback )
-{
-    if ( getdvar( name ) == "" )
-        return fallback;
-
-    return getdvarint( name );
-}
-
-// Lower-case string setting: the dvar's value, or fallback while it is unset.
+// A dvar's value in lower case, or fallback while it is unset (settings use config.gsc).
 dvar_string( name, fallback )
 {
     value = getdvar( name );
@@ -48,4 +39,75 @@ join( items, separator )
     }
 
     return result;
+}
+
+// 1 for "1", "true", "on", "yes"; 0 for "0", "false", "off", "no" (any case);
+// undefined for anything else.
+parse_bool( text )
+{
+    switch ( tolower( text ) )
+    {
+        case "1":
+        case "true":
+        case "on":
+        case "yes":
+            return 1;
+        case "0":
+        case "false":
+        case "off":
+        case "no":
+            return 0;
+    }
+
+    return undefined;
+}
+
+// Digits with an optional leading "-", and with allow_fraction one ".":
+// is_number( "-12", 0 ) and is_number( "0.5", 1 ) are true, is_number( "1e3", 1 ) is not.
+is_number( text, allow_fraction )
+{
+    if ( !isstring( text ) || text.size == 0 )
+        return 0;
+
+    digits = 0;
+    dots = 0;
+
+    for ( i = 0; i < text.size; i++ )
+    {
+        // One character, the way the stock scripts take it (cp_disco_song_quest.gsc).
+        c = getsubstr( text, i, i + 1 );
+
+        if ( c == "-" && i == 0 )
+            continue;
+
+        if ( c == "." && allow_fraction && dots == 0 )
+        {
+            dots++;
+            continue;
+        }
+
+        if ( !issubstr( "0123456789", c ) )
+            return 0;
+
+        digits++;
+    }
+
+    return digits > 0;
+}
+
+// True when items holds value (compared with ==, so give both the same type).
+array_contains( items, value )
+{
+    foreach ( item in items )
+    {
+        if ( item == value )
+            return 1;
+    }
+
+    return 0;
+}
+
+starts_with( text, prefix )
+{
+    return text.size >= prefix.size && getsubstr( text, 0, prefix.size ) == prefix;
 }

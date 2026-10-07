@@ -343,12 +343,12 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
 | Lobby options ("Custom Mutations") | LUI menus `tfoptions*.lua`; writes `modvar tfoption_*`; read once by `tfoption.gsc` | **In-game GSC HUD menu** ("Settings" pages) writing `ix_*` dvars, plus a settings file. Lobby LUI is a later optional client add-on (`ui_scripts/`) | M | RI | PLANNED (Phase 3) |
-| Option persistence | LUI save data (`AAESavingDataUtility`), `exec AAECustomMutations` | GSC `writefile`/`readfile` of `ix_settings.cfg` under `fs_game` (iw7-mod I/O) | M | RI | PLANNED (Phase 2) |
-| Option-schema versioning | `tfoption_master_ver` vs `tfoption_tf_enabled`; reset on mismatch | `ix_settings_version` key in the settings file; migrate or reset | E | RI | PLANNED (Phase 2) |
-| Console overrides | `modvar tfoption_<k> <v>`; plain dvars `zm_speed`, `elmg_cheats` | `set ix_<k> <v>` (iw7-mod console); watcher thread applies live | E | RI | PLANNED (Phase 2) |
+| Option persistence | LUI save data (`AAESavingDataUtility`), `exec AAECustomMutations` | Archived dvars: `executecommand("seta ix_<k> <v>")` into the host's config (`ix\core\persist`). Planned as `ix_settings.cfg` via GSC file I/O, which needs `fs_game` and so the install nobody can join (L9, L30) | M | RI | TESTING (Phase 2) |
+| Option-schema versioning | `tfoption_master_ver` vs `tfoption_tf_enabled`; reset on mismatch | `ix_settings_version` dvar with a migration hook; an invalid saved value falls back to the default | E | RI | TESTING (Phase 2) |
+| Console overrides | `modvar tfoption_<k> <v>`; plain dvars `zm_speed`, `elmg_cheats` | `set ix_<k> <v>` (iw7-mod console); watcher thread applies live; also `!ix set <k> <v>` in chat | E | RI | TESTING (Phase 2) |
 | Presets | Client "Preset" list (`AAE_PRESENT_LIST`) | Data-defined presets (Default/Classic/Enhanced/Testing/Developer/Custom) | E | RI | PLANNED (Phase 11) |
 | Module system / init order | `autoexec` + `system::register(name, __init__, __main__, deps)` | No BO3 system manager in IW7. `ix\core\bootstrap` calls each module's `register()` in a fixed order from one entry script per mode | M | RI | PLANNED (Phase 1) |
-| Engine hooks | `callback::on_connect/on_spawned`, `zm::register_*_callback`, `level._custom_powerups[..].grab_powerup`, `level.round_wait_func` | `level waittill("connected")` / `"spawned_player"`; wrap `level.callbackplayerdamage`, `level.agent_funcs[type]["on_damaged"/"on_killed"]`, `level.movemodefunc[type]`; `replacefunc` for the rest | M | RI | PLANNED (Phase 2) |
+| Engine hooks | `callback::on_connect/on_spawned`, `zm::register_*_callback`, `level._custom_powerups[..].grab_powerup`, `level.round_wait_func` | Event bus `ix\core\events` over `connected` / `spawned_player`, round, last-stand, weapon and chat notifies (TESTING, Phase 2); wrap `level.callbackplayerdamage`, `level.agent_funcs[type]["on_damaged"/"on_killed"]`, `level.movemodefunc[type]` and `replacefunc` for the rest when a feature needs them | M | RI | PARTIAL (Phase 2: events; wrappers with their features) |
 | Server→client dvar bridge | Client sys-state `"deadshot_keyline"` carrying `dvar,<name>,<value>` | Native `setclientdvar(s)` (both compilers); client acceptance of cheat-flagged dvars UNK | E | RI / UNK | PLANNED |
 | LUI notifications (score popups) | `luinotifyevent(&"aae_score_event", …)` + CSV table | GSC HUD text; LUI only through predefined omnvars, or later client Lua | M | PP | PLANNED (HUD) |
 | String tables | `gamedata/tables/common/*.csv` | `tablelookup` works on stock tables; **new** tables need a fastfile, so data is inlined in GSC | E | PP | Design note |
@@ -465,7 +465,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Custom keybinds (flashlight, drop points, third person, map view, split door cost, …) | LUI key-binding UI | GSC cannot create new binds. Use `notifyonplayercommand` on **existing** commands, or chat commands players can bind (`bind <key> "say /cmd"`) | M | PP | PLANNED (as chat commands) |
 | Drop/share points | Keybind | Chat command `/share` + `give_player_currency` / `take_player_currency` | E | RI | PLANNED |
 | Overhead map view | Keybind | Link the player to a high script origin camera (`playerlinkto`) | M | PP / UNK | INVESTIGATING |
-| Chat commands (`/bal /dep /transfer /save /tp /ammo /ee /?`) | `self waittill("chat", msg)` | iw7-mod `say` notify (`level waittill("say", player, msg)`, v1.0.3+) | E | RI | PLANNED |
+| Chat commands (`/bal /dep /transfer /save /tp /ammo /ee /?`) | `self waittill("chat", msg)` | iw7-mod `say` notify (`level waittill("say", player, msg)`, v1.0.3+). The router and the `!ix` settings commands exist (`ix\core\chat`, Phase 2); these gameplay commands come with their features | E | RI | PLANNED (router: TESTING) |
 | Weapon inspect / redraw | Third-party script | Already provided by iw7-mod (`startweaponinspection`, actionslot 8) | – | DP | N/A (exists) |
 
 ### 3.10 Dev/cheat menu (`elmg_cheats`)
