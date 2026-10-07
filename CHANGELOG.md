@@ -4,6 +4,17 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### The player card shows the character's picture (2026-10-07)
+
+**Added**
+- The card in the bottom-right corner now shows the character's picture at its left: their square card from the current map, the one the game's HUD shows for teammates. These pictures are part of every map, so every player sees them, without the picture pack.
+  - A special character from another map (`character_crossmap`) has no picture there, and the card stays as before.
+  - The new setting `player_card_picture` (on by default) turns the picture off: `!ix off player_card_picture`.
+- Version 0.2.1.
+
+**Tests**
+- Each of the 50 card names (every character on their maps, main and team card) is a material that the map loads, per the game's asset listing. A new test checks that the player card and the setup's picture pack use the same names.
+
 ### Phase 2: settings, chat commands, saving; the launcher (2026-10-07)
 
 **Added**

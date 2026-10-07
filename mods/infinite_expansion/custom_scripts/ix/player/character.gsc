@@ -230,6 +230,51 @@ make_special( key, name, aliases, home, home_num, select_id, soul_key, merit, bo
     return entry;
 }
 
+// The stock HUD's character cards (KNOWN_LIMITATIONS.md L28): a main card and a
+// small square team card per slot, named in each map's playercash_images table.
+// Their materials are in the map's techsets zone, which loads with every match
+// on that map, for every player. The setup's picture pack copies the same cards
+// (installer/IXPictures.Core.ps1; tools/tests/test_character_data.py checks
+// that both use the same names). Returns the parts around kind and slot:
+// parts[0] + kind + parts[1] + slot + parts[2].
+card_name_parts( map )
+{
+    switch ( map )
+    {
+        case "cp_zmb":
+            return [ "zm_pc_score_", "_plyr_", "" ];
+        case "cp_rave":
+            return [ "zm_", "_plyr_", "_dlc1" ];
+        case "cp_disco":
+            return [ "zm_", "_plyr_", "_dlc2" ];
+        case "cp_town":
+            return [ "zm_", "_plyr_", "_dlc3" ];
+        case "cp_final":
+            return [ "zm_", "_plyr_", "_dlc4" ];
+    }
+
+    return undefined;
+}
+
+// The material of a character's card on this map, kind "main" or "team", or
+// undefined: a special character from another map has no card loaded here.
+card_material( entry, kind )
+{
+    if ( !isdefined( entry ) || !entry.native || !isdefined( entry.num ) )
+        return undefined;
+
+    // Willard Wyler's cards are in patch_cp_zmb, named after the last map.
+    if ( entry.key == "willard" )
+        return "zm_" + kind + "_plyr_6_dlc4";
+
+    parts = card_name_parts( level.ix.map );
+
+    if ( !isdefined( parts ) )
+        return undefined;
+
+    return parts[0] + kind + parts[1] + entry.num + parts[2];
+}
+
 // "Sally (Valley Girl)", or only the name where there is no outfit name.
 describe( entry )
 {

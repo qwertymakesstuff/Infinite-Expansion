@@ -1,1 +1,1 @@
-Infinite Expansion 0.2.0 - modular enhancement framework for Infinite Warfare zombies. Character selection, settings and !ix chat commands; more options in later versions.
+Infinite Expansion 0.2.1 - modular enhancement framework for Infinite Warfare zombies. Character selection, settings and !ix chat commands; more options in later versions.

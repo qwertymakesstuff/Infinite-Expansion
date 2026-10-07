@@ -73,9 +73,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.2.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.2.1 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix
+[IX] INFO: settings: 9 (0 changed from the default); features: 1; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -109,6 +109,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `character_crossmap` | 0 | 0/1 | **Experimental:** special characters on other maps (from the next map) |
 | `character_announce` | 0 | 0/1 | An "is playing as" line for each player after the intro |
 | `player_card` | 1 | 0/1 | The card in the bottom-right corner; switching it off hides it at once |
+| `player_card_picture` | 1 | 0/1 | The character's picture on that card: their card from the current map, the one the HUD shows for teammates |
 | `player_card_x` | 16 | 0–600 | The card's distance from the right edge (640 × 480 screen) |
 | `player_card_y` | 96 | 0–440 | The card's distance from the bottom edge |
 
@@ -133,7 +134,7 @@ To see what happened to your pick, open the console (`~`) in the match, or read 
 | A special character you have unlocked | You play as them on their own map. On other maps only with the setting `character_crossmap` on | The same. The pick travels with you in the stock lobby setting, so on the character's own map it works even if the host does not have this mod |
 | Random | The game picks | The game picks |
 
-No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. If the host switches on `character_announce` (`!ix on character_announce`), everyone also sees a line such as "Alex is playing as Andre (Rapper)" for each player after the intro. The card in the bottom-right corner shows your own character.
+No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. If the host switches on `character_announce` (`!ix on character_announce`), everyone also sees a line such as "Alex is playing as Andre (Rapper)" for each player after the intro. The card in the bottom-right corner shows your own character, with their picture from the current map. A special character from another map (`character_crossmap`) has no picture there.
 
 The rules are enforced by the host's copy of the mod. A host without the mod runs the stock game, which hands out a special character on its own map without checking the unlock.
 

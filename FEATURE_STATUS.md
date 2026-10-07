@@ -21,7 +21,7 @@
 | Far-call / layout lint, bytecode budget | Tooling | 1 | COMPLETE | `calls`, `layout`, `source`, `budget` (fixture-tested) |
 | Stock scripts loaded on every zombies map (link-error guard) | Tooling | 1 | COMPLETE | `calls`: per-map link closure from the dump; 126 scripts common to all five maps |
 | Checker test suite | Tooling | 1 | COMPLETE | `tools/tests/test_check.py` (12 tests; `bad_mod` / `good_mod` fixtures) |
-| Cast data test (character table vs. stock scripts and the menu) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (6 tests; mutation-checked) |
+| Cast data test (character table vs. stock scripts, the menu, and the picture pack's card names) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (7 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
 
 ## Installer (Windows)
@@ -55,7 +55,7 @@
 | Compatibility module (raw ids, feature detection) | Core | 1 | TESTING | Fixes the v1.1.0 mislabels (C1, C2); wrappers are exercised by Phases 4 and 6; R-S8 |
 | Logging (`[IX]` console lines, `ix_debug_log`, ring buffer) | Core | 1 | TESTING | R-S1, R-S9 |
 | Feature manager (on/off features, requirements, global and per-player hooks) | Core | 2 | TESTING | `ix/core/features.gsc`; first user: `player_card`; R-C7 |
-| Configuration manager (bool/int/float/enum settings with defaults and ranges, like AAE's `tfoption_*`) | Core | 2 | TESTING | `ix/core/config.gsc`; 8 settings so far; invalid values refused, numbers clamped; R-C1, R-C3, R-C6 |
+| Configuration manager (bool/int/float/enum settings with defaults and ranges, like AAE's `tfoption_*`) | Core | 2 | TESTING | `ix/core/config.gsc`; 9 settings so far; invalid values refused, numbers clamped; R-C1, R-C3, R-C6 |
 | Saved settings + layout version (AAE: save data + `tfoption_master_ver`) | Core | 2 | TESTING | `ix/core/persist.gsc`: archived dvars (`seta ix_<id>`) in the host's config, so it works in the install friends can join; `ix_settings_version` with a migration hook (L38); R-C5 |
 | Live console overrides (`set ix_x v`) | Core | 2 | TESTING | Watcher every 0.5 s; replaces AAE `modvar` / `/d` (L3); R-C2 |
 | Event bus | Core | 2 | TESTING | `ix/core/events.gsc`: 12 events from real IW7 notifies, one listener per source; R-C9, R-Z1 |
@@ -81,7 +81,7 @@
 | Special characters gated by unlocks | Player | 1.5 | TESTING | The stock lobby's stats: soul keys, and for Willard also the merit (L27); checked in the menu and for every pick in the match; setting `character_specials` 0/1/2; R-CH6 |
 | Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in setting `character_crossmap`; their models may not exist on other maps (L26); R-CH7 |
 | Stock HUD portrait follows the chosen character | HUD | 1.5 | TESTING | Stock `setmodelfromcustomization` → `zm_player_character` |
-| Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: name and outfit; the feature `player_card` (off hides it at once) and the settings `player_card_x` / `_y`; R-CH9, R-C7 |
+| Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: the character's picture (the stock team card of the current map, setting `player_card_picture`), name and outfit; the feature `player_card` (off hides it at once) and the settings `player_card_x` / `_y`; R-CH9, R-C7 |
 | Player card picture (in a match) | HUD | 1.5 | BLOCKED | L28 |
 
 ## UI (Phase 3) / HUD (Phase 8)
