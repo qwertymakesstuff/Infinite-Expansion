@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -273,6 +274,46 @@ class ManualInstallAndSetupCopy(unittest.TestCase):
             self.assertTrue((self.copy / relative).is_file(), relative)
 
 
+SCENARIO_NEWER_FILES = r"""
+param([string]$Core, [string]$Game, [string]$Package, [string]$Newer, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$r = [ordered]@{}
+Install-IX $Game $Package | Out-Null
+$r.same = (Get-IXState $Game $Package).FilesDiffer
+$state = Get-IXState $Game $Newer
+$r.newer = $state.FilesDiffer
+$r.versions = @($state.InstalledVersion, $state.PackageVersion)
+Install-IX $Game $Newer | Out-Null
+$r.afterUpdate = (Get-IXState $Game $Newer).FilesDiffer
+[IO.File]::Delete((Join-IXPath (Get-IXTarget $Game) @('ui_scripts', 'InfiniteExpansion', '__init__.lua')))
+$r.fileMissing = (Get-IXState $Game $Newer).FilesDiffer
+ConvertTo-Json -InputObject $r -Depth 3 | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class NewerFiles(unittest.TestCase):
+    """A newer download with the same version number: the setup must still offer UPDATE."""
+
+    def test_changed_or_missing_files_count_as_outdated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _steam, game = make_game(root)
+            newer = root / "newer" / "infinite_expansion"
+            shutil.copytree(PACKAGE, newer)
+            changed = newer / "custom_scripts" / "ix" / "player" / "character.gsc"
+            changed.write_text(changed.read_text() + "\n// a fix from a newer download\n")
+            out = root / "result.json"
+            run_pwsh(SCENARIO_NEWER_FILES, CORE, game, PACKAGE, newer, out, workdir=tmp)
+            r = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertFalse(r["same"])
+            self.assertEqual(r["versions"][0], r["versions"][1], "same version number")
+            self.assertTrue(r["newer"])
+            self.assertFalse(r["afterUpdate"])
+            self.assertTrue(r["fileMissing"])
+
+
 @unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
 class SetupScriptWithoutWindow(unittest.TestCase):
     """installer/IXSetup.ps1 -NoWindow: the setup script itself, minus WPF."""
@@ -284,7 +325,7 @@ class SetupScriptWithoutWindow(unittest.TestCase):
     def test_install_and_uninstall(self):
         with tempfile.TemporaryDirectory() as tmp:
             _steam, game = make_game(Path(tmp))
-            result = self.run_setup("-GameDir", str(game))
+            result = self.run_setup("-GameDir", str(game), "-NoPictures")
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(f"Installed {len(payload_files())} files", result.stdout)
             self.assertTrue((game / "iw7-mod" / "custom_scripts" / "cp" / "ix_main.gsc").is_file())
@@ -301,6 +342,43 @@ class SetupScriptWithoutWindow(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("Infinite Warfare was not found", result.stderr)
             self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_first_install_builds_the_pictures_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            (game / "zone").mkdir()
+            (game / "fake_zonetool.json").write_text("{}")
+            result = self.run_setup("-GameDir", str(game), "-ZoneTool", str(FAKE_ZONETOOL))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Building the character pictures (first time only", result.stdout)
+            self.assertIn("Copying the character cards of Zombies in Spaceland (1 of 5)...", result.stdout)
+            self.assertIn(f"Character pictures: {len(picture_plan_names())} in", result.stdout)
+            pack = game / "iw7-mod" / "zone" / "ix_portraits.ff"
+            self.assertTrue(pack.is_file())
+            # Installing again (an update) does not build them again.
+            result = self.run_setup("-GameDir", str(game), "-ZoneTool", str(FAKE_ZONETOOL))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("character pictures", result.stdout.lower())
+            log = (game / "fake_zonetool.log").read_text()
+            self.assertEqual(log.count("args -dds -unbuffered-io"), 5)
+            self.assertEqual(log.count("args -buildzone"), 1)
+            # Uninstalling removes them with the mod.
+            result = self.run_setup("-Uninstall", "-GameDir", str(game))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(pack.exists())
+            self.assertFalse((game / "iw7-mod" / "zone" / "ix_portraits.txt").exists())
+
+    def test_failed_pictures_leave_the_mod_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            maps = ["cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final"]
+            (game / "fake_zonetool.json").write_text(json.dumps({"crash_on": maps}))
+            result = self.run_setup("-GameDir", str(game), "-ZoneTool", str(FAKE_ZONETOOL))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Character pictures could not be built: x64-zt copied none of the cards.", result.stdout)
+            self.assertTrue((game / "iw7-mod" / "custom_scripts" / "cp" / "ix_main.gsc").is_file())
+            for name in ("iw7-mod/zone/ix_portraits.ff", "ix-zonetool.exe", "dump", "zonetool", "zone_source"):
+                self.assertFalse((game / name).exists(), name)
 
 
 SCENARIO_CLIENT = r"""
@@ -553,6 +631,97 @@ class BackgroundDownload(unittest.TestCase):
         r = self.r["bg_fail"]
         self.assertFalse(r["ok"], r)
         self.assertIn("iw7-mod could not be downloaded", r["error"])
+
+
+SCENARIO_BACKGROUND_PICTURES = r"""
+param([string]$ScriptFile, [string]$Game, [string]$Stopped, [string]$ZoneTool, [string]$Out)
+$ErrorActionPreference = 'Stop'
+$text = [IO.File]::ReadAllText($ScriptFile)
+$r = [ordered]@{}
+
+function Start-Build {
+    param([string]$Dir, $Progress, [string]$Log)
+    $shell = [PowerShell]::Create()
+    [void]$shell.AddScript($text).AddArgument($Dir).AddArgument($Progress).AddArgument($Log).AddArgument($ZoneTool)
+    return @{ Shell = $shell; Handle = $shell.BeginInvoke() }
+}
+
+# A whole build, as the window runs it after INSTALL.
+$progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = '' })
+$log = Join-Path $Game 'pictures.log'
+$job = Start-Build $Game $progress $log
+$phases = New-Object System.Collections.ArrayList
+while (-not $job.Handle.IsCompleted) {
+    if ($phases -notcontains $progress.Phase) {
+        [void]$phases.Add($progress.Phase)
+    }
+    Start-Sleep -Milliseconds 20
+}
+$output = @($job.Shell.EndInvoke($job.Handle))
+$job.Shell.Dispose()
+$r.count = $output.Count
+$r.pictures = $output[$output.Count - 1].Pictures
+$r.phases = @($phases)
+$r.log = [IO.File]::ReadAllText($log)
+
+# The window closing while x64-zt runs: Stop() runs the clean-up.
+$progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = '' })
+$job = Start-Build $Stopped $progress (Join-Path $Stopped 'pictures.log')
+$deadline = (Get-Date).AddSeconds(60)
+while ([string]$progress.Phase -notlike 'Copying*' -and (Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 50
+}
+Start-Sleep -Seconds 3
+$job.Shell.Stop()
+$r.stoppedState = [string]$job.Shell.InvocationStateInfo.State
+$job.Shell.Dispose()
+ConvertTo-Json -InputObject $r -Depth 4 | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class BackgroundPictures(unittest.TestCase):
+    """The window builds the pictures after INSTALL in a second runspace: the same script text, run the same way."""
+
+    def test_build_and_stop(self):
+        gui = GUI.read_text()
+        match = re.search(r"\$PictureBuildScript = \[IO\.File\]::ReadAllText\(\$CorePath\) \+ \[Environment\]::NewLine \+ "
+                          r"\[IO\.File\]::ReadAllText\(\$PicturesCorePath\) \+ @'\r?\n(.*?)\r?\n'@", gui, re.S)
+        self.assertIsNotNone(match, "IXSetup.ps1 builds $PictureBuildScript from both core files and a here-string")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _steam, game = make_game(root / "a")
+            _steam, stopped = make_game(root / "b")
+            for folder in (game, stopped):
+                run_pwsh("param([string]$Core, [string]$Game, [string]$Package)\n. $Core\nInstall-IX $Game $Package | Out-Null\n",
+                         CORE, folder, PACKAGE, workdir=tmp)
+            (game / "fake_zonetool.json").write_text("{}")
+            (stopped / "fake_zonetool.json").write_text(json.dumps({"hang": True}))
+            script_file = root / "pictures.ps1"
+            script_file.write_text(CORE.read_text() + "\n" + PICTURES_CORE.read_text() + match.group(1) + "\n")
+            scenario = root / "scenario.ps1"
+            scenario.write_text(SCENARIO_BACKGROUND_PICTURES)
+            out = root / "result.json"
+            result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(scenario), str(script_file),
+                                     str(game), str(stopped), str(FAKE_ZONETOOL), str(out)], capture_output=True, text=True, timeout=600)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            r = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertEqual(r["count"], 1, "the script must output exactly one object")
+            self.assertEqual(r["pictures"], len(picture_plan_names()))
+            self.assertIn("Copying the character cards of The Beast from Beyond (5 of 5)", r["phases"])
+            self.assertEqual(r["phases"][-1], "Building the picture pack")
+            self.assertIn("== Copying the character cards of Zombies in Spaceland (1 of 5)", r["log"])
+            self.assertIn("ZoneTool initialization complete!", r["log"])
+            self.assertTrue((game / "iw7-mod" / "zone" / "ix_portraits.ff").is_file())
+            # Stopped: x64-zt ended, its copy and work files gone, no pack.
+            self.assertEqual(r["stoppedState"], "Stopped")
+            pids = [int(line.split()[1]) for line in (stopped / "fake_zonetool.log").read_text().splitlines() if line.startswith("pid ")]
+            self.assertEqual(len(pids), 1)
+            time.sleep(0.5)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pids[0], 0)
+            for name in ("ix-zonetool.exe", "dump", "zonetool", "zone_source", "iw7-mod/zone/ix_portraits.ff"):
+                self.assertFalse((stopped / name).exists(), name)
 
 
 SCENARIO_NAME = r"""
@@ -846,7 +1015,7 @@ class ZoneToolConsole(unittest.TestCase):
             self.assertEqual(r["lines"], ["ZoneTool is initializing...", "ZoneTool initialization complete!",
                                           'Loading zone "ui_boot"...', "Dumped to dump/assets"])
             self.assertEqual(r["logged"], r["lines"])
-            log = (game / "fake_zonetool.log").read_text().splitlines()
+            log = [line for line in (game / "fake_zonetool.log").read_text().splitlines() if not line.startswith("pid ")]
             # Plain "\n" line ends, and standard input still open at "quit".
             self.assertEqual(log[:4], ["args -dds -unbuffered-io", repr("loadzone ui_boot\n"),
                                        repr("dumpasset material zm_character_select_hoff\n"), repr("quit\n")])

@@ -4,15 +4,20 @@ Infinite Expansion - setup window.
 Start it with "Infinite Expansion Setup.cmd", next to the installer folder. It finds
 Infinite Warfare through Steam (or offers Steam's install dialog), downloads the iw7-mod
 client when the game folder has none, installs or uninstalls the mod with one click, and
-then starts the game (the logic is in IXSetup.Core.ps1). After installing, Windows
-Settings > Apps lists the mod, and uninstalling there runs this script with -Uninstall.
+then starts the game (the logic is in IXSetup.Core.ps1). The first install also builds
+the character pictures from the player's own game files (IXPictures.Core.ps1), once.
+After installing, Windows Settings > Apps lists the mod, and uninstalling there runs this
+script with -Uninstall.
 
 Switches:
   -GameDir <folder>   use this game folder instead of looking in Steam
   -Install            install as soon as the window opens (used after "run as administrator")
   -Uninstall          uninstall as soon as the window opens (Windows Settings > Apps)
-  -NoWindow           no window: install (downloading iw7-mod if needed), or uninstall with
-                      -Uninstall; print the result and exit with 0 or 1
+  -NoPictures         do not build the character pictures
+  -ZoneTool <file>    build them with this zonetool.exe instead of downloading x64-zt
+  -NoWindow           no window: install (downloading iw7-mod if needed, then building the
+                      character pictures), or uninstall with -Uninstall; print the result
+                      and exit with 0 or 1 (1 only when the mod itself was not installed)
 
 Windows PowerShell 5.1 runs this file, so it stays ASCII and avoids PowerShell 7 syntax
 (tools/tests/test_installer.py checks both).
@@ -21,6 +26,8 @@ param(
     [string]$GameDir,
     [switch]$Install,
     [switch]$Uninstall,
+    [switch]$NoPictures,
+    [string]$ZoneTool,
     [switch]$NoWindow
 )
 
@@ -29,8 +36,10 @@ $SetupRoot = Split-Path -Parent $PSScriptRoot
 $PackageRoot = Join-Path (Join-Path $SetupRoot 'mods') 'infinite_expansion'
 $ScriptPath = $PSCommandPath
 $CorePath = Join-Path $PSScriptRoot 'IXSetup.Core.ps1'
+$PicturesCorePath = Join-Path $PSScriptRoot 'IXPictures.Core.ps1'
 $LogPath = Join-Path ([IO.Path]::GetTempPath()) 'InfiniteExpansionSetup.log'
 . $CorePath
+. $PicturesCorePath
 
 # Every control this script uses; each must be an x:Name in IXSetup.xaml.
 $IXControlNames = @(
@@ -118,6 +127,31 @@ if ($NoWindow) {
             Write-Output ('Installed {0} files into {1}.' -f $result.Copied, $result.Target)
             if ($player) {
                 Write-Output ('In-game name: {0} (from Steam).' -f $player)
+            }
+            # The character pictures, the first time. A failure here leaves the
+            # mod installed: the menu shows initials instead.
+            if (-not $NoPictures -and -not [IO.File]::Exists((Get-IXPicturePackPath $dir))) {
+                Write-Output 'Building the character pictures (first time only, a few minutes)...'
+                $pictureLogFile = Get-IXPictureLogPath
+                [IO.File]::WriteAllText($pictureLogFile, '')
+                $pictureLog = {
+                    param([string]$Text, [bool]$Step)
+                    if ($Step) {
+                        Write-Host ('  ' + $Text + '...')
+                        $Text = '== ' + $Text
+                    }
+                    Write-IXPictureLog $pictureLogFile $Text
+                }
+                try {
+                    $built = Invoke-IXPictureBuild -GameDir $dir -ZoneTool $ZoneTool -Log $pictureLog
+                    Write-Output ('Character pictures: {0} in {1}.' -f $built.Pictures, $built.Pack)
+                    foreach ($failure in $built.Failed) {
+                        Write-Output ('  ' + $failure)
+                    }
+                }
+                catch {
+                    Write-Output ('Character pictures could not be built: ' + $_.Exception.Message + ' Details: ' + $pictureLogFile)
+                }
             }
         }
         exit 0
@@ -246,7 +280,7 @@ function Update-IXView {
     }
     Set-IXVisible $ui.ClientLink ($state.GameFound -and -not $state.ClientFound)
 
-    $outdated = $state.Installed -and $state.PackageVersion -and ($state.InstalledVersion -ne $state.PackageVersion)
+    $outdated = $state.Installed -and $state.PackageVersion -and (($state.InstalledVersion -ne $state.PackageVersion) -or $state.FilesDiffer)
     if (-not $state.GameFound) {
         Set-IXDot $ui.ModDot $Colors.Off
         $ui.ModText.Text = '-'
@@ -259,7 +293,11 @@ function Update-IXView {
         if (-not $state.HasRecord) {
             $text = $text + ' (copied by hand)'
         }
-        if ($outdated) {
+        if ($outdated -and $state.InstalledVersion -eq $state.PackageVersion) {
+            $text = $text + ' ' + $Dash + ' newer files are ready'
+            Set-IXDot $ui.ModDot $Colors.Warn
+        }
+        elseif ($outdated) {
             $text = $text + ' ' + $Dash + ' v' + $state.PackageVersion + ' is ready'
             Set-IXDot $ui.ModDot $Colors.Warn
         }
@@ -273,6 +311,12 @@ function Update-IXView {
         $ui.ModText.Text = 'Not installed'
     }
     Set-IXVisible $ui.ReinstallLink ($state.Installed -and -not $outdated -and $state.PackageFound)
+    if ($state.PicturesBuilt -or $NoPictures) {
+        $ui.ReinstallLink.ToolTip = 'Copy the mod files again'
+    }
+    else {
+        $ui.ReinstallLink.ToolTip = 'Copy the mod files again and build the character pictures'
+    }
 
     # The green button is always the next step: INSTALL, UPDATE, then PLAY.
     if ($outdated) {
@@ -317,6 +361,9 @@ function Set-IXReadyStatus {
     elseif (-not $state.PackageFound) {
         Set-IXStatus 'UNINSTALL ONLY' 'To install, run the setup from the full download.' $Colors.Warn
     }
+    elseif ($ui.InstallButton.Content -eq 'PLAY' -and -not $state.PicturesBuilt -and -not $NoPictures) {
+        Set-IXStatus 'READY TO PLAY' 'Click PLAY, then pick Zombies in the main menu. No character pictures yet: REINSTALL builds them (a few minutes, once).' $Colors.Ok
+    }
     elseif ($ui.InstallButton.Content -eq 'PLAY') {
         Set-IXStatus 'READY TO PLAY' 'Click PLAY, then pick Zombies in the main menu. The dead are waiting.' $Colors.Ok
     }
@@ -324,10 +371,10 @@ function Set-IXReadyStatus {
         Set-IXStatus 'UPDATE READY' 'Click UPDATE to replace the installed files.' $Colors.Warn
     }
     elseif (-not $state.ClientFound) {
-        Set-IXStatus 'READY' 'Click INSTALL. It downloads the iw7-mod client from its official GitHub page, puts it in the game folder with a desktop shortcut, then installs Infinite Expansion.' $Colors.Ok
+        Set-IXStatus 'READY' 'Click INSTALL. It downloads the iw7-mod client from its official GitHub page, puts it in the game folder with a desktop shortcut, installs Infinite Expansion, then builds its character pictures from your game files (a few minutes, once).' $Colors.Ok
     }
     else {
-        Set-IXStatus 'READY' 'Click INSTALL. It copies the mod into the game''s iw7-mod folder and adds an uninstall entry to Windows Settings.' $Colors.Ok
+        Set-IXStatus 'READY' 'Click INSTALL. It copies the mod into the game''s iw7-mod folder, adds an uninstall entry to Windows Settings, then builds the character pictures from your game files (a few minutes, once).' $Colors.Ok
     }
 }
 
@@ -350,6 +397,12 @@ function Start-IXElevated {
         $switch = '-Uninstall'
     }
     $arguments = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + $ScriptPath + '" ' + $switch + ' -GameDir "' + $script:GameDir.TrimEnd('\', '/') + '"'
+    if ($NoPictures) {
+        $arguments = $arguments + ' -NoPictures'
+    }
+    if ($ZoneTool) {
+        $arguments = $arguments + ' -ZoneTool "' + $ZoneTool + '"'
+    }
     try {
         Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Verb RunAs | Out-Null
         $window.Close()
@@ -427,10 +480,53 @@ function Invoke-IXInstall {
             $text = $text + ' Uninstall here or in Windows Settings > Apps.'
         }
         Update-IXView
-        Set-IXStatus 'ALL SET' ($text + ' Click PLAY.') $Colors.Ok
+        Complete-IXInstall $text
     }
     catch {
         Invoke-IXFailure $_ 'install'
+    }
+}
+
+# After installing: the character pictures, the first time (README "Character
+# pictures"). x64-zt cannot run next to the game; then REINSTALL builds them later.
+function Complete-IXInstall {
+    param([string]$Text)
+    if ($NoPictures -or $script:State.PicturesBuilt) {
+        Set-IXStatus 'ALL SET' ($Text + ' Click PLAY.') $Colors.Ok
+        return
+    }
+    if (Test-IXGameRunning) {
+        Set-IXStatus 'ALL SET' ($Text + ' For the character pictures, close the game and click REINSTALL. Then click PLAY.') $Colors.Ok
+        return
+    }
+    $logFile = Get-IXPictureLogPath
+    try {
+        [IO.File]::WriteAllText($logFile, 'Game folder: ' + $script:GameDir + [Environment]::NewLine)
+    }
+    catch {
+    }
+    Write-IXLog 'building the character pictures'
+    $progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = 'Starting' })
+    Start-IXJob $PictureBuildScript @($script:GameDir, $progress, $logFile, [string]$ZoneTool) $progress @{
+        Title   = 'BUILDING CHARACTER PICTURES'
+        Prefix  = 'First time only, a few minutes. '
+        What    = 'The character pictures are still being built (first time only). Closing stops it; REINSTALL builds them later.'
+        Stop    = $true
+        Context = $Text
+        Then    = {
+            param($Built, [string]$Text)
+            Write-IXLog ('character pictures: ' + $Built.Pictures + ' in ' + $Built.Pack + '; not copied: ' + $Built.Missing.Count)
+            $more = ' Built ' + $Built.Pictures + ' character pictures from your game files'
+            if ($Built.Missing.Count -gt 0) {
+                $more = $more + ' (' + $Built.Missing.Count + ' cards not found; those show initials)'
+            }
+            Set-IXStatus 'ALL SET' ($Text + $more + '. Click PLAY.') $Colors.Ok
+        }
+        Fail    = {
+            param([string]$Failure, [string]$Text)
+            Write-IXLog ('character pictures failed: ' + $Failure)
+            Set-IXStatus 'ALL SET' ($Text + ' The character pictures could not be built (' + $Failure + '), so the menu shows initials; REINSTALL tries again. Details: ' + (Get-IXPictureLogPath) + '. Click PLAY.') $Colors.Warn
+        }
     }
 }
 
@@ -449,14 +545,51 @@ function Invoke-IXUninstall {
 }
 
 # ---------------------------------------------------------------------------
-# Downloading iw7-mod without freezing the window: the download runs in a second
-# PowerShell runspace, and a timer shows its progress.
+# Work that takes a while runs in a second PowerShell runspace, so the window
+# keeps responding, and a timer shows its progress: the iw7-mod download and the
+# character pictures.
 
 $ClientDownloadScript = [IO.File]::ReadAllText($CorePath) + @'
 
 $ErrorActionPreference = 'Stop'
 Install-IXClient -GameDir $args[0] -Progress $args[1]
 '@
+
+# Both core files, then the build. The log callback is made in that runspace,
+# where it runs.
+$PictureBuildScript = [IO.File]::ReadAllText($CorePath) + [Environment]::NewLine + [IO.File]::ReadAllText($PicturesCorePath) + @'
+
+$ErrorActionPreference = 'Stop'
+$pictureLogFile = $args[2]
+$pictureLog = {
+    param([string]$Text, [bool]$Step)
+    if ($Step) {
+        $Text = '== ' + $Text
+    }
+    Write-IXPictureLog $pictureLogFile $Text
+}
+Invoke-IXPictureBuild -GameDir $args[0] -Progress $args[1] -Log $pictureLog -ZoneTool $args[3]
+'@
+
+# Runs $Script with $Arguments in the background. $Job holds: Title (the status
+# title meanwhile), Prefix (text before the progress), What (the question when
+# the window closes meanwhile), Stop (stop the work then), Then and Fail (called
+# with the result or the error text, then Context).
+function Start-IXJob {
+    param([string]$Script, [object[]]$Arguments, $Progress, [hashtable]$Job)
+    Set-IXBusy $true
+    $shell = [PowerShell]::Create()
+    [void]$shell.AddScript($Script)
+    foreach ($argument in $Arguments) {
+        [void]$shell.AddArgument($argument)
+    }
+    $Job.Shell = $shell
+    $Job.Progress = $Progress
+    $Job.Handle = $shell.BeginInvoke()
+    $script:Job = $Job
+    Set-IXStatus $Job.Title ($Job.Prefix + $Progress.Phase + '...') $Colors.Info
+    $script:JobTimer.Start()
+}
 
 function Start-IXClientDownload {
     param([scriptblock]$Then)
@@ -474,13 +607,20 @@ function Start-IXClientDownload {
         Invoke-IXFailure $_ 'install'
         return
     }
-    Set-IXBusy $true
     $progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = 'Looking up the latest iw7-mod' })
-    $shell = [PowerShell]::Create()
-    [void]$shell.AddScript($ClientDownloadScript).AddArgument($script:GameDir).AddArgument($progress)
-    $script:Job = @{ Shell = $shell; Handle = $shell.BeginInvoke(); Progress = $progress; Then = $Then }
-    Set-IXStatus 'INSTALLING IW7-MOD' ($progress.Phase + '...') $Colors.Info
-    $script:JobTimer.Start()
+    Start-IXJob $ClientDownloadScript @($script:GameDir, $progress) $progress @{
+        Title   = 'INSTALLING IW7-MOD'
+        Prefix  = ''
+        What    = 'iw7-mod is still downloading.'
+        Stop    = $false
+        Context = $null
+        Then    = $Then
+        Fail    = {
+            param([string]$Failure)
+            Write-IXLog ('iw7-mod download failed: ' + $Failure)
+            Set-IXStatus 'IW7-MOD DOWNLOAD FAILED' ($Failure + ' You can also download it by hand: ' + $IXClientUrl) $Colors.Bad
+        }
+    }
 }
 
 function Update-IXJob {
@@ -497,22 +637,22 @@ function Update-IXJob {
     elseif ($progress.Done -gt 0) {
         $text = $text + ': ' + ('{0:N1} MB' -f ($progress.Done / 1MB))
     }
-    $ui.StatusText.Text = $text
+    $ui.StatusText.Text = $job.Prefix + $text
     if (-not $job.Handle.IsCompleted) {
         return
     }
 
     $script:JobTimer.Stop()
     $script:Job = $null
-    $client = $null
+    $result = $null
     $failure = $null
     try {
         $output = @($job.Shell.EndInvoke($job.Handle))
         if ($output.Count -gt 0) {
-            $client = $output[$output.Count - 1]
+            $result = $output[$output.Count - 1]
         }
         else {
-            $failure = 'The download stopped without a result.'
+            $failure = 'It stopped without a result.'
         }
     }
     catch {
@@ -523,11 +663,28 @@ function Update-IXJob {
     }
     Set-IXBusy $false
     if ($failure) {
-        Write-IXLog ('iw7-mod download failed: ' + $failure)
-        Set-IXStatus 'IW7-MOD DOWNLOAD FAILED' ($failure + ' You can also download it by hand: ' + $IXClientUrl) $Colors.Bad
+        & $job.Fail $failure $job.Context
         return
     }
-    & $job.Then $client
+    & $job.Then $result $job.Context
+}
+
+# Stops the background work when the window closes. The work's own clean-up
+# runs: for the pictures, x64-zt is ended and its files removed.
+function Stop-IXJob {
+    $job = $script:Job
+    if ($null -eq $job) {
+        return
+    }
+    $script:JobTimer.Stop()
+    $script:Job = $null
+    try {
+        $job.Shell.Stop()
+    }
+    catch {
+        Write-IXLog ('stop: ' + $_.Exception.Message)
+    }
+    $job.Shell.Dispose()
 }
 
 # What a finished iw7-mod download did, for the status line; also makes the desktop shortcut.
@@ -694,10 +851,14 @@ $window.Add_ContentRendered({
         }
     })
 $window.Add_Closing({
-        if ($script:Busy) {
-            $answer = [System.Windows.MessageBox]::Show($window, "iw7-mod is still downloading.`n`nClose anyway?", 'Infinite Expansion Setup', 'YesNo', 'Question')
+        if ($script:Busy -and $null -ne $script:Job) {
+            $answer = [System.Windows.MessageBox]::Show($window, $script:Job.What + "`n`nClose anyway?", 'Infinite Expansion Setup', 'YesNo', 'Question')
             if ($answer -ne 'Yes') {
                 $_.Cancel = $true
+                return
+            }
+            if ($script:Job.Stop) {
+                Stop-IXJob
             }
         }
     })

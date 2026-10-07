@@ -110,6 +110,8 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V58 | Build input from a fake dump (`CharacterPictures`) | ✅ A material per card, patterned on the dumped menu material with the card as its image; `require,ui_boot` and `techset,,2d` before the materials; the pattern's state files copied under each card's name; the largest streamed size taken; missing cards listed. Installing moves the zone into `iw7-mod\zone\` with its list; UNINSTALL removes both; the cleanup removes only what the run added |
 | V59 | Download, console and runner with a stand-in for x64-zt (`ZoneToolDownload`, `ZoneToolConsole`, `PicturesScript`, `tools/tests/fake_zonetool.py`) | ✅ The release's "Release zonetool.zip" is found, checked against GitHub's SHA-256 and unpacked to `zonetool.exe` alone; a wrong checksum or a missing asset fails with nothing left behind. Commands go after the ready line, with `\n` line ends, and standard input is still open at `quit`; a run that stops answering ends after the idle time. End to end: five dump runs and a build; a map whose run crashes is named and skipped; the pack and its list are installed; x64-zt's copy and work files are gone. The stand-in only does what V56 describes |
 | V60 | CHARACTER menu with a pack (`test_menu_script.py`) | ✅ `loadzone ix_portraits` once per game session, not with `ix_pictures 0` or without the zone file; the main card from the selected map (248 × 360), else a special's own picture, else the team card (256 × 256), else the initials; a 30 × 30 team card left of each row that has one |
+| V61 | The setup builds the pictures after installing (`SetupScriptWithoutWindow`, `BackgroundPictures`) | ✅ `-NoWindow`: the first install builds them with the stand-in for x64-zt, a second install does not, UNINSTALL removes them; when every map fails, the mod stays installed and nothing of x64-zt is left (this found empty work folders the clean-up missed; fixed). The window's background script, taken from `IXSetup.ps1` and run in a second runspace the same way: exactly one result, the progress steps, the log; stopped mid-run as when the window closes, x64-zt's process is gone and its files removed. The window itself (WPF) was not opened (E5) |
+| V62 | A newer download with the same version number (`NewerFiles`) | ✅ Reproduces the problem: every build so far said 0.1.0, so the setup showed PLAY and kept the old files. Now one changed file (same version) or one missing installed file counts as outdated, and after the update it does not |
 
 ## 3. Runtime test environment (for testers)
 
@@ -132,7 +134,7 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.1.0 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.1.1 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, then `[IX] INFO: ready` once you are in | not run | not run |
 | R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
 | R-S3 | Menu opens (ADS + Melee) *(Phase 3)* | Menu visible; weapons/offhands disabled while open | not run | not run |
 | R-S4 | Menu closes (Melee at root) *(Phase 3)* | Menu hidden; weapons restored | not run | not run |
@@ -216,6 +218,7 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I3 | INSTALL, then start a zombies match | Status INSTALLED; `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` and `iw7-mod\infinite-expansion.json` exist; *Settings → Apps* lists Infinite Expansion; the console shows `[IX] INFO: init` | not run |
 | R-I4 | With the old `mods\infinite_expansion` copy present | The yellow note shows; INSTALL removes that copy's files and says so | not run |
 | R-I5 | UNINSTALL | Status UNINSTALLED; the mod's files and the record are gone; other files in `iw7-mod` stay; the Settings entry is gone | not run |
+| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.1.1` | not run |
 | R-I6 | Install, delete the download, then uninstall from *Settings → Apps* | The setup window opens and uninstalls by itself; after closing it, `%LOCALAPPDATA%\InfiniteExpansion` is gone | not run |
 | R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
 | R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
@@ -230,10 +233,11 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 
 | ID | Test | Expected | Result |
 |----|------|----------|--------|
-| R-PK1 | Install the mod, close the game, double-click `Build Character Pictures.cmd` | It downloads x64-zt and shows five "Copying the character cards of …" steps with x64-zt's lines under each, then "Building ix_portraits.ff..." and "Done. N pictures in …". `<game>\iw7-mod\zone\ix_portraits.ff` and `ix_portraits.txt` exist; no `ix-zonetool.exe`, and no `dump`, `zonetool` or `zone_source` folder that was not there before. Send `%TEMP%\InfiniteExpansionPictures.log` either way | not run |
+| R-PK1 | With the game closed, run the setup and click INSTALL (or UPDATE) | After the mod's files, the status says BUILDING CHARACTER PICTURES, "First time only, a few minutes", then downloading x64-zt and "Copying the character cards of …" for each of the five maps; the buttons stay disabled; then ALL SET with "Built N character pictures". `<game>\iw7-mod\zone\ix_portraits.ff` and `ix_portraits.txt` exist; no `ix-zonetool.exe`, and no `dump`, `zonetool` or `zone_source` folder that was not there before. Send `%TEMP%\InfiniteExpansionPictures.log` either way | not run |
 | R-PK2 | Start the game; Solo Match → CHARACTER with SELECT SHOW on Spaceland, then on another map | Each regular character shows their card from that map, not stretched; a small team card beside each row; the specials show their cards. The console has no error about `ix_portraits` or a missing material. A screenshot helps | not run |
-| R-PK3 | Play a match, return to the menu, open CHARACTER again | The pictures are still there; no error from loading the pack a second time | not run |
+| R-PK3 | Play a match, return to the menu, open CHARACTER again; click UPDATE or REINSTALL in the setup | The pictures are still there, with no error from loading the pack a second time. The setup does not build them again | not run |
 | R-PK4 | `ix_pictures 0` and restart the game; then UNINSTALL in the setup | Initials and the game's own special pictures again; UNINSTALL removes `ix_portraits.ff` and `ix_portraits.txt` | not run |
+| R-PK5 | INSTALL with the game running; then close the setup while it builds the pictures; then run `Build Character Pictures.cmd` | Running game: ALL SET says to close the game and click REINSTALL. Closing mid-build asks first, then leaves no `ix-zonetool.exe` running (Task Manager) and no work folders. The `.cmd` window shows the same steps and ends with "Done." | not run |
 
 ### 4.7 Compatibility matrix
 

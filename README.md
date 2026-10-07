@@ -27,6 +27,7 @@ What the setup does for you:
 | Finds the game | Through Steam, including libraries on other drives. Not installed yet? **STEAM** opens Steam's own install dialog (you must own the game), and the window notices when the game is there. Installed somewhere else? **BROWSE** to `iw7_ship.exe` |
 | Installs the iw7-mod client, if the game folder has none | Downloads `iw7-mod.exe` from the latest release on [iw7-mod's GitHub page](https://github.com/auroramod/iw7-mod/releases), or from iw7-mod's own update server if GitHub fails. It checks the file against the checksum the source lists, puts it in the game folder as iw7-mod's install guide says, and adds an **IW7-Mod (Infinite Warfare)** desktop shortcut. **DOWNLOAD** in the iw7-mod row does only this step |
 | Installs the mod | Copies it into `<Infinite Warfare>\iw7-mod\` and records the copied files in `iw7-mod\infinite-expansion.json`. Also removes an old copy in `mods\infinite_expansion` (see below), keeping any file of your own in it |
+| Builds the character pictures, the first time | Right after installing, while the window shows its progress (a few minutes, once): the cards the HUD shows in a match, copied from your own game files for the CHARACTER menu. See [Character pictures](#character-pictures-automatic-experimental) |
 | Starts the game | **PLAY** starts iw7-mod from the game folder (Steam must be running; PLAY opens Steam if it is not). iw7-mod's first start downloads the rest of its own files, then pick Zombies |
 
 The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, look for the CHARACTER button in the lobby after **Solo Match** or **Custom Game**, and the card in the corner of a match (`TESTING.md` §4).
@@ -35,7 +36,7 @@ INSTALL also sets your in-game name to your Steam name. iw7-mod calls everyone "
 
 UNINSTALL removes exactly the recorded mod files; other mods' scripts and the iw7-mod client stay. To remove iw7-mod too, follow [its uninstall guide](https://github.com/auroramod/docs/blob/main/docs/iw7-uninstall.md).
 
-INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files, and the button then reads UPDATE.
+INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files: the button then reads UPDATE. It compares the files themselves, so this works even when the version number did not change.
 
 Windows asks before running a file from the internet, and the setup is not code-signed, so it may show "Windows protected your PC". Choose *More info → Run anyway*. The setup is plain PowerShell (`installer\IXSetup.ps1`) that you can read first. If something goes wrong, details go to `%TEMP%\InfiniteExpansionSetup.log`. For a protected game folder, the setup offers to retry as administrator.
 
@@ -55,7 +56,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.1.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.1.1 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: ready
 ```
@@ -95,25 +96,25 @@ The rules are enforced by the host's copy of the mod. A host without the mod run
 | `ix_character_announce 1` | 0 | Host: an "is playing as" line for each player after the intro |
 | `ix_player_card 0` | 1 | Host: hides the card; `ix_player_card_x` / `ix_player_card_y` move it |
 
-### Character pictures (optional, experimental)
+### Character pictures (automatic, experimental)
 
-Out of the box, the CHARACTER menu has pictures only for the special characters (the game's own lobby pictures), and big initials for Sally, Poindexter, Andre and A.J. The cards the HUD shows in a match exist only inside each map's own files, which the menus cannot reach while you are in the lobby (`KNOWN_LIMITATIONS.md` L28). **`Build Character Pictures.cmd`** copies those cards out of *your own* game files into a small picture pack. Nothing of the game's art ships with this mod.
+The game's menus only have pictures of the special characters, so the CHARACTER menu used to show big initials for Sally, Poindexter, Andre and A.J. The cards the HUD shows in a match exist only inside each map's own files, which the menus cannot reach while you are in the lobby (`KNOWN_LIMITATIONS.md` L28). So the setup copies those cards out of *your own* game files into a small picture pack. Nothing of the game's art ships with this mod.
 
-1. Install the mod first (above), and close the game.
-2. Double-click **`Build Character Pictures.cmd`** (next to the setup). It takes a few minutes, mostly one pass per map.
-3. Start the game. In the CHARACTER menu, each character shows their card from the selected map, with their team card (the small picture the HUD shows for teammates) beside each row.
+It happens **once, by itself**, the first time you click INSTALL (or UPDATE): after copying the mod, the window says BUILDING CHARACTER PICTURES and shows which map it is on. It takes a few minutes, and the game must be closed. After that the CHARACTER menu shows each character's card from the map selected in the lobby. The team card (the small picture the HUD shows for teammates) appears beside each name. Later updates keep the pack, so it is never built again.
 
 What it does:
 
 - **Downloads the tool.** It fetches [x64-zt](https://github.com/Joelrau/x64-zt), the community fastfile tool, from its latest GitHub release and checks the checksum GitHub lists.
-- **Copies the cards.** It runs x64-zt in the game folder once per map to copy the cards, then builds `iw7-mod\zone\ix_portraits.ff` and a list of what it holds (`ix_portraits.txt`).
+- **Copies the cards.** It runs x64-zt in the game folder once per map, then builds `iw7-mod\zone\ix_portraits.ff` and a list of what it holds (`ix_portraits.txt`).
 - **Cleans up.** It deletes x64-zt and its work files afterwards. Your own files in `dump\`, `zonetool\` or `zone_source\` stay.
 - **Skips missing maps.** A map you do not have (DLC) is skipped, and those characters keep their initials.
 - **Logs.** Details go to `%TEMP%\InfiniteExpansionPictures.log`.
 
-`ix_pictures 0` turns the pictures off without deleting them. UNINSTALL also removes the pack. Run it again after a game update.
+If it cannot finish, the mod is still installed and the menu shows initials. The status line says why, and **REINSTALL** tries again; so does the game running during INSTALL. Closing the window during the build stops it cleanly.
 
-This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK4 list what to check.
+To build the pictures again (after a game update, for example), double-click **`Build Character Pictures.cmd`** with the game closed. `ix_pictures 0` hides them without deleting them, and UNINSTALL removes them. To install without them, start the setup with `-NoPictures` (`"Infinite Expansion Setup.cmd" -NoPictures` in a command prompt).
+
+This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5 list what to check.
 
 ## Documentation
 

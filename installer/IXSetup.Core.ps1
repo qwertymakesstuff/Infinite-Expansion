@@ -363,18 +363,45 @@ function Get-IXState {
         InstalledVersion = $null
         OldCopy          = $false
         GameRunning      = (Test-IXGameRunning)
+        PicturesBuilt    = $false
+        FilesDiffer      = $false
     }
     if ($state.GameFound) {
         $target = Get-IXTarget $GameDir
         $state.ClientFound = [IO.File]::Exists((Join-Path $GameDir $IXClientExe))
+        $state.PicturesBuilt = [IO.File]::Exists((Get-IXPicturePackPath $GameDir))
         $state.HasRecord = [IO.File]::Exists((Join-Path $target $IXRecordName))
         $state.Installed = $state.HasRecord -or [IO.File]::Exists((Join-IXPath $target @('custom_scripts', 'cp', 'ix_main.gsc')))
         if ($state.Installed) {
             $state.InstalledVersion = Get-IXPackageVersion $target
+            if ($state.PackageFound) {
+                $state.FilesDiffer = -not (Test-IXFilesCurrent $PackageRoot $target)
+            }
         }
         $state.OldCopy = Test-IXOldCopy $GameDir
     }
     return [pscustomobject]$state
+}
+
+# True when every file of the package is installed in $Target with the same
+# content. A newer download can keep the version number, so the setup compares
+# the files themselves to offer UPDATE.
+function Test-IXFilesCurrent {
+    param([string]$PackageRoot, [string]$Target)
+    foreach ($relative in (Get-IXPayloadFiles $PackageRoot)) {
+        $installed = Join-IXPath $Target @($relative)
+        if (-not [IO.File]::Exists($installed)) {
+            return $false
+        }
+        $source = Join-IXPath $PackageRoot @($relative)
+        if ((New-Object System.IO.FileInfo $source).Length -ne (New-Object System.IO.FileInfo $installed).Length) {
+            return $false
+        }
+        if ((Get-IXFileHash $source 'SHA256') -ne (Get-IXFileHash $installed 'SHA256')) {
+            return $false
+        }
+    }
+    return $true
 }
 
 # ---------------------------------------------------------------------------

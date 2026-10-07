@@ -57,11 +57,12 @@ Infinite-Expansion/                          (repository)
 │               └── debug/                   ≙ /scripts/debug/   (gated)
 │                   └── debug.gsc            inspector, trace info, perf/log read-outs
 ├── Infinite Expansion Setup.cmd             double-click: opens the setup window (Windows)
-├── Build Character Pictures.cmd             double-click: builds the optional picture pack (Windows)
+├── Build Character Pictures.cmd             double-click: builds the picture pack again (the setup builds it once)
 ├── installer/                               one-click setup: IXSetup.ps1 (WPF window), IXSetup.Core.ps1
 │                                            (install logic, tested on Linux), IXSetup.xaml (layout + art), ix.ico;
-│                                            picture pack: IXPictures.ps1 (console), IXPictures.Core.ps1 (x64-zt
-│                                            runs, build input, install; tested with a stand-in for x64-zt)
+│                                            picture pack: IXPictures.Core.ps1 (x64-zt runs, build input, install;
+│                                            run by the setup after installing, and by IXPictures.ps1, the
+│                                            console version; tested with a stand-in for x64-zt)
 ├── tools/                                   offline verification (Linux)
 └── *.md                                     project documentation
 ```

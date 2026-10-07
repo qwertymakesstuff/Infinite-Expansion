@@ -28,6 +28,21 @@ $IXZoneToolReleaseApi = 'https://api.github.com/repos/Joelrau/x64-zt/releases/ta
 $IXZoneToolCopyName = 'ix-zonetool.exe'
 $IXZoneToolReady = 'initialization complete'
 
+# The log of the last picture build, shared by the setup and the console version.
+function Get-IXPictureLogPath {
+    return Join-Path ([IO.Path]::GetTempPath()) 'InfiniteExpansionPictures.log'
+}
+
+# Appends a line to that log; never fails.
+function Write-IXPictureLog {
+    param([string]$Path, [string]$Text)
+    try {
+        [IO.File]::AppendAllText($Path, $Text + "`r`n")
+    }
+    catch {
+    }
+}
+
 # The language zones of a map: <xxx>_<map>.ff in the game's zone\ folder or a
 # language folder under it (eng_cp_town in English). eng_<map> when none is
 # found, which x64-zt reports as missing and skips.
@@ -266,22 +281,24 @@ function Install-IXPicturePack {
     return $destination
 }
 
-# The game folder's files under x64-zt's working folders, to tell afterwards
-# which ones this run created.
+# The game folder's files and folders under x64-zt's working folders (and
+# those folders), to tell afterwards which ones this run created.
 function Get-IXZoneToolFiles {
     param([string]$GameDir)
-    $files = @()
+    $entries = @()
     foreach ($folder in @('dump', 'zonetool', 'zone_source')) {
         $path = Join-IXPath $GameDir @($folder)
         if ([IO.Directory]::Exists($path)) {
-            $files += [IO.Directory]::GetFiles($path, '*', [IO.SearchOption]::AllDirectories)
+            $entries += $path
+            $entries += [IO.Directory]::GetFileSystemEntries($path, '*', [IO.SearchOption]::AllDirectories)
         }
     }
-    return $files
+    return $entries
 }
 
-# Deletes what this run added under dump\, zonetool\ and zone_source\, and the
-# folders that became empty. Files that were there before stay.
+# Deletes the files this run added under dump\, zonetool\ and zone_source\,
+# then the folders it added, once they are empty. What was there before stays.
+# Returns how many files it deleted.
 function Remove-IXZoneToolWork {
     param([string]$GameDir, [string[]]$Before)
     $keep = @{}
@@ -289,17 +306,23 @@ function Remove-IXZoneToolWork {
         $keep[$path.ToLowerInvariant()] = $true
     }
     $removed = 0
+    $folders = @()
     foreach ($path in (Get-IXZoneToolFiles $GameDir)) {
-        if (-not $keep.ContainsKey($path.ToLowerInvariant())) {
+        if ($keep.ContainsKey($path.ToLowerInvariant())) {
+            continue
+        }
+        if ([IO.Directory]::Exists($path)) {
+            $folders += $path
+        }
+        else {
             [IO.File]::Delete($path)
-            Remove-IXEmptyParents $GameDir $path
             $removed++
         }
     }
-    foreach ($folder in @('dump', 'zonetool', 'zone_source')) {
-        $path = Join-IXPath $GameDir @($folder)
-        if ([IO.Directory]::Exists($path) -and @([IO.Directory]::GetFileSystemEntries($path)).Count -eq 0) {
-            [IO.Directory]::Delete($path)
+    # Deepest first: a folder's path is longer than its parent's.
+    foreach ($folder in @($folders | Sort-Object -Property Length -Descending)) {
+        if ([IO.Directory]::Exists($folder) -and @([IO.Directory]::GetFileSystemEntries($folder)).Count -eq 0) {
+            [IO.Directory]::Delete($folder)
         }
     }
     return $removed
@@ -329,14 +352,14 @@ function Get-IXZoneToolFromGitHub {
 }
 
 # Downloads and unpacks x64-zt into $Folder, keeping only zonetool.exe.
-# Returns its path.
+# Returns its path. $Progress, a synchronized hashtable, gets Done and Total bytes.
 function Save-IXZoneTool {
-    param([string]$Folder, $Source)
+    param([string]$Folder, $Source, $Progress)
     [IO.Directory]::CreateDirectory($Folder) | Out-Null
     $zip = Join-IXPath $Folder @('zonetool.zip')
     $exe = $null
     try {
-        Save-IXHttpFile $Source.Url $zip
+        Save-IXHttpFile $Source.Url $zip $Progress
         if ($Source.Hash) {
             $actual = Get-IXFileHash $zip 'SHA256'
             if ($actual -ne $Source.Hash.ToUpperInvariant()) {
@@ -405,7 +428,7 @@ function Invoke-IXZoneTool {
                 [void]$lines.Add($line)
                 $lastOutput = Get-Date
                 if ($Log) {
-                    & $Log $line
+                    $null = & $Log $line
                 }
                 $ready = $line.IndexOf($IXZoneToolReady, [StringComparison]::OrdinalIgnoreCase) -ge 0
                 $pending = $process.StandardOutput.ReadLineAsync()
@@ -428,11 +451,149 @@ function Invoke-IXZoneTool {
         return [pscustomobject]@{ ExitCode = $process.ExitCode; Lines = @($lines) }
     }
     finally {
+        # Stopped early (an error, or the setup window closing): x64-zt goes too.
+        try {
+            if (-not $process.HasExited) {
+                $process.Kill()
+                [void]$process.WaitForExit(10000)
+            }
+        }
+        catch {
+        }
         try {
             $process.StandardInput.Close()
         }
         catch {
         }
         $process.Dispose()
+    }
+}
+
+# Builds the pack from start to end: x64-zt from GitHub (unless $ZoneTool names
+# a zonetool.exe to use), one dump run per map, the build, the install, then the
+# clean-up of x64-zt, its download and its work files ($KeepWork keeps the work
+# files). The game must be closed and the mod installed.
+#
+# $Log, when given, gets every step (second argument $true) and every line
+# x64-zt prints. $Progress, a synchronized hashtable, gets the current step in
+# Phase, and Done and Total bytes while x64-zt downloads. Returns the pack's
+# path, how many pictures it holds, the cards x64-zt did not copy, and the maps
+# whose run failed. Throws when no pack could be built.
+function Invoke-IXPictureBuild {
+    param([string]$GameDir, [string]$ZoneTool, [scriptblock]$Log, $Progress, [switch]$KeepWork)
+    # Closures, so that the callbacks keep these values wherever x64-zt's
+    # output is read (PowerShell looks variables up along the call chain).
+    $report = {
+        param([string]$Text, [bool]$Step)
+        if ($Step -and $null -ne $Progress) {
+            $Progress.Phase = $Text
+            $Progress.Done = 0
+            $Progress.Total = 0
+        }
+        if ($Log) {
+            $null = & $Log $Text $Step
+        }
+    }.GetNewClosure()
+    $lines = {
+        param([string]$Line)
+        & $report $Line $false
+    }.GetNewClosure()
+
+    if (Test-IXGameRunning) {
+        throw 'Close Infinite Warfare first: x64-zt cannot run next to the game.'
+    }
+    $menuScript = Join-IXPath (Get-IXTarget $GameDir) @('ui_scripts', 'InfiniteExpansion', '__init__.lua')
+    if (-not [IO.File]::Exists($menuScript)) {
+        throw 'Install Infinite Expansion first. The pictures are for its CHARACTER menu.'
+    }
+
+    $exe = Join-IXPath $GameDir @($IXZoneToolCopyName)
+    $downloadDir = $null
+    $before = $null
+    $failed = @()
+    try {
+        if (-not $ZoneTool) {
+            & $report 'Downloading x64-zt' $true
+            Enable-IXTls12
+            $source = Get-IXZoneToolFromGitHub
+            & $report ('x64-zt: ' + $source.Url + ' sha256=' + $source.Hash) $false
+            $downloadDir = Join-Path ([IO.Path]::GetTempPath()) 'InfiniteExpansionZoneTool'
+            $ZoneTool = Save-IXZoneTool $downloadDir $source $Progress
+        }
+        [IO.File]::Copy($ZoneTool, $exe, $true)
+        $before = @(Get-IXZoneToolFiles $GameDir)
+
+        $plan = Get-IXPicturePlan $GameDir
+        $runs = @(Get-IXPictureDumpRuns $plan)
+        $step = 0
+        foreach ($run in $runs) {
+            $step++
+            & $report ('Copying the character cards of ' + $run.Title + ' (' + $step + ' of ' + $runs.Count + ')') $true
+            try {
+                $result = Invoke-IXZoneTool $GameDir $exe @('-dds', '-unbuffered-io') $run.Commands $lines
+                & $report ('x64-zt exit code: ' + $result.ExitCode) $false
+                if ($result.ExitCode -ne 0) {
+                    $failed += $run.Title + ': x64-zt stopped early (exit code ' + $result.ExitCode + ')'
+                }
+            }
+            catch {
+                $failed += $run.Title + ': ' + $_.Exception.Message
+                & $report ('x64-zt failed on ' + $run.Map + ': ' + $_.Exception.Message) $false
+            }
+        }
+
+        & $report 'Building the picture pack' $true
+        $prepared = New-IXPictureSource $GameDir $plan
+        foreach ($name in $prepared.Missing) {
+            & $report ('not copied: ' + $name) $false
+        }
+        if (@($prepared.Materials).Count -eq 0) {
+            throw 'x64-zt copied none of the cards.'
+        }
+        $stale = Find-IXBuiltPictureZone $GameDir
+        if ($stale) {
+            [IO.File]::Delete($stale)
+        }
+        $build = Invoke-IXZoneTool $GameDir $exe @('-buildzone', $IXPictureZone, '-unbuffered-io') @() $lines
+        & $report ('x64-zt exit code: ' + $build.ExitCode) $false
+        $built = Find-IXBuiltPictureZone $GameDir
+        if (-not $built) {
+            throw 'x64-zt did not build the picture pack.'
+        }
+        $pack = Install-IXPicturePack $GameDir $built $prepared.Materials
+        return [pscustomobject]@{
+            Pack     = $pack
+            Pictures = @($prepared.Materials).Count
+            Missing  = @($prepared.Missing)
+            Failed   = @($failed)
+        }
+    }
+    finally {
+        # Each step on its own: an error here must not hide the one that ended
+        # the build, nor stop the other steps.
+        try {
+            if ([IO.File]::Exists($exe)) {
+                [IO.File]::Delete($exe)
+            }
+        }
+        catch {
+            & $report ('could not delete ' + $exe + ': ' + $_.Exception.Message) $false
+        }
+        try {
+            if ($null -ne $before -and -not $KeepWork) {
+                & $report ('work files removed: ' + (Remove-IXZoneToolWork $GameDir $before)) $false
+            }
+        }
+        catch {
+            & $report ('could not remove the work files: ' + $_.Exception.Message) $false
+        }
+        try {
+            if ($downloadDir -and [IO.Directory]::Exists($downloadDir)) {
+                [IO.Directory]::Delete($downloadDir, $true)
+            }
+        }
+        catch {
+            & $report ('could not delete ' + $downloadDir + ': ' + $_.Exception.Message) $false
+        }
     }
 }

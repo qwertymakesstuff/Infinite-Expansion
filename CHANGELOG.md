@@ -4,6 +4,26 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### The setup builds the character pictures by itself (2026-10-06)
+
+**Changed**
+- The character pictures no longer need a separate step. The first INSTALL (or UPDATE) builds them right after copying the mod, while the window shows which map it is on. Later updates keep them, so they are built once.
+  - The game must be closed, because x64-zt cannot run next to it. If it is running, ALL SET says to close it and click REINSTALL.
+  - A failed build never fails the install: the menu shows initials, the status line says why, and REINSTALL tries again.
+  - Closing the window during the build asks first, then stops x64-zt and removes its files.
+  - `-NoPictures` installs without them. `Build Character Pictures.cmd` stays, for building them again after a game update.
+- `-NoWindow` installs build them too.
+- Version 0.1.1. The console's `[IX] INFO: init 0.1.1` line shows that this build's files are the ones loaded.
+
+**Fixed**
+- A newer download showed PLAY instead of UPDATE, because every build so far kept the version number 0.1.0. Clicking PLAY then kept the older mod files, so a fix in a newer download might never have reached the game (unless REINSTALL was used). The setup now compares the installed files with the download's and offers UPDATE when any differs.
+- When every map failed, the build's clean-up left empty `dump`/`zonetool` folders in the game folder. It now removes the folders it created, and only those.
+- x64-zt could keep running after the build stopped early; it is now ended.
+
+**Tests**
+- A download with the same version number but a changed or missing file counts as newer.
+- The first `-NoWindow` install builds the pictures and a second does not; a failed build leaves the mod installed. The window's background build script runs in a second runspace, and when stopped mid-run, x64-zt's process is gone and its files removed.
+
 ### Character pictures from the HUD's cards (2026-10-06)
 
 **Added**

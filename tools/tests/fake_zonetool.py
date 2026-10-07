@@ -12,7 +12,8 @@ fake_zonetool.json in the game folder sets what it does:
     streamed  images dumped the streamed way (streamed_images/<name>_stream<n>.dds)
     crash_on  zones whose loadzone makes it exit with code 3
     hang      true: print the ready line, then never answer again
-Every command it receives is appended to fake_zonetool.log, as Python repr.
+Every command it receives is appended to fake_zonetool.log, as Python repr,
+after a "pid <n>" line, so a test can tell whether it was ended.
 """
 import json
 import os
@@ -132,6 +133,7 @@ def build(zone):
 def main():
     config = json.load(open(CONFIG, encoding="utf-8")) if os.path.isfile(CONFIG) else {}
     args = sys.argv[1:]
+    log(f"pid {os.getpid()}")
     log("args " + " ".join(args))
     if "-buildzone" in args:
         return build(args[args.index("-buildzone") + 1])

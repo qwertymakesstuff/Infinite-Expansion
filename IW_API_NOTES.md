@@ -373,7 +373,7 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
 
 ## 18. Character pictures pack: x64-zt `[ZT]`
 
-`installer/IXPictures.ps1` builds `iw7-mod/zone/ix_portraits.ff` with x64-zt (README "Character pictures"). These facts come from x64-zt's source; R-PK1 confirms them on a real install.
+The setup (and `installer/IXPictures.ps1`) builds `iw7-mod/zone/ix_portraits.ff` with x64-zt (README "Character pictures"). These facts come from x64-zt's source; R-PK1 confirms them on a real install.
 
 - **The tool.**
   - One `zonetool.exe` serves several games and picks the game by the executable in the current folder: `iw7_ship.exe` means IW7 (`main.cpp`). It must run in the game folder, and its README lists IW7 as supported, "no custom maps".
@@ -407,6 +407,7 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
   - If `techset` were wrong, x64-zt would skip that row and copy the techset into the pack.
   - If `material` or `image` were wrong, `dumpasset` gets no valid type (it does not check), and the runs would fail. The log of R-PK1 shows it.
 - **How the mod uses it.**
-  - `IXPictures.Core.ps1` runs x64-zt once per map: it loads the map's zones, names the first zone again to wait, dumps the 50 cards named in each map's `playercash_images` table (§16), then quits.
+  - The setup runs the build once, after the first install, in a second runspace while its window shows the progress. `Build Character Pictures.cmd` runs the same function (`Invoke-IXPictureBuild`) in a console.
+  - `IXPictures.Core.ps1` runs x64-zt once per map: it loads the map's zones, names the first zone again to wait, dumps the 50 cards named in each map's `playercash_images` table (§16), then quits. When the build stops early (an error, or the window closing), x64-zt's process is ended and its files removed.
   - Each card becomes a material patterned on the stock menu material `zm_character_select_hoff`, with `require,ui_boot` and a `techset,,<name>` reference, so the pack never replaces the game's shaders.
   - The menu loads the pack with iw7-mod's `loadzone` (§16).

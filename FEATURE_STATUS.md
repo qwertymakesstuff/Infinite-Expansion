@@ -35,8 +35,9 @@
 | Game not installed: Steam's install dialog, then automatic re-detection | Installer | 1.5 | TESTING | `steam://install/292730`; checks again every 4 s; R-I12 |
 | Uninstall from Windows Settings → Apps | Installer | 1.5 | TESTING | Per-user entry; a setup copy in `%LOCALAPPDATA%`; R-I6 |
 | Removes exactly what it installed; removes the old Mods-menu copy | Installer | 1.5 | TESTING | Record `iw7-mod/infinite-expansion.json`; R-I4, R-I5 |
-| Builds the character pictures pack (downloads x64-zt, one run per map, cleans up after itself) | Installer | 1.5 | TESTING (experimental) | `installer/IXPictures.ps1`, `IXPictures.Core.ps1`; UNINSTALL removes the pack; R-PK1, R-PK4 |
-| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks, downloads against a local fake server, the picture pack against a stand-in for x64-zt) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (42 tests), `tools/tests/ps51_lint.ps1`, `tools/tests/fake_zonetool.py` |
+| Offers UPDATE when the download's files differ from the installed ones, even with the same version number | Installer | 1.5 | TESTING | Compares each file's SHA-256; every build up to 0.1.0 kept that number; R-I15 |
+| Builds the character pictures pack once, by itself, after installing (downloads x64-zt, one run per map, cleans up after itself) | Installer | 1.5 | TESTING (experimental) | In the background with progress in the window; skipped while the game runs (REINSTALL then builds it); closing the window stops it cleanly; `-NoPictures` skips it. `installer/IXPictures.Core.ps1`; `Build Character Pictures.cmd` rebuilds by hand; UNINSTALL removes the pack; R-PK1, R-PK3–R-PK5 |
+| Installer tests (logic under PowerShell 7, 5.1 lint, XAML checks, downloads against a local fake server, the picture pack against a stand-in for x64-zt) | Tooling | 1.5 | COMPLETE | `tools/tests/test_installer.py` (46 tests), `tools/tests/ps51_lint.ps1`, `tools/tests/fake_zonetool.py` |
 | Signed installer (no Windows warning) | Installer | – | NOT PLANNED | Needs a paid certificate (L31) |
 
 ## Core (Phases 1–2)
@@ -65,7 +66,7 @@
 |---------|----------|-------|--------|-------|
 | CHARACTER button in the zombies lobby, under SELECT SHOW (base-game style) | UI | 1.5 | TESTING | `ui_scripts/InfiniteExpansion`; in the lobby of Solo Match and Custom Game (moved there from the main menu after the second in-game report); saves `ix_character`, and for specials the stock lobby field `characterSelect`. Layout from the stock lobby (L35); R-UI1–R-UI6 |
 | Picture of the highlighted character in the CHARACTER menu | UI | 1.5 | TESTING | The game's own pictures of the five specials; colored initials for the regular characters, or their HUD cards with the picture pack (L28); R-UI2 |
-| Character pictures pack: the HUD's cards in the CHARACTER menu, a team card beside each row | UI | 1.5 | TESTING (experimental) | `Build Character Pictures.cmd` → `installer/IXPictures.ps1`: x64-zt copies the cards from the player's own game files into `iw7-mod/zone/ix_portraits.ff`; the menu loads it with `loadzone` and picks the selected map's cards. `ix_pictures 0` turns it off (L28, L37); R-PK1–R-PK4 |
+| Character pictures pack: the HUD's cards in the CHARACTER menu, a team card beside each row | UI | 1.5 | TESTING (experimental) | Built by the setup after the first INSTALL (or by hand with `Build Character Pictures.cmd`): x64-zt copies the cards from the player's own game files into `iw7-mod/zone/ix_portraits.ff`; the menu loads it with `loadzone` and picks the selected map's cards. `ix_pictures 0` turns it off (L28, L37); R-PK1–R-PK5 |
 | Locked special characters shown and refused in the menu | UI | 1.5 | TESTING | Reads the same zombies stats as the stock lobby (L27); `ix_character_specials`; R-UI4 |
 | A chosen special survives the stock lobby's reset | UI | 1.5 | TESTING | The stock lobby clears `characterSelect` when it opens; the menu script writes the choice back; R-UI5 |
 | Steam name instead of "Unknown Soldier" | Player | 1.5 | TESTING | The setup copies the Steam name; the menu script sets iw7-mod's `name` while it is the default (L34); R-I14 |
