@@ -4,6 +4,25 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.3.2: automatic updates from GitHub (2026-10-08)
+
+**Added**
+- **Automatic updates.** New versions install themselves; no more downloading zips after this one.
+  - Each time the **Infinite Expansion** shortcut starts the game, it asks GitHub whether a newer version has been released (five seconds at most; offline, the game just starts). If so, the setup window opens, downloads it, installs it, and starts the game.
+  - The setup window asks too when it opens: the mod row says "v… is out" and the green button reads UPDATE.
+  - Downloads come only from this project's own Releases page and are checked against the SHA-256 GitHub lists for them. Then the new version's own setup installs it, so each version installs itself the way it was written to. Old downloads are deleted; UNINSTALL removes them all.
+  - **AUTO-UPDATE: ON / OFF** at the bottom of the setup window switches the launcher's check off; `--ix-no-update` on the shortcut skips it once.
+  - `IXSetup.ps1 -NoWindow -Update` updates without any window.
+- **Releases.** A new GitHub workflow publishes a release by itself whenever a push changes the version number: `Infinite-Expansion-<version>.zip` (the same layout as the downloads so far) with that version's notes from this changelog.
+- Version 0.3.2.
+
+**Changed**
+- The setup copy in `%LOCALAPPDATA%\InfiniteExpansion\Setup` is now updated file by file instead of being deleted and copied again, so an update can replace the copy it was started from.
+- The README no longer mentions the removed in-match card when it says how to check the install.
+
+**Tests**
+- 12 new installer tests (99 in all): release lookup, download, checksum, size and unpacking against a local stand-in for GitHub, including a release from elsewhere, a tampered checksum and a zip with a path outside its folder; a whole `-NoWindow -Update` in which the new version's setup installs itself; the auto-update switch; the launcher's version checks and the arguments it hands to the setup; and the release workflow's script, run against a stand-in for `gh`.
+
 ### 0.3.1: easier menu controls; the lobby card in the bottom right; the in-match card removed (2026-10-08)
 
 **Changed**

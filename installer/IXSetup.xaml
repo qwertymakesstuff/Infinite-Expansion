@@ -693,6 +693,7 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="44,0,0,12">
           <TextBlock Text="Fan-made mod. Not affiliated with Activision or Infinity Ward." FontSize="10.5" Foreground="#6C6285" VerticalAlignment="Center"/>
           <Button x:Name="RepoLink" Content="Project page" Style="{StaticResource LinkButton}" FontWeight="Normal" FontSize="10.5" Padding="8,2"/>
+          <Button x:Name="AutoUpdateLink" Content="AUTO-UPDATE: ON" Style="{StaticResource LinkButton}" FontWeight="Normal" FontSize="10.5" Padding="8,2" ToolTip="Whether the Infinite Expansion shortcut asks GitHub for a newer version, and installs it, each time it starts the game. Click to switch."/>
         </StackPanel>
       </Grid>
     </Grid>

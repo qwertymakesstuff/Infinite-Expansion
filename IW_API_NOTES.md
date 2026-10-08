@@ -13,6 +13,7 @@ This is the working API reference for the project. **Nothing here is guessed.** 
 | `[ZT]` | `Joelrau/x64-zt` (zonetool) source, for the character pictures pack (§18) | `3802db4d` |
 | `[LISTING]` | aurora's IW7 asset listing (`iw7_asset_listing.zip`, linked from `auroramod/docs`): every stock zone's assets (§18) | |
 | `[COMPILED]` | Compiled locally with **both** compilers during Phase 0 | |
+| `[GITHUB]` | GitHub's documented REST API and Actions behaviour (§17), used by the setup's downloads and updates; checked against this repository where stated | |
 
 If an API is not listed here, verify it the same way before using it. The rule is in section 12.
 
@@ -382,6 +383,9 @@ Read from the source; none of it has been run yet. Line numbers are the same at 
   - CI (`.github/workflows/build.yml`) uploads every push to `main` and `develop` to that server. GitHub releases are made by hand.
 - **Steam `[STEAM]`.** `steam://install/292730` opens Steam's install dialog for the game; `steam://open/main` starts Steam. iw7-mod exits with a message when Steam is not running (`steam_proxy.cpp`).
 - **Player name.** iw7-mod registers the `name` dvar with the default "Unknown Soldier" and the saved flag, and reports it as the local player's name (`get_login_username`, `live_get_local_client_name` in `patches.cpp`, the same in v1.1.0 and develop). Its Steam stand-in answers `GetPersonaName` with "1337" (`steam/interfaces/friends.cpp`), so the Steam name is never used. `name <new name>` in the console changes it, and it is saved. Steam keeps each account's display name in `<Steam>\config\loginusers.vdf` (`"PersonaName"`, with `"MostRecent" "1"` on the last account) `[STEAM]`, and the logged-in account's 32-bit id in `HKCU\Software\Valve\Steam\ActiveProcess\ActiveUser` (SteamID64 = 76561197960265728 + id) `[STEAM]`.
+
+- **GitHub releases `[GITHUB]`** (the setup reads iw7-mod's releases the same way). `GET https://api.github.com/repos/<owner>/<repo>/releases/latest` returns the newest release that is neither a draft nor a pre-release: `tag_name`, `html_url`, and `assets[]` with `name`, `size`, `browser_download_url` (`https://github.com/<owner>/<repo>/releases/download/<tag>/<name>`, which redirects to GitHub's download host) and `digest` (`sha256:<hex>`, listed for assets uploaded since 2025). It answers 404 when the repository has no release. Requests without a token need a `User-Agent` and are limited to 60 an hour per IP address; HTTPS needs TLS 1.2, which .NET Framework 4 enables with `ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072`. This repository is public (V91), so the launcher and the setup need no token.
+- **Publishing releases `[GITHUB]`.** A push runs the `on: push` workflows of the pushed commit; `paths:` limits that to pushes that change those files. The run's `GITHUB_TOKEN` may create releases when the workflow asks for `permissions: contents: write`, and `gh` is installed on GitHub's runners: `gh release create <tag> <file> --target <sha> --notes-file <file>` creates the tag at that commit. `.github/workflows/release.yml` does this for each new `level.ix.version` (`ARCHITECTURE.md` §11). Pushing the workflow file from this environment was accepted, and GitHub lists the workflow as active (V91).
 
 ## 18. Character pictures pack: x64-zt `[ZT]` `[LISTING]`
 

@@ -65,6 +65,7 @@ Infinite-Expansion/                          (repository)
 │                                            picture pack: IXPictures.Core.ps1 (x64-zt runs, build input, install;
 │                                            run by the setup after installing, and by IXPictures.ps1, the
 │                                            console version; tested with a stand-in for x64-zt)
+├── .github/workflows/release.yml            publishes a GitHub release for each new version (§11)
 ├── tools/                                   offline verification (Linux)
 └── *.md                                     project documentation
 ```
@@ -319,3 +320,37 @@ register()
 | Client sys-state "set client dvar" bridge; `luinotifyevent` score popups | `setclientdvar(s)`; GSC HUD text | Native in IW7 |
 | 48 custom CSV tables, 1,678 localized strings | Inline GSC data; plain `settext` labels | New tables/strings need a fastfile (L21) |
 | ~800 ported assets, sound banks, movies | Not ported (optional future asset phase, x64-zt) | Script-only scope |
+
+## 11. Distribution and updates (0.3.2)
+
+Players get new versions from the project's GitHub releases; nobody has to download a zip again after installing 0.3.2 (README "Updates").
+
+```text
+push that changes level.ix.version ──► .github/workflows/release.yml
+                                        └─ no release v<version> yet: git archive → Infinite-Expansion-<version>.zip
+                                           (Infinite-Expansion/installer, mods, …), notes = that CHANGELOG section,
+                                           gh release create v<version> at the pushed commit; GitHub lists its SHA-256
+
+Infinite Expansion.exe (IXLauncher.cs), on each start without --ix-no-update:
+  setup window open? → "start it there", stop          (it may be installing)
+  AutoUpdate=0 in %LOCALAPPDATA%\InfiniteExpansion\settings.ini, no setup copy, no answer in 5 s,
+  or the newest release is not newer than iw7-mod\custom_scripts\ix\core\bootstrap.gsc → start the game
+  else → powershell <LOCALAPPDATA>\InfiniteExpansion\Setup\installer\IXSetup.ps1 -Update -Play
+         -GameDir <game> [-PlayArgs <Base64 of the game's arguments>]; the launcher ends
+
+IXSetup.ps1 -Update (the installed version's setup copy), in its window:
+  Get-IXLatestRelease → Save-IXUpdate: download (zip asset on the project's releases/download/ only),
+  size and SHA-256 against GitHub's listing, unzip (no entry outside the folder, 64 MB at most) into
+  %LOCALAPPDATA%\InfiniteExpansion\Updates\<version>-<id>, check its bootstrap.gsc says that version
+  → Start-IXSetupFrom: the NEW version's IXSetup.ps1 -Install -Play -NoPictures -WaitPid <old pid>; closes
+
+IXSetup.ps1 -Install -Play (the new version): waits for the old setup to end, installs as INSTALL does
+  (files, record, launcher, setup copy over Setup\, older Updates folders deleted), then starts the
+  game through the new launcher with --ix-no-update
+```
+
+- **Each version installs itself.** The old setup only downloads and checks; the install logic that runs is the new version's own, so a later version may change how it installs.
+- **The setup window** asks the same question when it opens (`Start-IXUpdateCheck`); a newer release turns the green button into UPDATE, which runs the same download and handover without `-Play`. `-NoWindow -Update` does it without windows (the new setup runs as `-NoWindow -NoPictures`); the tests run that against a local stand-in for GitHub.
+- **Off switch.** AUTO-UPDATE in the window writes `AutoUpdate=0|1` to `settings.ini`; the launcher reads it. `--ix-no-update` skips one start, and the setup passes it whenever it starts the game itself.
+- **Failure.** A failed check or download never blocks playing: the launcher starts the game, and the window says why and offers PLAY.
+

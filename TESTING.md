@@ -151,6 +151,18 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V84 | Lobby card (`test_menu_script.py`; the stand-in lobby runs the stock display / hide sequences after every step) | ✅ One player: a regular character's card 331 × 480 at 1457–1788 × 475–955, the new show's card after SELECT SHOW; a second player joining: 263 × 381 at 1491–1754 × 574–955; three players: 177 × 256 in the lower middle (837–1014 × 714–970). Pam Grier's card 436 × 218; without the pack The Hoff's square stock picture 256 × 256 and Kevin Smith's 240 × 480; the stock special picture stays hidden (with the hide removed, the test sees it); a special the player has not unlocked and Random: no card. Initials and team cards as before, in the new place |
 | V85 | `python3 -m unittest discover -s tools/tests` | ✅ 87 tests OK: installer 54, checker 12, character data 7 (the player card's names test replaced by the picture pack's specials against the cast), menu script 14 |
 
+### 0.3.2 (automatic updates from GitHub releases)
+
+| # | Check | Result |
+|---|-------|--------|
+| V86 | Release lookup and download against a local stand-in for GitHub (`Updates`) | ✅ The newest release's version, tag, size and SHA-256 (from `digest`); the zip downloaded with progress, checked, unpacked into `Updates/<version>-<id>/Infinite-Expansion`, its bootstrap.gsc saying that version, the zip deleted. No release (404): nothing to do. Refused, each leaving nothing behind: a server error, a tag that is no version, a release without the zip, a zip outside the project's `releases/download/`, a wrong checksum, a wrong size, a zip entry `../../evil.txt` (nothing written outside), a zip holding another version. A release without a checksum is taken. Old downloads are deleted except the one in use |
+| V87 | `IXSetup.ps1 -NoWindow -Update` end to end (`SetupUpdateWithoutWindow`; the setup's GitHub addresses pointed at the stand-in) | ✅ With the current version installed, a release "9.9.9" is downloaded ("checksum verified") and installed by its own setup: the game folder, the record and the setup copy in `LOCALAPPDATA` all say 9.9.9, one download folder is left. Again: "9.9.9 is installed; the newest release is 9.9.9." UNINSTALL removes the downloads. No release: "There is no release on GitHub yet." and nothing installed |
+| V88 | The launcher's update helpers, compiled with C# 5 rules (`GameLauncher`) | ✅ Version parsing and comparison agree with the setup's; the version from GitHub's JSON and from bootstrap.gsc; `AutoUpdate=0` read case-insensitively; `--ix-no-update` stripped in any case; the setup's command line splits back by Windows' rules, the game's arguments surviving as Base64. PowerShell 7 warns that `HttpWebRequest` is obsolete on .NET 8 (it is not on .NET Framework 4), so that compile ignores warnings. Not run: the launcher itself (Windows: R-U2, R-U4–R-U6) |
+| V89 | The setup's own settings and quoting (`UpdateSettings`); `Start-IXGame` (`GameLauncher`) | ✅ AUTO-UPDATE off and on, other lines kept; arguments quoted so they split back exactly; Base64 game arguments decoded, junk ignored. The setup starts the launcher with `--ix-no-update` (then the game's arguments) and iw7-mod.exe with the arguments alone |
+| V90 | The release workflow's script, run in a scratch repository with a stand-in for `gh` (`ReleaseWorkflow`) | ✅ Creates `v7.7.7` at the pushed commit with `Infinite-Expansion-7.7.7.zip` (everything under `Infinite-Expansion/`, the name the setup accepts) and that version's CHANGELOG section as notes ("See CHANGELOG.md." without one; 7.7.70 is not 7.7.7); does nothing when the release exists. Its `sed` reads the real bootstrap.gsc's version, and its `paths:` names that file |
+| V91 | GitHub itself | ✅ The repository is public; the push of `.github/workflows/release.yml` from this environment was accepted, and GitHub lists the workflow "Release" as active. Its first real run is the 0.3.2 push (see below) |
+| V92 | `python3 -m unittest discover -s tools/tests` | ✅ 99 tests OK: installer 66 (12 new), checker 12, character data 7, menu script 14 |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -172,7 +184,7 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.3.1 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.3.2 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
 | R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
 | R-S3 | Menu opens (ADS + Melee) (R-M1) | Menu visible; weapons/offhands disabled while open | not run | not run |
 | R-S4 | Menu closes (Melee at root) (R-M1) | Menu hidden; weapons restored | not run | not run |
@@ -209,7 +221,7 @@ Chat commands are typed in the match's chat. The replies appear only for the pla
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-C1 | Type `!ix`, then `!ix list`, `!ix list character`, `!ix get character_specials`, `!ix version` | The command list (with `!ix menu`); all 8 settings with values (a few per line); only the four `character` ones; "Special characters: character_specials = 1 (default 1, a whole number from 0 to 2)" and its help line; "Infinite Expansion 0.3.1". A second player sees none of the replies | not run | not run |
+| R-C1 | Type `!ix`, then `!ix list`, `!ix list character`, `!ix get character_specials`, `!ix version` | The command list (with `!ix menu`); all 8 settings with values (a few per line); only the four `character` ones; "Special characters: character_specials = 1 (default 1, a whole number from 0 to 2)" and its help line; "Infinite Expansion 0.3.2". A second player sees none of the replies | not run | not run |
 | R-C2 | Console: `set ix_menu_hint 0` | Within about half a second the console shows `[IX] INFO: setting menu_hint = 0 (console)`; `!ix get menu_hint` says 0 | not run | not run |
 | R-C3 | Invalid values: console `set ix_character_specials abc`; chat `!ix set character_specials 9999`, `!ix set character_specials maybe`, `!ix on character_specials`, `!ix get nothing` | `abc`: a warning, and `ix_character_specials` is back at its value. 9999 becomes 2. "character_specials: 'maybe' is not a whole number from 0 to 2." "character_specials is not an on/off setting …". "No setting 'nothing' …" | not run | not run |
 | R-C4 | Co-op: the guest types `!ix list`, then `!ix set menu_hint 0` | The list works; then "Only the host can change settings." and nothing changes | not run | not run |
@@ -264,7 +276,7 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I3 | INSTALL, then start a zombies match | Status INSTALLED; `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` and `iw7-mod\infinite-expansion.json` exist; *Settings → Apps* lists Infinite Expansion; the console shows `[IX] INFO: init` | not run |
 | R-I4 | With the old `mods\infinite_expansion` copy present | The yellow note shows; INSTALL removes that copy's files and says so | not run |
 | R-I5 | UNINSTALL | Status UNINSTALLED; the mod's files and the record are gone; other files in `iw7-mod` stay; the Settings entry is gone | not run |
-| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.3.1` | not run |
+| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.3.2` | not run |
 | R-I6 | Install, delete the download, then uninstall from *Settings → Apps* | The setup window opens and uninstalls by itself; after closing it, `%LOCALAPPDATA%\InfiniteExpansion` is gone | not run |
 | R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
 | R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
@@ -290,11 +302,25 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-M9 | With a controller: open the menu, then the left stick up / down / left / right, Jump, Use, Melee | As W/S/A/D, Jump, Use and Melee on the keyboard. The bottom lines read "Stick up / down: move   left / right: change" (the hint after the first spawn names the left stick) | not run | not run |
 | R-M10 | Open the menu with zombies nearby and let one reach you; close it. Try ADS + Melee in mid-jump. Open it, then let a zombie down you | While open you stay in place and zombies can still hurt you; Melee closes it and you can walk at once. In the air it does not open (`!ix menu`: "The menu cannot open now."). Going down closes it and frees you. No console error | not run | not run |
 
+### 4.12 Updates (0.3.2)
+
+The first update to 0.3.2 is by hand (download, setup, UPDATE). To try an automatic update before a newer release exists, make the install look older: in `<game>\iw7-mod\custom_scripts\ix\core\bootstrap.gsc`, change `"0.3.2"` to `"0.3.0"`, then use the shortcut (R-U2).
+
+| ID | Test | Expected | Result |
+|----|------|----------|--------|
+| R-U1 | Install 0.3.2 with its setup, then open the setup again | "Installed · v0.3.2" and PLAY; briefly CHECKING FOR UPDATES, then READY TO PLAY; AUTO-UPDATE: ON at the bottom. `%TEMP%\InfiniteExpansionSetup.log` has no "update check failed" line | not run |
+| R-U2 | With a newer release on GitHub (or the trick above): double-click the desktop shortcut | Within seconds the setup window opens with UPDATING INFINITE EXPANSION; then the new version's window installs it, and the game starts by itself. The game's console shows the new version's init line. Report the time it took and any Windows or antivirus prompt | not run |
+| R-U3 | Same situation, but open the setup instead | The mod row says "v… is out" and the button UPDATE; UPDATE downloads and installs it (ALL SET); PLAY starts the game | not run |
+| R-U4 | Click AUTO-UPDATE: ON, then use the shortcut with a newer release out; click it again | It reads OFF, and the shortcut starts the game without the setup window; then ON again | not run |
+| R-U5 | Offline (Wi-Fi off), double-click the shortcut | The game starts, at most about five seconds later than usual, with no message | not run |
+| R-U6 | Leave the setup window open, double-click the shortcut | A message says the setup is open; nothing else starts. PLAY in the setup starts the game | not run |
+| R-U7 | After an update, look in `%LOCALAPPDATA%\InfiniteExpansion`; then UNINSTALL | `Setup` holds the new version, `Updates` one folder (the version just installed). UNINSTALL deletes `Updates` and `settings.ini` | not run |
+
 ### 4.10 The launcher
 
 | ID | Test | Expected | Result |
 |----|------|----------|--------|
-| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.3.1.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
+| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.3.2.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
 | R-L2 | Steam open and signed in: double-click the shortcut | The game starts within a few seconds, on its main menu; no other window appears. Report any Windows or antivirus warning about the launcher | not run |
 | R-L3 | Steam closed: double-click the shortcut; also once while Steam asks for your password | Steam starts; the game starts by itself a few seconds after Steam has signed in (with the password: after you sign in, within five minutes). No "Steam must be running" box | not run |
 | R-L4 | Double-click twice quickly; then once more while the game runs | One game; then "Infinite Warfare is already running." | not run |

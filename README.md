@@ -5,7 +5,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
 > **Status: Phase 3 (in-game menu) complete — not yet run in-game.**
-> The in-game menu (ADS + Melee) shows and changes every setting. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
+> The in-game menu (ADS + Melee) shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
 
 ## Requirements
 
@@ -19,7 +19,7 @@ The BO3 mod serves only as a reference. Nothing is copied from it, and every fea
 1. Download this repository (on GitHub: **Code → Download ZIP**) and extract the whole zip.
 2. Double-click **`Infinite Expansion Setup.cmd`**.
 3. Click **INSTALL**. When it says ALL SET, the button becomes **PLAY**. Click **UNINSTALL** in the same window to remove the mod again.
-4. From then on, start the game with **Infinite Expansion** on your desktop, or `Infinite Expansion.exe` in the game folder ([the launcher](#the-launcher)).
+4. From then on, start the game with **Infinite Expansion** on your desktop, or `Infinite Expansion.exe` in the game folder ([the launcher](#the-launcher)). It installs new versions by itself ([Updates](#updates)), so this download is the last one you need.
 
 What the setup does for you:
 
@@ -31,14 +31,15 @@ What the setup does for you:
 | Adds the launcher | Builds `Infinite Expansion.exe` in the game folder and an **Infinite Expansion** shortcut on the desktop. See [The launcher](#the-launcher) |
 | Builds the character pictures, the first time | Right after installing, while the window shows its progress (a few minutes, once): the cards the HUD shows in a match, copied from your own game files for the CHARACTER menu. See [Character pictures](#character-pictures-automatic-experimental) |
 | Starts the game | **PLAY** starts the game through the launcher, which waits for Steam. iw7-mod's first start downloads the rest of its own files; then pick Zombies in the main menu |
+| Keeps the mod up to date | When the window opens, it asks GitHub for a newer version; so does the launcher each time it starts the game. See [Updates](#updates) |
 
-The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, look for the CHARACTER button in the lobby after **Solo Match** or **Custom Game**, and the card in the corner of a match (`TESTING.md` §4).
+The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, look for the CHARACTER button in the lobby after **Solo Match** or **Custom Game**, and open the menu in a match with ADS + Melee (`TESTING.md` §4).
 
 INSTALL also sets your in-game name to your Steam name. iw7-mod calls everyone "Unknown Soldier" otherwise. A name you already chose with `name <new name>` in the console stays.
 
 UNINSTALL removes exactly the recorded mod files; other mods' scripts and the iw7-mod client stay. To remove iw7-mod too, follow [its uninstall guide](https://github.com/auroramod/docs/blob/main/docs/iw7-uninstall.md).
 
-INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files: the button then reads UPDATE. It compares the files themselves, so this works even when the version number did not change.
+INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you can uninstall from there after deleting the download; it keeps a copy of the setup in `%LOCALAPPDATA%\InfiniteExpansion` for that, and uninstalling deletes it. Running the setup from a newer download replaces the installed files: the button then reads UPDATE. It compares the files themselves, so this works even when the version number did not change. Newer versions on GitHub are found without a download, see [Updates](#updates).
 
 ### The launcher
 
@@ -46,16 +47,30 @@ INSTALL also adds **Infinite Expansion** to *Windows Settings → Apps*, so you 
 
 1. checks that `iw7-mod.exe` is there, and that the mod is installed (if not, it asks whether to start iw7-mod anyway);
 2. does nothing if the game is already running;
-3. starts Steam if it is not running, and waits until you are signed in (up to five minutes; Steam shows its own window meanwhile). iw7-mod refuses to start without Steam ("Steam must be running to play this game!");
-4. starts `iw7-mod.exe` from the game folder. The game opens on its main menu: pick **Zombies**. iw7-mod has a `-zombies` switch, but it only works on dedicated servers.
+3. asks GitHub whether a newer version of the mod is out, and if so lets the setup install it first ([Updates](#updates));
+4. starts Steam if it is not running, and waits until you are signed in (up to five minutes; Steam shows its own window meanwhile). iw7-mod refuses to start without Steam ("Steam must be running to play this game!");
+5. starts `iw7-mod.exe` from the game folder. The game opens on its main menu: pick **Zombies**. iw7-mod has a `-zombies` switch, but it only works on dedicated servers.
 
 The setup builds the launcher on your PC with the C# compiler that comes with Windows (.NET Framework 4), from `installer\IXLauncher.cs`, which you can read. So the download contains no program file, and Windows has no downloaded program to warn about. Every INSTALL, UPDATE and REINSTALL builds it again; UNINSTALL deletes it and its shortcut. If it cannot be built, the status line says why, and PLAY and `iw7-mod.exe` start the game as before.
 
 Arguments given to the launcher go on to iw7-mod: a shortcut target such as `"...\Infinite Expansion.exe" +set ix_debug_log 1` works.
 
+### Updates
+
+From 0.3.2 on, new versions install themselves; no more downloading zips:
+
+- **When you start the game** with the **Infinite Expansion** shortcut, the launcher asks GitHub whether a newer version has been released. It waits five seconds at most; without an answer (offline) the game starts as it is. When there is one, the setup window opens with UPDATING INFINITE EXPANSION, downloads it, installs it, and starts the game, usually within seconds.
+- **When you open the setup**, it asks too. If a newer version is out, the mod row says "v… is out" and the green button reads UPDATE.
+- **What it installs:** the newest release on the [Releases page](https://github.com/qwertymakesstuff/Infinite-Expansion/releases), `Infinite-Expansion-<version>.zip`, checked against the SHA-256 checksum GitHub lists for it, and only from this project's own releases. It is unpacked in `%LOCALAPPDATA%\InfiniteExpansion\Updates`, and then the new version's own setup installs it, in the window you know. Older downloads are deleted afterwards; UNINSTALL deletes them all.
+- **Character pictures** stay. An update the launcher started does not build them for the first time (that takes minutes); REINSTALL does.
+- **To turn it off**, click **AUTO-UPDATE: ON** at the bottom of the setup window (it then reads OFF; the choice is saved in `%LOCALAPPDATA%\InfiniteExpansion\settings.ini`). The launcher then starts the game without asking GitHub; the setup window still says when a new version is out. To skip it once, add `--ix-no-update` to the end of the shortcut's *Target*.
+- **What is sent:** one anonymous request to GitHub's public release page, the same as opening it in a browser. GitHub answers 60 of those an hour per internet connection; after that the check is skipped until the next hour.
+
+**For maintainers:** `.github/workflows/release.yml` publishes a release by itself whenever a push changes `level.ix.version` in `bootstrap.gsc` and there is no release `v<version>` yet, with that version's section of `CHANGELOG.md` as its notes. Every change meant for players therefore needs a new version number, and players get it the next time they start the game.
+
 ### Windows warnings and logs
 
-Windows asks before running a file from the internet, and the setup is not code-signed, so it may show "Windows protected your PC". Choose *More info → Run anyway*. The setup is plain PowerShell (`installer\IXSetup.ps1`) that you can read first. If something goes wrong, details go to `%TEMP%\InfiniteExpansionSetup.log`. For a protected game folder, the setup offers to retry as administrator.
+Windows asks before running a file from the internet, and the setup is not code-signed, so it may show "Windows protected your PC". Choose *More info → Run anyway*. The setup is plain PowerShell (`installer\IXSetup.ps1`) that you can read first. If something goes wrong, details go to `%TEMP%\InfiniteExpansionSetup.log` (updates too). For a protected game folder, the setup offers to retry as administrator.
 
 ### By hand
 
@@ -73,7 +88,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.3.1 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.3.2 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix
 [IX] INFO: ready

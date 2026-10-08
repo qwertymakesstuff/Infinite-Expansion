@@ -10,16 +10,29 @@ shortcut, and the first one builds the character pictures from the player's own 
 files (IXPictures.Core.ps1), once. After installing, Windows Settings > Apps lists the
 mod, and uninstalling there runs this script with -Uninstall.
 
+Updates (README "Updates"): when the window opens, it asks GitHub for the newest release,
+and the green button downloads a newer one. The launcher asks too, each time it starts the
+game, and then runs the setup copy with -Update -Play. Either way the release is checked,
+unpacked, and its own setup window installs it (-Install), so each version installs
+itself; this window closes. AUTO-UPDATE at the bottom switches the launcher's check off.
+
 Switches:
   -GameDir <folder>   use this game folder instead of looking in Steam
-  -Install            install as soon as the window opens (used after "run as administrator")
+  -Install            install as soon as the window opens (used after "run as administrator",
+                      and by an update)
   -Uninstall          uninstall as soon as the window opens (Windows Settings > Apps)
+  -Update             download the newest GitHub release if it is newer than the installed
+                      version, and let its setup install it
+  -Play               start the game when done (after -Install or -Update)
+  -PlayArgs <text>    the game's arguments, Base64 of UTF-8 text (from the launcher)
+  -WaitPid <id>       first wait until this process has ended (the setup that handed over)
   -NoPictures         do not build the character pictures
   -ZoneTool <file>    build them with this zonetool.exe instead of downloading x64-zt
   -NoWindow           no window: install (downloading iw7-mod if needed, then building the
-                      launcher and the character pictures), or uninstall with -Uninstall;
-                      print the result and exit with 0 or 1 (1 only when the mod itself
-                      was not installed)
+                      launcher and the character pictures), uninstall with -Uninstall, or
+                      update with -Update (the new version's setup installs it without a
+                      window); print the result and exit with 0 or 1 (1 only when the mod
+                      itself was not installed)
 
 Windows PowerShell 5.1 runs this file, so it stays ASCII and avoids PowerShell 7 syntax
 (tools/tests/test_installer.py checks both).
@@ -28,6 +41,10 @@ param(
     [string]$GameDir,
     [switch]$Install,
     [switch]$Uninstall,
+    [switch]$Update,
+    [switch]$Play,
+    [string]$PlayArgs,
+    [int]$WaitPid,
     [switch]$NoPictures,
     [string]$ZoneTool,
     [switch]$NoWindow
@@ -44,13 +61,23 @@ $LogPath = Join-Path ([IO.Path]::GetTempPath()) 'InfiniteExpansionSetup.log'
 . $CorePath
 . $PicturesCorePath
 
+# An update: the setup that handed over must have ended before this one
+# replaces the setup copy it may run from.
+if ($WaitPid -gt 0) {
+    try {
+        Wait-Process -Id $WaitPid -Timeout 30 -ErrorAction Stop
+    }
+    catch {
+    }
+}
+
 # Every control this script uses; each must be an x:Name in IXSetup.xaml.
 $IXControlNames = @(
     'TitleBar', 'MinButton', 'CloseButton', 'VersionText',
     'GameDot', 'GameText', 'SteamLink', 'BrowseButton',
     'ClientDot', 'ClientText', 'ClientLink',
     'ModDot', 'ModText', 'ReinstallLink', 'NoteText',
-    'InstallButton', 'UninstallButton', 'StatusTitle', 'StatusText', 'RepoLink'
+    'InstallButton', 'UninstallButton', 'StatusTitle', 'StatusText', 'RepoLink', 'AutoUpdateLink'
 )
 
 $Colors = @{
@@ -114,6 +141,28 @@ if ($NoWindow) {
         if (-not (Test-IXGameDir $dir)) {
             throw 'Infinite Warfare was not found. Pass -GameDir "<game folder>".'
         }
+        if ($Update) {
+            # The newest release, installed by its own setup (without a window).
+            $installed = Get-IXPackageVersion (Get-IXTarget $dir)
+            $release = Get-IXLatestRelease
+            if ($null -eq $release) {
+                Write-Output 'There is no release on GitHub yet.'
+                exit 0
+            }
+            if ($installed -and (Compare-IXVersion $release.Version $installed) -le 0) {
+                Write-Output ('Infinite Expansion {0} is installed; the newest release is {1}.' -f $installed, $release.Version)
+                exit 0
+            }
+            $root = Save-IXUpdate $release (Get-IXUpdatesDir) $null
+            $checked = ''
+            if ($release.Hash) {
+                $checked = ' (checksum verified)'
+            }
+            Write-Output ('Downloaded Infinite Expansion {0} from GitHub{1}.' -f $release.Version, $checked)
+            $arguments = Get-IXSetupArguments (Join-IXPath $root @('installer', 'IXSetup.ps1')) @('-NoWindow', '-NoPictures', '-GameDir', $dir) $false
+            & (Get-IXPowerShellPath) @arguments
+            exit $LASTEXITCODE
+        }
         if ($Uninstall) {
             $result = Uninstall-IX $dir $PackageRoot
             Unregister-IXUninstaller $SetupRoot | Out-Null
@@ -133,6 +182,7 @@ if ($NoWindow) {
             $player = ConvertTo-IXPlayerName (Get-IXSteamPersonaName)
             $result = Install-IX $dir $PackageRoot $player
             Register-IXUninstaller $dir (Get-IXPackageVersion $PackageRoot) $SetupRoot | Out-Null
+            Remove-IXOldUpdates (Get-IXUpdatesDir) $SetupRoot
             Write-Output ('Installed {0} files into {1}.' -f $result.Copied, $result.Target)
             if ($player) {
                 Write-Output ('In-game name: {0} (from Steam).' -f $player)
@@ -301,6 +351,8 @@ function Update-IXView {
     Set-IXVisible $ui.ClientLink ($state.GameFound -and -not $state.ClientFound)
 
     $outdated = $state.Installed -and $state.PackageVersion -and (($state.InstalledVersion -ne $state.PackageVersion) -or $state.FilesDiffer)
+    # A newer release on GitHub (Start-IXUpdateCheck) comes before this download.
+    $online = $script:Online
     if (-not $state.GameFound) {
         Set-IXDot $ui.ModDot $Colors.Off
         $ui.ModText.Text = '-'
@@ -313,7 +365,11 @@ function Update-IXView {
         if (-not $state.HasRecord) {
             $text = $text + ' (copied by hand)'
         }
-        if ($outdated -and $state.InstalledVersion -eq $state.PackageVersion) {
+        if ($null -ne $online) {
+            $text = $text + ' ' + $Dash + ' v' + $online.Version + ' is out'
+            Set-IXDot $ui.ModDot $Colors.Warn
+        }
+        elseif ($outdated -and $state.InstalledVersion -eq $state.PackageVersion) {
             $text = $text + ' ' + $Dash + ' newer files are ready'
             Set-IXDot $ui.ModDot $Colors.Warn
         }
@@ -326,11 +382,15 @@ function Update-IXView {
         }
         $ui.ModText.Text = $text
     }
+    elseif ($null -ne $online) {
+        Set-IXDot $ui.ModDot $Colors.Off
+        $ui.ModText.Text = 'Not installed ' + $Dash + ' v' + $online.Version + ' is out'
+    }
     else {
         Set-IXDot $ui.ModDot $Colors.Off
         $ui.ModText.Text = 'Not installed'
     }
-    Set-IXVisible $ui.ReinstallLink ($state.Installed -and -not $outdated -and $state.PackageFound)
+    Set-IXVisible $ui.ReinstallLink ($state.Installed -and -not $outdated -and $state.PackageFound -and $null -eq $online)
     if ($state.PicturesBuilt -or $NoPictures) {
         $ui.ReinstallLink.ToolTip = 'Copy the mod files again'
     }
@@ -339,7 +399,7 @@ function Update-IXView {
     }
 
     # The green button is always the next step: INSTALL, UPDATE, then PLAY.
-    if ($outdated) {
+    if ($outdated -or ($null -ne $online -and $state.Installed)) {
         $ui.InstallButton.Content = 'UPDATE'
     }
     elseif ($state.Installed -and $state.ClientFound) {
@@ -348,7 +408,7 @@ function Update-IXView {
     else {
         $ui.InstallButton.Content = 'INSTALL'
     }
-    $ui.InstallButton.IsEnabled = $state.GameFound -and ($state.PackageFound -or $ui.InstallButton.Content -eq 'PLAY')
+    $ui.InstallButton.IsEnabled = $state.GameFound -and ($state.PackageFound -or $null -ne $online -or $ui.InstallButton.Content -eq 'PLAY')
     $ui.UninstallButton.IsEnabled = $state.GameFound -and ($state.Installed -or $state.OldCopy)
 
     # One short line each: the window has room for about two.
@@ -378,6 +438,9 @@ function Set-IXReadyStatus {
     if (-not $state.GameFound) {
         Set-IXStatus 'GAME NOT FOUND' 'Click STEAM to install Infinite Warfare (you need to own it on Steam); this window notices when it is there. Installed somewhere else? Click BROWSE.' $Colors.Bad
     }
+    elseif ($null -ne $script:Online) {
+        Set-IXStatus 'UPDATE READY' ('Infinite Expansion ' + $script:Online.Version + ' is out. Click ' + $ui.InstallButton.Content + ' to download it from GitHub and install it.') $Colors.Warn
+    }
     elseif (-not $state.PackageFound) {
         Set-IXStatus 'UNINSTALL ONLY' 'To install, run the setup from the full download.' $Colors.Warn
     }
@@ -402,7 +465,7 @@ function Set-IXReadyStatus {
 function Set-IXBusy {
     param([bool]$Busy)
     $script:Busy = $Busy
-    foreach ($name in @('InstallButton', 'UninstallButton', 'BrowseButton', 'SteamLink', 'ClientLink', 'ReinstallLink')) {
+    foreach ($name in @('InstallButton', 'UninstallButton', 'BrowseButton', 'SteamLink', 'ClientLink', 'ReinstallLink', 'AutoUpdateLink')) {
         $ui[$name].IsEnabled = -not $Busy
     }
     if (-not $Busy) {
@@ -489,6 +552,8 @@ function Invoke-IXInstall {
         $player = ConvertTo-IXPlayerName $steamName
         $result = Install-IX $script:GameDir $PackageRoot $player
         $registered = Register-IXUninstaller $script:GameDir (Get-IXPackageVersion $PackageRoot) $SetupRoot
+        # Downloads of earlier updates; the one this setup runs from stays.
+        Remove-IXOldUpdates (Get-IXUpdatesDir) $SetupRoot
         $script:RemoveCopyOnExit = $false
         Write-IXLog ('installed ' + $result.Copied + ' files into ' + $result.Target)
         $text = $ClientText + 'Copied ' + $result.Copied + ' mod files into ' + $result.Target + '.'
@@ -532,6 +597,7 @@ function Complete-IXInstall {
     param([string]$Text)
     if ($NoPictures -or $script:State.PicturesBuilt) {
         Set-IXStatus 'ALL SET' ($Text + ' Click PLAY.') $Colors.Ok
+        Invoke-IXPlayAfterInstall
         return
     }
     if (Test-IXGameRunning) {
@@ -560,12 +626,21 @@ function Complete-IXInstall {
                 $more = $more + ' (' + $Built.Missing.Count + ' cards not found; those show initials)'
             }
             Set-IXStatus 'ALL SET' ($Text + $more + '. Click PLAY.') $Colors.Ok
+            Invoke-IXPlayAfterInstall
         }
         Fail    = {
             param([string]$Failure, [string]$Text)
             Write-IXLog ('character pictures failed: ' + $Failure)
             Set-IXStatus 'ALL SET' ($Text + ' The character pictures could not be built (' + $Failure + '), so the menu shows initials; REINSTALL tries again. Details: ' + (Get-IXPictureLogPath) + '. Click PLAY.') $Colors.Warn
+            Invoke-IXPlayAfterInstall
         }
+    }
+}
+
+# -Play (an update on the way into the game): start it once the mod is installed.
+function Invoke-IXPlayAfterInstall {
+    if ($Play -and $ui.InstallButton.Content -eq 'PLAY') {
+        Invoke-IXPlay
     }
 }
 
@@ -614,6 +689,26 @@ $pictureLog = {
     Write-IXPictureLog $pictureLogFile $Text
 }
 Invoke-IXPictureBuild -GameDir $args[0] -Progress $args[1] -Log $pictureLog -ZoneTool $args[3]
+'@
+
+# The newest release on GitHub ($null: none yet), for the window's check.
+$UpdateCheckScript = [IO.File]::ReadAllText($CorePath) + @'
+
+$ErrorActionPreference = 'Stop'
+[pscustomobject]@{ Release = (Get-IXLatestRelease) }
+'@
+
+# The newest release, downloaded and unpacked when it is newer than $args[0]
+# (the installed version, or ''): Root is the unpacked download, or $null.
+$UpdateDownloadScript = [IO.File]::ReadAllText($CorePath) + @'
+
+$ErrorActionPreference = 'Stop'
+$release = Get-IXLatestRelease
+$root = $null
+if ($null -ne $release -and (Compare-IXVersion $release.Version $args[0]) -gt 0) {
+    $root = Save-IXUpdate $release $args[2] $args[1]
+}
+[pscustomobject]@{ Release = $release; Root = $root }
 '@
 
 # Runs $Script with $Arguments in the background. $Job holds: Title (the status
@@ -744,6 +839,145 @@ function Complete-IXClient {
     return $text + '. Its first start downloads the rest of its files. '
 }
 
+# When the window opens: is a newer version on GitHub? Then the green button
+# downloads it. No answer (offline, GitHub down): nothing changes.
+function Start-IXUpdateCheck {
+    if (-not $script:State.GameFound) {
+        return
+    }
+    $progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = 'Asking GitHub for the newest version' })
+    Start-IXJob $UpdateCheckScript @() $progress @{
+        Title   = 'CHECKING FOR UPDATES'
+        Prefix  = ''
+        What    = 'The setup is still asking GitHub for updates.'
+        Stop    = $true
+        Context = $null
+        Then    = {
+            param($Result)
+            $script:Online = $null
+            $release = $Result.Release
+            if ($null -ne $release -and (Compare-IXVersion $release.Version (Get-IXNewestLocalVersion)) -gt 0) {
+                $script:Online = $release
+                Write-IXLog ('update available: ' + $release.Version + ' ' + $release.Page)
+            }
+            Update-IXView
+            Set-IXReadyStatus
+        }
+        Fail    = {
+            param([string]$Failure)
+            Write-IXLog ('update check failed: ' + $Failure)
+            Set-IXReadyStatus
+        }
+    }
+}
+
+# The newer of the installed version and this download's.
+function Get-IXNewestLocalVersion {
+    $newest = [string]$script:State.InstalledVersion
+    if ($script:State.PackageVersion -and (Compare-IXVersion $script:State.PackageVersion $newest) -gt 0) {
+        $newest = $script:State.PackageVersion
+    }
+    return $newest
+}
+
+# Downloads the newest release (when it is newer than the installed version),
+# then hands over to its setup, which installs it. -Update: the launcher started
+# this on the way into the game.
+function Start-IXUpdate {
+    $installed = ''
+    if ($script:State.InstalledVersion) {
+        $installed = [string]$script:State.InstalledVersion
+    }
+    $progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = 'Asking GitHub for the newest version' })
+    Start-IXJob $UpdateDownloadScript @($installed, $progress, (Get-IXUpdatesDir)) $progress @{
+        Title   = 'UPDATING INFINITE EXPANSION'
+        Prefix  = ''
+        What    = 'Infinite Expansion is still downloading its update. Closing stops it.'
+        Stop    = $true
+        Context = $null
+        Then    = {
+            param($Result)
+            if ($null -eq $Result.Root) {
+                Write-IXLog 'update: nothing newer'
+                $script:Online = $null
+                Update-IXView
+                if ($Play) {
+                    Invoke-IXPlay
+                    return
+                }
+                Set-IXStatus 'UP TO DATE' ('Infinite Expansion ' + $script:State.InstalledVersion + ' is the newest version.') $Colors.Ok
+                return
+            }
+            Write-IXLog ('update: ' + $Result.Release.Version + ' unpacked in ' + $Result.Root)
+            Start-IXHandover $Result.Root
+        }
+        Fail    = {
+            param([string]$Failure)
+            Write-IXLog ('update failed: ' + $Failure)
+            $script:Online = $null
+            Update-IXView
+            $text = 'The update could not be downloaded: ' + $Failure + '.'
+            if ($ui.InstallButton.Content -eq 'PLAY') {
+                $text = $text + ' Click PLAY to play the installed version.'
+            }
+            Set-IXStatus 'UPDATE FAILED' ($text + ' Details: ' + $LogPath) $Colors.Bad
+        }
+    }
+}
+
+# The new version's setup window installs it (and with -Play starts the game);
+# this window closes. An update the launcher started skips the character
+# pictures: a first build takes minutes, and REINSTALL does it later.
+function Start-IXHandover {
+    param([string]$Root)
+    $arguments = @('-Install', '-GameDir', $script:GameDir.TrimEnd('\', '/'), '-WaitPid', [string]$PID)
+    if ($Update -or $NoPictures) {
+        $arguments += '-NoPictures'
+    }
+    if ($Play) {
+        $arguments += '-Play'
+    }
+    if ($PlayArgs) {
+        $arguments += @('-PlayArgs', $PlayArgs)
+    }
+    if ($ZoneTool) {
+        $arguments += @('-ZoneTool', $ZoneTool)
+    }
+    try {
+        Start-IXSetupFrom $Root $arguments
+        Write-IXLog ('handed over to ' + $Root)
+        $window.Close()
+    }
+    catch {
+        Invoke-IXFailure $_ 'update'
+    }
+}
+
+function Update-IXAutoUpdateLink {
+    if (Get-IXAutoUpdate) {
+        $ui.AutoUpdateLink.Content = 'AUTO-UPDATE: ON'
+    }
+    else {
+        $ui.AutoUpdateLink.Content = 'AUTO-UPDATE: OFF'
+    }
+}
+
+function Switch-IXAutoUpdate {
+    try {
+        Set-IXAutoUpdate (-not (Get-IXAutoUpdate)) | Out-Null
+    }
+    catch {
+        Write-IXLog ('auto-update setting: ' + $_.Exception.Message)
+    }
+    Update-IXAutoUpdateLink
+    if (Get-IXAutoUpdate) {
+        Set-IXStatus 'AUTO-UPDATE ON' 'Each time the Infinite Expansion shortcut starts the game, it asks GitHub for a newer version and installs it first.' $Colors.Info
+    }
+    else {
+        Set-IXStatus 'AUTO-UPDATE OFF' 'The shortcut starts the game without asking GitHub. This window still says when a newer version is out.' $Colors.Warn
+    }
+}
+
 function Invoke-IXPlay {
     try {
         # The launcher waits for Steam by itself.
@@ -756,7 +990,7 @@ function Invoke-IXPlay {
             Set-IXStatus 'STARTING STEAM' 'iw7-mod needs Steam running. Click PLAY again once Steam is open.' $Colors.Warn
             return
         }
-        $started = Start-IXGame $script:GameDir
+        $started = Start-IXGame $script:GameDir (ConvertFrom-IXPlayArgs $PlayArgs)
         Write-IXLog ('started ' + $started)
         $window.Close()
     }
@@ -769,6 +1003,9 @@ function Invoke-IXPlay {
 function Invoke-IXPrimary {
     if ($ui.InstallButton.Content -eq 'PLAY') {
         Invoke-IXPlay
+    }
+    elseif ($null -ne $script:Online) {
+        Start-IXUpdate
     }
     elseif (-not $script:State.ClientFound) {
         Start-IXClientDownload {
@@ -877,14 +1114,25 @@ $ui.ClientLink.Add_Click({
     })
 $ui.ReinstallLink.Add_Click({ Invoke-IXInstall '' })
 $ui.RepoLink.Add_Click({ Start-Process $IXProjectUrl })
+$ui.AutoUpdateLink.Add_Click({ Switch-IXAutoUpdate })
 $ui.InstallButton.Add_Click({ Invoke-IXPrimary })
 $ui.UninstallButton.Add_Click({ Invoke-IXUninstall })
 $window.Add_ContentRendered({
-        if ($Install -and $ui.InstallButton.IsEnabled -and $ui.InstallButton.Content -ne 'PLAY') {
+        if ($Update -and $script:State.GameFound) {
+            Start-IXUpdate
+        }
+        elseif ($Install -and $ui.InstallButton.IsEnabled -and $ui.InstallButton.Content -ne 'PLAY') {
             Invoke-IXPrimary
+        }
+        elseif ($Install -and $Play -and $ui.InstallButton.Content -eq 'PLAY') {
+            # Already installed (the same update twice): straight into the game.
+            Invoke-IXPlay
         }
         elseif ($Uninstall -and $ui.UninstallButton.IsEnabled) {
             Invoke-IXUninstall
+        }
+        elseif (-not $Install -and -not $Uninstall -and -not $Update) {
+            Start-IXUpdateCheck
         }
     })
 $window.Add_Closing({
@@ -903,9 +1151,11 @@ $window.Add_Closing({
 $script:Busy = $false
 $script:Job = $null
 $script:RemoveCopyOnExit = $false
+$script:Online = $null
 try {
     $script:GameDir = Resolve-IXGameDir
     Update-IXView
+    Update-IXAutoUpdateLink
     Set-IXReadyStatus
     Write-IXLog ('opened; game folder: ' + $script:GameDir)
 }

@@ -9,7 +9,8 @@
 # What it installs: the mod's custom_scripts and ui_scripts folders, copied into
 # <game>\iw7-mod\, a search path of the iw7-mod client (README: Installation). The
 # record <game>\iw7-mod\infinite-expansion.json lists the copied files, so that
-# uninstalling removes exactly those files and leaves other mods alone.
+# uninstalling removes exactly those files and leaves other mods alone. Updates
+# come from the project's newest GitHub release (section "Updates" below).
 
 $IXAppId = '292730'                  # Steam app id of Call of Duty: Infinite Warfare
 $IXGameExe = 'iw7_ship.exe'          # the game's executable (iw7-mod src/client/main.cpp)
@@ -39,6 +40,14 @@ $IXLauncherName = 'Infinite Expansion.exe'
 $IXLauncherSource = 'IXLauncher.cs'
 $IXLauncherIcon = 'ix-launcher.ico'
 $IXLauncherShortcutName = 'Infinite Expansion.lnk'
+# Given to the launcher when the setup starts the game: the setup has just
+# installed or looked for an update, so the launcher need not.
+$IXLauncherNoUpdate = '--ix-no-update'
+# Updates: the newest release of the project, which .github/workflows/release.yml
+# publishes for each version (tag v<version>, asset Infinite-Expansion-<version>.zip).
+$IXReleaseApi = 'https://api.github.com/repos/qwertymakesstuff/Infinite-Expansion/releases/latest'
+$IXReleaseDownloads = 'https://github.com/qwertymakesstuff/Infinite-Expansion/releases/download/'
+$IXUpdateMaxBytes = 64MB
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -845,9 +854,11 @@ function Test-IXSteamRunning {
 
 # Starts the game from the game folder: with the launcher when the setup built
 # it (it waits for Steam), else iw7-mod.exe the way its install guide says.
-# Returns the program it started.
+# $Arguments (a command line) go to the game; the launcher also gets
+# $IXLauncherNoUpdate, because the setup has just installed or looked for an
+# update. Returns the program it started.
 function Start-IXGame {
-    param([string]$GameDir)
+    param([string]$GameDir, [string]$Arguments)
     $exe = Join-Path $GameDir $IXClientExe
     if (-not [IO.File]::Exists($exe)) {
         throw "$IXClientExe is not in the game folder."
@@ -855,8 +866,14 @@ function Start-IXGame {
     $launcher = Get-IXLauncherPath $GameDir
     if ([IO.File]::Exists($launcher)) {
         $exe = $launcher
+        $Arguments = ($IXLauncherNoUpdate + ' ' + $Arguments).Trim()
     }
-    Start-Process -FilePath $exe -WorkingDirectory $GameDir | Out-Null
+    if ($Arguments) {
+        Start-Process -FilePath $exe -WorkingDirectory $GameDir -ArgumentList $Arguments | Out-Null
+    }
+    else {
+        Start-Process -FilePath $exe -WorkingDirectory $GameDir | Out-Null
+    }
     return $exe
 }
 
@@ -1035,24 +1052,36 @@ function Remove-IXLauncher {
 # ---------------------------------------------------------------------------
 # Apps & features entry (Windows only)
 
-# Where the setup keeps a copy of itself and the mod, for uninstalling from
-# Windows Settings after the download is gone.
-function Get-IXSetupCopyDir {
+# %LOCALAPPDATA%\InfiniteExpansion: the setup's copy of itself, downloaded
+# updates, and its settings. $null where there is no LOCALAPPDATA (not Windows).
+function Get-IXDataDir {
     if (-not $env:LOCALAPPDATA) {
         return $null
     }
-    return Join-IXPath $env:LOCALAPPDATA @('InfiniteExpansion', 'Setup')
+    return Join-IXPath $env:LOCALAPPDATA @('InfiniteExpansion')
 }
 
-# Copies the setup (installer\ and mods\infinite_expansion\ below $SetupRoot) to $Destination.
+# Where the setup keeps a copy of itself and the mod, for uninstalling from
+# Windows Settings after the download is gone. The launcher starts this copy to
+# update (IXLauncher.cs).
+function Get-IXSetupCopyDir {
+    $data = Get-IXDataDir
+    if (-not $data) {
+        return $null
+    }
+    return Join-IXPath $data @('Setup')
+}
+
+# Copies the setup (installer\ and mods\infinite_expansion\ below $SetupRoot) to
+# $Destination, over the copy of an older version, whose files this one no
+# longer has are deleted. The folder itself stays: an older setup handing over
+# to this one may still be running from it (Updates below).
 function Copy-IXSetup {
     param([string]$SetupRoot, [string]$Destination)
     if (Test-IXSamePath $SetupRoot $Destination) {
         return
     }
-    if ([IO.Directory]::Exists($Destination)) {
-        [IO.Directory]::Delete($Destination, $true)
-    }
+    $copied = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach ($folder in @('installer', 'mods\infinite_expansion')) {
         $source = Join-IXPath $SetupRoot @($folder)
         if (-not [IO.Directory]::Exists($source)) {
@@ -1063,6 +1092,21 @@ function Copy-IXSetup {
             $destinationFile = Join-IXPath $Destination @($folder, $file.Substring($sourceFull.Length + 1))
             [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destinationFile)) | Out-Null
             [IO.File]::Copy($file, $destinationFile, $true)
+            [void]$copied.Add((Get-IXFullPath $destinationFile))
+        }
+    }
+    if (-not [IO.Directory]::Exists($Destination)) {
+        return
+    }
+    foreach ($file in [IO.Directory]::GetFiles((Get-IXFullPath $Destination), '*', [IO.SearchOption]::AllDirectories)) {
+        if ($copied.Contains((Get-IXFullPath $file))) {
+            continue
+        }
+        try {
+            [IO.File]::Delete($file)
+            Remove-IXEmptyParents $Destination $file
+        }
+        catch {
         }
     }
 }
@@ -1102,13 +1146,27 @@ function Register-IXUninstaller {
     }
 }
 
-# Removes the Settings entry and the setup copy, unless the copy is running ($RunningFrom).
-# Returns $true when the copy still has to be removed after the window closes.
+# Removes the Settings entry, downloaded updates, the setup's settings and the
+# setup copy, unless the copy is running ($RunningFrom). Returns $true when the
+# copy still has to be removed after the window closes.
 function Unregister-IXUninstaller {
     param([string]$RunningFrom)
     try {
         if (Test-Path -LiteralPath $IXUninstallKey) {
             Remove-Item -LiteralPath $IXUninstallKey -Recurse -Force
+        }
+    }
+    catch {
+    }
+    $updates = Get-IXUpdatesDir
+    Remove-IXOldUpdates $updates $RunningFrom
+    try {
+        if ($updates -and [IO.Directory]::Exists($updates) -and @([IO.Directory]::GetFileSystemEntries($updates)).Count -eq 0) {
+            [IO.Directory]::Delete($updates)
+        }
+        $settings = Get-IXSettingsPath
+        if ($settings -and [IO.File]::Exists($settings)) {
+            [IO.File]::Delete($settings)
         }
     }
     catch {
@@ -1126,4 +1184,407 @@ function Unregister-IXUninstaller {
     catch {
     }
     return $false
+}
+
+# ---------------------------------------------------------------------------
+# Updates (README "Updates")
+#
+# .github/workflows/release.yml publishes a GitHub release for each version of
+# the mod: tag v<version>, with Infinite-Expansion-<version>.zip, the whole
+# download under an Infinite-Expansion\ folder. The launcher looks for a newer
+# one each time it starts the game and hands over to the setup copy
+# (IXSetup.ps1 -Update); the setup window looks when it opens. The download is
+# checked against the SHA-256 GitHub lists for it, unpacked below
+# %LOCALAPPDATA%\InfiniteExpansion\Updates, and the new version's own setup
+# installs it, so each version installs itself the way it was written to.
+
+# "v0.3.2" or "0.3.2" as "0.3.2"; $null unless it is one to four numbers.
+function ConvertTo-IXVersion {
+    param([string]$Text)
+    $value = ([string]$Text).Trim()
+    if ($value -match '^[vV]') {
+        $value = $value.Substring(1)
+    }
+    if ($value -notmatch '^\d{1,6}(\.\d{1,6}){0,3}$') {
+        return $null
+    }
+    return $value
+}
+
+# 1, 0 or -1 as version $A is newer than, the same as or older than $B. Missing
+# numbers count as 0 ("0.4" is "0.4.0"), and so does text that is no version.
+function Compare-IXVersion {
+    param([string]$A, [string]$B)
+    $left = ConvertTo-IXVersion $A
+    $right = ConvertTo-IXVersion $B
+    if (-not $left) {
+        $left = '0'
+    }
+    if (-not $right) {
+        $right = '0'
+    }
+    # Not $a / $b: PowerShell names ignore case, and those are the [string] parameters.
+    $leftParts = @($left.Split([char]'.'))
+    $rightParts = @($right.Split([char]'.'))
+    for ($i = 0; $i -lt 4; $i++) {
+        $x = 0
+        $y = 0
+        if ($i -lt $leftParts.Count) {
+            $x = [int]$leftParts[$i]
+        }
+        if ($i -lt $rightParts.Count) {
+            $y = [int]$rightParts[$i]
+        }
+        if ($x -gt $y) {
+            return 1
+        }
+        if ($x -lt $y) {
+            return -1
+        }
+    }
+    return 0
+}
+
+# The HTTP status of a failed request (404 and so on), or 0.
+function Get-IXHttpStatus {
+    param($ErrorRecord)
+    $exception = $ErrorRecord.Exception
+    while ($exception) {
+        if ($exception -is [Net.WebException] -and $null -ne $exception.Response) {
+            return [int]$exception.Response.StatusCode
+        }
+        $exception = $exception.InnerException
+    }
+    return 0
+}
+
+# The newest release: its version and tag, the zip's address and size, the
+# SHA-256 GitHub lists for it ($null if none) and the release page; $null when
+# the project has no release yet. Throws when GitHub cannot be reached, or the
+# release is not one this setup can install: its zip must be on the project's
+# own release downloads ($Downloads).
+function Get-IXLatestRelease {
+    param([string]$ApiUrl = $IXReleaseApi, [string]$Downloads = $IXReleaseDownloads)
+    Enable-IXTls12
+    try {
+        $text = Invoke-IXHttpText $ApiUrl
+    }
+    catch {
+        if ((Get-IXHttpStatus $_) -eq 404) {
+            return $null
+        }
+        throw
+    }
+    $release = $text | ConvertFrom-Json
+    $tag = [string]$release.tag_name
+    $version = ConvertTo-IXVersion $tag
+    if (-not $version) {
+        throw ("the newest release is called '" + $tag + "', which is not a version number")
+    }
+    foreach ($asset in @($release.assets)) {
+        if ([string]$asset.name -notmatch '^Infinite-Expansion-[\w.-]+\.zip$') {
+            continue
+        }
+        $url = [string]$asset.browser_download_url
+        if (-not $url.StartsWith($Downloads, [StringComparison]::Ordinal)) {
+            throw ('the download of release ' + $tag + ' is not on the project''s GitHub page')
+        }
+        $hash = $null
+        $digest = [string]$asset.digest
+        if ($digest.StartsWith('sha256:')) {
+            $hash = $digest.Substring(7).ToUpperInvariant()
+        }
+        return [pscustomobject]@{
+            Version = $version
+            Tag     = $tag
+            Url     = $url
+            Size    = [long]$asset.size
+            Hash    = $hash
+            Page    = [string]$release.html_url
+        }
+    }
+    throw ('release ' + $tag + ' has no Infinite-Expansion zip')
+}
+
+function Get-IXUpdatesDir {
+    $data = Get-IXDataDir
+    if (-not $data) {
+        return $null
+    }
+    return Join-IXPath $data @('Updates')
+}
+
+# Unpacks $Zip into $Destination. Refuses entries that would land outside it
+# (".." or absolute paths) and more than $IXUpdateMaxBytes in all.
+function Expand-IXZip {
+    param([string]$Zip, [string]$Destination)
+    Add-Type -AssemblyName System.IO.Compression
+    $root = Get-IXFullPath $Destination
+    [IO.Directory]::CreateDirectory($root) | Out-Null
+    $prefix = $root + [IO.Path]::DirectorySeparatorChar
+    $stream = [IO.File]::OpenRead($Zip)
+    try {
+        $archive = New-Object System.IO.Compression.ZipArchive($stream, [System.IO.Compression.ZipArchiveMode]::Read)
+        try {
+            $total = 0
+            foreach ($entry in $archive.Entries) {
+                $name = $entry.FullName.Replace('\', '/')
+                if ($name -match '(^|/)\.\.(/|$)' -or $name.StartsWith('/') -or $name.Contains(':')) {
+                    throw ('the download has a file outside its folder: ' + $name)
+                }
+                $path = [IO.Path]::GetFullPath((Join-IXPath $root @($name)))
+                if (-not $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+                    throw ('the download has a file outside its folder: ' + $name)
+                }
+                if ($name.EndsWith('/')) {
+                    [IO.Directory]::CreateDirectory($path) | Out-Null
+                    continue
+                }
+                $total += $entry.Length
+                if ($total -gt $IXUpdateMaxBytes) {
+                    throw 'the download unpacks to more than 64 MB'
+                }
+                [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path)) | Out-Null
+                $source = $entry.Open()
+                try {
+                    $target = [IO.File]::Create($path)
+                    try {
+                        $source.CopyTo($target)
+                    }
+                    finally {
+                        $target.Close()
+                    }
+                }
+                finally {
+                    $source.Close()
+                }
+            }
+        }
+        finally {
+            $archive.Dispose()
+        }
+    }
+    finally {
+        $stream.Close()
+    }
+}
+
+# The folder of an unpacked download that holds installer\ and mods\ (the
+# download's own folder, or the one folder in it), or $null.
+function Find-IXDownloadRoot {
+    param([string]$Folder)
+    foreach ($candidate in @($Folder) + @([IO.Directory]::GetDirectories($Folder))) {
+        if ([IO.File]::Exists((Join-IXPath $candidate @('installer', 'IXSetup.ps1'))) -and
+            [IO.Directory]::Exists((Join-IXPath $candidate @('mods', 'infinite_expansion')))) {
+            return $candidate
+        }
+    }
+    return $null
+}
+
+# Downloads $Release's zip into a new folder below $UpdatesDir, checks its size
+# and SHA-256, unpacks it, and checks that it holds that version. Returns the
+# folder with its installer\ and mods\. Leaves nothing behind when a check fails.
+# $Progress, a synchronized hashtable, gets Phase, Done and Total.
+function Save-IXUpdate {
+    param($Release, [string]$UpdatesDir, $Progress)
+    if (-not $UpdatesDir) {
+        throw 'there is no folder for updates (LOCALAPPDATA is not set)'
+    }
+    [IO.Directory]::CreateDirectory($UpdatesDir) | Out-Null
+    $folder = Join-IXPath $UpdatesDir @($Release.Version + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $zip = $folder + '.zip'
+    try {
+        if ($null -ne $Progress) {
+            $Progress.Phase = 'Downloading Infinite Expansion ' + $Release.Version + ' from GitHub'
+        }
+        Save-IXHttpFile $Release.Url $zip $Progress
+        $size = (New-Object System.IO.FileInfo $zip).Length
+        if ($Release.Size -gt 0 -and $size -ne $Release.Size) {
+            throw ('the download has ' + $size + ' bytes; the release lists ' + $Release.Size)
+        }
+        if ($Release.Hash -and (Get-IXFileHash $zip 'SHA256') -ne $Release.Hash) {
+            throw 'SHA256 checksum mismatch'
+        }
+        if ($null -ne $Progress) {
+            $Progress.Phase = 'Unpacking Infinite Expansion ' + $Release.Version
+        }
+        Expand-IXZip $zip $folder
+        $root = Find-IXDownloadRoot $folder
+        if (-not $root) {
+            throw 'the download has no installer folder'
+        }
+        $version = Get-IXPackageVersion (Join-IXPath $root @('mods', 'infinite_expansion'))
+        if ($version -ne $Release.Version) {
+            throw ('the download holds version ' + $version + ', not ' + $Release.Version)
+        }
+        return $root
+    }
+    catch {
+        if ([IO.Directory]::Exists($folder)) {
+            try {
+                [IO.Directory]::Delete($folder, $true)
+            }
+            catch {
+            }
+        }
+        throw
+    }
+    finally {
+        if ([IO.File]::Exists($zip)) {
+            try {
+                [IO.File]::Delete($zip)
+            }
+            catch {
+            }
+        }
+    }
+}
+
+# Deletes downloaded updates, except the one the setup runs from ($Keep, a
+# folder in it or below it). A folder in use stays for next time.
+function Remove-IXOldUpdates {
+    param([string]$UpdatesDir, [string]$Keep)
+    if (-not $UpdatesDir -or -not [IO.Directory]::Exists($UpdatesDir)) {
+        return
+    }
+    $keepFull = $null
+    if ($Keep) {
+        $keepFull = (Get-IXFullPath $Keep) + [IO.Path]::DirectorySeparatorChar
+    }
+    foreach ($dir in [IO.Directory]::GetDirectories($UpdatesDir)) {
+        if ($keepFull -and $keepFull.StartsWith((Get-IXFullPath $dir) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        try {
+            [IO.Directory]::Delete($dir, $true)
+        }
+        catch {
+        }
+    }
+    foreach ($file in [IO.Directory]::GetFiles($UpdatesDir, '*.zip')) {
+        try {
+            [IO.File]::Delete($file)
+        }
+        catch {
+        }
+    }
+}
+
+# The setup's own settings: key=value lines in %LOCALAPPDATA%\InfiniteExpansion\
+# settings.ini, which the launcher reads too. AutoUpdate=0: the launcher does
+# not look for updates.
+function Get-IXSettingsPath {
+    $data = Get-IXDataDir
+    if (-not $data) {
+        return $null
+    }
+    return Join-IXPath $data @('settings.ini')
+}
+
+function Get-IXAutoUpdate {
+    $path = Get-IXSettingsPath
+    if (-not $path -or -not [IO.File]::Exists($path)) {
+        return $true
+    }
+    foreach ($line in [IO.File]::ReadAllLines($path)) {
+        if ($line -match '^\s*AutoUpdate\s*=\s*0\s*$') {
+            return $false
+        }
+    }
+    return $true
+}
+
+# Returns $false where there is no settings folder (not Windows).
+function Set-IXAutoUpdate {
+    param([bool]$On)
+    $path = Get-IXSettingsPath
+    if (-not $path) {
+        return $false
+    }
+    $lines = New-Object System.Collections.Generic.List[string]
+    if ([IO.File]::Exists($path)) {
+        foreach ($line in [IO.File]::ReadAllLines($path)) {
+            if ($line -notmatch '^\s*AutoUpdate\s*=') {
+                $lines.Add($line)
+            }
+        }
+    }
+    $value = '1'
+    if (-not $On) {
+        $value = '0'
+    }
+    $lines.Add('AutoUpdate=' + $value)
+    [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($path)) | Out-Null
+    [IO.File]::WriteAllLines($path, $lines.ToArray())
+    return $true
+}
+
+# The game's command line the launcher passed on (Base64 of UTF-8 text, so it
+# survives being passed between programs), or ''.
+function ConvertFrom-IXPlayArgs {
+    param([string]$Encoded)
+    if (-not $Encoded) {
+        return ''
+    }
+    try {
+        return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Encoded))
+    }
+    catch {
+        return ''
+    }
+}
+
+# One argument for a Windows command line, quoted the way programs split them
+# again (CommandLineToArgvW rules, as the launcher's Quote does).
+function ConvertTo-IXArgument {
+    param([string]$Value)
+    if ($Value.Length -gt 0 -and $Value -notmatch '[\s"]') {
+        return $Value
+    }
+    $text = New-Object System.Text.StringBuilder
+    [void]$text.Append('"')
+    $backslashes = 0
+    foreach ($c in $Value.ToCharArray()) {
+        if ($c -eq [char]'\') {
+            $backslashes++
+            continue
+        }
+        if ($c -eq [char]'"') {
+            [void]$text.Append([char]'\', $backslashes * 2 + 1)
+        }
+        else {
+            [void]$text.Append([char]'\', $backslashes)
+        }
+        $backslashes = 0
+        [void]$text.Append($c)
+    }
+    [void]$text.Append([char]'\', $backslashes * 2)
+    [void]$text.Append('"')
+    return $text.ToString()
+}
+
+# The PowerShell running this script: Windows PowerShell for the setup.
+function Get-IXPowerShellPath {
+    return (Get-Process -Id $PID).Path
+}
+
+# Arguments for PowerShell to run the setup $Script with $Arguments; $Window: a
+# setup window, which needs one thread for WPF and no console (Windows only).
+function Get-IXSetupArguments {
+    param([string]$Script, [string[]]$Arguments, [bool]$Window)
+    $list = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+    if ($Window -and $env:OS -eq 'Windows_NT') {
+        $list += @('-STA', '-WindowStyle', 'Hidden')
+    }
+    return @($list + @('-File', $Script) + @($Arguments))
+}
+
+# Starts the setup window of the download in $Root with $Arguments: the new
+# version installs itself.
+function Start-IXSetupFrom {
+    param([string]$Root, [string[]]$Arguments)
+    $script = Join-IXPath $Root @('installer', 'IXSetup.ps1')
+    $line = (@(Get-IXSetupArguments $script $Arguments $true) | ForEach-Object { ConvertTo-IXArgument $_ }) -join ' '
+    Start-Process -FilePath (Get-IXPowerShellPath) -ArgumentList $line -WorkingDirectory $Root | Out-Null
 }

@@ -9,8 +9,11 @@ resources the scripts use. Needs pwsh from tools/setup_compilers.sh (or on PATH)
 
 Run: python3 -m unittest discover -s tools/tests -v
 """
+import base64
 import hashlib
 import http.server
+import io
+import zipfile
 import importlib.util
 import json
 import os
@@ -1267,15 +1270,36 @@ $ErrorActionPreference = 'Stop'
 # The launcher is written for the C# 5 compiler of .NET Framework 4; PowerShell 7
 # compiles it here with C# 5 rules (the .NET 8 reference assemblies it needs
 # are all in mscorlib and System.dll on .NET Framework).
+# HttpWebRequest is obsolete on .NET 8 (a warning there), not on .NET Framework 4.
 $references = @('Microsoft.Win32.Registry', 'System.Diagnostics.Process', 'System.ComponentModel.Primitives',
-    'System.Threading', 'System.Threading.Thread')
+    'System.Threading', 'System.Threading.Thread', 'System.Net.Requests', 'System.Net.Primitives',
+    'System.Net.ServicePoint', 'System.Text.RegularExpressions', 'System.Collections')
 $dll = Join-Path $Work 'launcher.dll'
-Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -OutputAssembly $dll -OutputType Library -CompilerOptions '/langversion:5' -ReferencedAssemblies $references
+Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -OutputAssembly $dll -OutputType Library -CompilerOptions '/langversion:5' -ReferencedAssemblies $references -IgnoreWarnings -WarningAction SilentlyContinue
 $type = [Reflection.Assembly]::LoadFrom($dll).GetType('InfiniteExpansion.Launcher')
+# Values from a pipeline come wrapped (PSObject); the method wants the values themselves.
+function Call([string]$Name, [object[]]$Arguments) {
+    $plain = New-Object 'object[]' $Arguments.Count
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        if ($null -ne $Arguments[$i]) {
+            $plain[$i] = $Arguments[$i].PSObject.BaseObject
+        }
+    }
+    return $type.GetMethod($Name).Invoke($null, $plain)
+}
 $result = [ordered]@{}
 $arguments = [string[]]@('+set', 'a b', '', 'x"y', 'C:\dir\', 'C:\my dir\', 'a\\"b', "tab`there")
 $result.line = $type.GetMethod('BuildArguments').Invoke($null, @(,$arguments))
 $result.empty = $type.GetMethod('BuildArguments').Invoke($null, @(,[string[]]@()))
+$result.versions = @(@('v0.3.2', '0.3', ' 1.2.3.4 ', 'latest', '1.2.3.4.5', '') | ForEach-Object { Call 'ParseVersion' @($_) })
+$result.compare = @(@(@('0.3.2', '0.3.1'), @('0.3.1', '0.3.2'), @('0.4', '0.4.0'), @('0.10.0', '0.9.9'), @('v1.0', '0.9'), @('junk', '0.0.1')) | ForEach-Object { Call 'CompareVersions' @($_[0], $_[1]) })
+$result.release = Call 'ReleaseVersion' @('{"url":"https://x","tag_name": "v0.3.2","name":"Infinite Expansion 0.3.2"}')
+$result.noRelease = Call 'ReleaseVersion' @('{"message":"Not Found"}')
+$result.script = Call 'VersionInScript' @("init()`n{`n    level.ix.version = `"0.3.2`";`n}")
+$result.auto = @(@($null, '', 'AutoUpdate=1', "Other=0`r`nautoupdate = 0`r`n", 'AutoUpdate=01') | ForEach-Object { Call 'AutoUpdateOn' @(,$_) })
+$result.without = Call 'WithoutFlag' @([string[]]@('--ix-no-update', '+set', 'a', '--IX-NO-UPDATE'), '--ix-no-update')
+$result.update = Call 'UpdateArguments' @('C:\Users\A B\AppData\Local\InfiniteExpansion\Setup\installer\IXSetup.ps1', 'C:\Games\Infinite Warfare\', [string[]]@('+set', 'ix_debug_log 1'))
+$result.updateNoArgs = Call 'UpdateArguments' @('C:\s.ps1', 'C:\g', [string[]]@())
 # /langversion:5 really refuses newer C#, so the compile above means something.
 try {
     Add-Type -TypeDefinition 'public static class IXNewer { public static string F(string s) { return s?.Trim(); } }' -CompilerOptions '/langversion:5'
@@ -1366,10 +1390,14 @@ function Wait-IXStarted([int]$Lines) {
 $result = [ordered]@{}
 $result.withoutLauncher = Start-IXGame $Game
 Wait-IXStarted 1
-[IO.File]::WriteAllText((Get-IXLauncherPath $Game), "#!/bin/sh`necho launcher `"`$PWD`" >> started.log`n")
+$result.withArguments = Start-IXGame $Game '+set ix_debug_log 1'
+Wait-IXStarted 2
+[IO.File]::WriteAllText((Get-IXLauncherPath $Game), "#!/bin/sh`necho launcher `"`$PWD`" `"`$@`" >> started.log`n")
 & chmod 755 (Get-IXLauncherPath $Game)
 $result.withLauncher = Start-IXGame $Game
-Wait-IXStarted 2
+Wait-IXStarted 3
+$result.launcherArguments = Start-IXGame $Game '+set ix_debug_log 1'
+Wait-IXStarted 4
 $result.started = @([IO.File]::ReadAllLines($log))
 ConvertTo-Json -InputObject $result | Set-Content -LiteralPath $Out
 """
@@ -1391,6 +1419,21 @@ class GameLauncher(unittest.TestCase):
             self.assertEqual(result["empty"], "")
             self.assertEqual(split_command_line(result["line"]),
                              ["+set", "a b", "", 'x"y', "C:\\dir\\", "C:\\my dir\\", 'a\\\\"b', "tab\there"])
+            # Updates: the same rules as the setup's ConvertTo-IXVersion / Compare-IXVersion.
+            self.assertEqual(result["versions"], ["0.3.2", "0.3", "1.2.3.4", None, None, None])
+            self.assertEqual(result["compare"], [1, -1, 0, 1, 1, -1])
+            self.assertEqual((result["release"], result["noRelease"], result["script"]), ("0.3.2", None, "0.3.2"))
+            self.assertEqual(result["auto"], [True, True, True, False, True])
+            self.assertEqual(result["without"], ["+set", "a"])
+            update = split_command_line(result["update"])
+            self.assertEqual(update[:11], ["-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-File",
+                                          "C:\\Users\\A B\\AppData\\Local\\InfiniteExpansion\\Setup\\installer\\IXSetup.ps1",
+                                          "-Update", "-Play", "-GameDir", "C:\\Games\\Infinite Warfare", "-PlayArgs"])
+            self.assertEqual(len(update), 12)
+            # The game's arguments travel as Base64, then split back as they were.
+            played = base64.b64decode(update[11]).decode("utf-8")
+            self.assertEqual(split_command_line(played), ["+set", "ix_debug_log 1"])
+            self.assertNotIn("-PlayArgs", result["updateNoArgs"])
 
     def test_source_has_no_mode_flag_and_one_placeholder(self):
         source = GAME_LAUNCHER_SOURCE.read_text()
@@ -1448,14 +1491,423 @@ class GameLauncher(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _steam, game = make_game(Path(tmp))
             client = game / "iw7-mod.exe"
-            client.write_text('#!/bin/sh\necho client "$PWD" >> started.log\n')
+            client.write_text('#!/bin/sh\necho client "$PWD" "$@" >> started.log\n')
             client.chmod(0o755)
             out = Path(tmp) / "out.json"
             run_pwsh(SCENARIO_START, CORE, game, out, workdir=tmp)
             r = json.loads(out.read_text())
             self.assertEqual(r["withoutLauncher"], str(client))
             self.assertEqual(r["withLauncher"], str(game / "Infinite Expansion.exe"))
-            self.assertEqual(r["started"], [f"client {game}", f"launcher {game}"])
+            # The setup has just installed or looked for updates: the launcher need not.
+            self.assertEqual([line.rstrip() for line in r["started"]],
+                             [f"client {game}", f"client {game} +set ix_debug_log 1",
+                              f"launcher {game} --ix-no-update", f"launcher {game} --ix-no-update +set ix_debug_log 1"])
+
+
+def release_zip(version, top="Infinite-Expansion", extra=None):
+    """A release zip as .github/workflows/release.yml makes it: installer/ and
+    mods/ under one folder, with bootstrap.gsc saying $version."""
+    data = io.BytesIO()
+    with zipfile.ZipFile(data, "w", zipfile.ZIP_DEFLATED) as archive:
+        for folder in (INSTALLER, PACKAGE):
+            for path in sorted(folder.rglob("*")):
+                if not path.is_file() or "__pycache__" in path.parts:
+                    continue
+                name = f"{top}/{path.relative_to(REPO).as_posix()}"
+                content = path.read_bytes()
+                if path.name == "bootstrap.gsc":
+                    content = re.sub(rb'level\.ix\.version = "[^"]+"', f'level.ix.version = "{version}"'.encode(), content)
+                archive.writestr(name, content)
+        for name, content in (extra or {}).items():
+            archive.writestr(name, content)
+    return data.getvalue()
+
+
+def release_json(base, name, version, data, digest="ok", url=None, assets=None):
+    if digest == "ok":
+        digest = "sha256:" + hashlib.sha256(data).hexdigest()
+    zip_name = f"Infinite-Expansion-{version}.zip"
+    asset = {"name": zip_name, "size": len(data), "digest": digest,
+             "browser_download_url": url or f"{base}/dl/{name}/{zip_name}"}
+    return json.dumps({"tag_name": f"v{version}", "html_url": f"{base}/releases/v{version}",
+                       "assets": assets if assets is not None else [{"name": "notes.txt", "size": 1}, asset]}).encode()
+
+
+SCENARIO_UPDATES = r"""
+param([string]$Core, [string]$Base, [string]$Updates, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$results = [ordered]@{}
+foreach ($name in @('ok', 'none', 'down', 'badtag', 'noasset', 'foreign', 'baddigest', 'badsize', 'slip', 'wrongver', 'nodigest')) {
+    $entry = [ordered]@{}
+    try {
+        $release = Get-IXLatestRelease -ApiUrl "$Base/$name/api" -Downloads "$Base/dl/"
+        $entry.release = $release
+        if ($null -ne $release) {
+            $progress = [hashtable]::Synchronized(@{ Done = 0; Total = 0; Phase = '' })
+            $entry.root = Save-IXUpdate $release (Join-Path $Updates $name) $progress
+            $entry.done = $progress.Done
+            $entry.phase = $progress.Phase
+            $entry.version = Get-IXPackageVersion (Join-IXPath $entry.root @('mods', 'infinite_expansion'))
+        }
+        $entry.ok = $true
+    }
+    catch {
+        $entry.ok = $false
+        $entry.error = $_.Exception.Message
+    }
+    $results[$name] = $entry
+}
+
+# Earlier downloads go, the one in use stays.
+$old = Join-Path $Updates 'cleanup'
+foreach ($dir in @('0.1.0-aaaa', '0.2.0-bbbb', '0.3.0-cccc')) {
+    [IO.Directory]::CreateDirectory((Join-IXPath $old @($dir, 'Infinite-Expansion', 'installer'))) | Out-Null
+}
+[IO.File]::WriteAllText((Join-Path $old '0.4.0-dddd.zip'), 'partial')
+Remove-IXOldUpdates $old (Join-IXPath $old @('0.2.0-bbbb', 'Infinite-Expansion'))
+$results.cleanup = @([IO.Directory]::GetFileSystemEntries($old) | ForEach-Object { [IO.Path]::GetFileName($_) })
+Remove-IXOldUpdates (Join-Path $Updates 'missing') $null
+ConvertTo-Json -InputObject $results -Depth 5 | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class Updates(unittest.TestCase):
+    """Get-IXLatestRelease and Save-IXUpdate against a local fake of GitHub."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FakeDownloads)
+        base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        cls.zip = release_zip("9.9.9")
+        routes = {}
+
+        def serve(name, version="9.9.9", data=None, **kwargs):
+            data = cls.zip if data is None else data
+            routes[f"/{name}/api"] = (200, release_json(base, name, version, data, **kwargs))
+            routes[f"/dl/{name}/Infinite-Expansion-{version}.zip"] = (200, data)
+
+        serve("ok")
+        routes["/none/api"] = (404, b'{"message": "Not Found"}')
+        routes["/down/api"] = (500, b"oops")
+        routes["/badtag/api"] = (200, json.dumps({"tag_name": "latest", "assets": []}).encode())
+        serve("noasset", assets=[{"name": "notes.txt"}])
+        serve("foreign", url=f"{base}/elsewhere/Infinite-Expansion-9.9.9.zip")
+        serve("baddigest", digest="sha256:" + "0" * 64)
+        routes["/badsize/api"] = (200, json.dumps({"tag_name": "v9.9.9", "assets": [
+            {"name": "Infinite-Expansion-9.9.9.zip", "size": len(cls.zip) + 1,
+             "browser_download_url": f"{base}/dl/badsize/Infinite-Expansion-9.9.9.zip"}]}).encode())
+        routes["/dl/badsize/Infinite-Expansion-9.9.9.zip"] = (200, cls.zip)
+        serve("slip", data=release_zip("9.9.9", extra={"Infinite-Expansion/../../evil.txt": b"evil"}))
+        serve("wrongver", data=release_zip("9.9.8"))
+        serve("nodigest", digest=None)
+        FakeDownloads.routes = routes
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        cls.updates = root / "deep" / "Updates"
+        out = root / "result.json"
+        script = root / "scenario.ps1"
+        script.write_text(SCENARIO_UPDATES)
+        env = dict(os.environ, NO_PROXY="127.0.0.1,localhost", no_proxy="127.0.0.1,localhost")
+        result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script), str(CORE), base,
+                                 str(cls.updates), str(out)], capture_output=True, text=True, env=env)
+        if result.returncode != 0:
+            raise AssertionError(result.stdout + result.stderr)
+        cls.root = root
+        cls.r = json.loads(out.read_text(encoding="utf-8-sig"))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.tmp.cleanup()
+
+    def leftovers(self, name):
+        folder = self.updates / name
+        return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
+
+    def test_newest_release_downloaded_checked_and_unpacked(self):
+        r = self.r["ok"]
+        self.assertTrue(r["ok"], r)
+        release = r["release"]
+        self.assertEqual((release["Version"], release["Tag"], release["Size"]), ("9.9.9", "v9.9.9", len(self.zip)))
+        self.assertEqual(release["Hash"], hashlib.sha256(self.zip).hexdigest().upper())
+        root = Path(r["root"])
+        self.assertEqual(root.name, "Infinite-Expansion")
+        self.assertEqual(root.parent.parent, self.updates / "ok")
+        self.assertRegex(root.parent.name, r"^9\.9\.9-[0-9a-f]{8}$")
+        self.assertTrue((root / "installer" / "IXSetup.ps1").is_file())
+        self.assertEqual(r["version"], "9.9.9")
+        self.assertEqual(r["done"], len(self.zip))
+        self.assertEqual(r["phase"], "Unpacking Infinite Expansion 9.9.9")
+        # The zip itself is gone; only the unpacked folder stays.
+        self.assertEqual(self.leftovers("ok"), [root.parent.name])
+
+    def test_no_release_yet(self):
+        self.assertEqual((self.r["none"]["ok"], self.r["none"]["release"]), (True, None))
+
+    def test_refused_releases_leave_nothing(self):
+        expected = {
+            "down": "500",
+            "badtag": "the newest release is called 'latest', which is not a version number",
+            "noasset": "release v9.9.9 has no Infinite-Expansion zip",
+            "foreign": "the download of release v9.9.9 is not on the project's GitHub page",
+            "baddigest": "SHA256 checksum mismatch",
+            "badsize": f"the download has {len(self.zip)} bytes; the release lists {len(self.zip) + 1}",
+            "slip": "the download has a file outside its folder: Infinite-Expansion/../../evil.txt",
+            "wrongver": "the download holds version 9.9.8, not 9.9.9",
+        }
+        for name, words in expected.items():
+            r = self.r[name]
+            self.assertFalse(r["ok"], name)
+            self.assertIn(words, r["error"], name)
+            self.assertEqual(self.leftovers(name), [], name)
+        self.assertFalse((self.updates / "evil.txt").exists())
+        self.assertFalse((self.updates.parent / "evil.txt").exists())
+
+    def test_release_without_digest_is_accepted(self):
+        r = self.r["nodigest"]
+        self.assertTrue(r["ok"], r)
+        self.assertIsNone(r["release"]["Hash"])
+        self.assertEqual(r["version"], "9.9.9")
+
+    def test_old_downloads_are_removed_except_the_running_one(self):
+        self.assertEqual(self.r["cleanup"], ["0.2.0-bbbb"])
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class SetupUpdateWithoutWindow(unittest.TestCase):
+    """IXSetup.ps1 -NoWindow -Update: a setup whose GitHub is a local fake
+    downloads a newer release and lets that release's own setup install it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FakeDownloads)
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        cls.zip = release_zip("9.9.9")
+        FakeDownloads.routes = {
+            "/new/api": (200, release_json(cls.base, "new", "9.9.9", cls.zip)),
+            "/dl/new/Infinite-Expansion-9.9.9.zip": (200, cls.zip),
+            "/none/api": (404, b'{"message": "Not Found"}'),
+        }
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+
+    def setup_copy(self, root, api):
+        """This download's setup, with its GitHub addresses pointed at the fake."""
+        download = root / f"download-{api}"
+        shutil.copytree(INSTALLER, download / "installer")
+        shutil.copytree(PACKAGE, download / "mods" / "infinite_expansion")
+        core = download / "installer" / "IXSetup.Core.ps1"
+        text = core.read_text()
+        text, count = re.subn(r"\$IXReleaseApi = '[^']*'", f"$IXReleaseApi = '{self.base}/{api}/api'", text)
+        self.assertEqual(count, 1)
+        text, count = re.subn(r"\$IXReleaseDownloads = '[^']*'", f"$IXReleaseDownloads = '{self.base}/dl/'", text)
+        self.assertEqual(count, 1)
+        core.write_text(text)
+        return download / "installer" / "IXSetup.ps1"
+
+    def run_setup(self, script, *args, appdata):
+        env = dict(without_windows(), LOCALAPPDATA=str(appdata), NO_PROXY="127.0.0.1,localhost", no_proxy="127.0.0.1,localhost")
+        return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script), "-NoWindow", *args],
+                              capture_output=True, text=True, env=env)
+
+    def test_update_installs_the_newer_release_with_its_own_setup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _steam, game = make_game(root)
+            appdata = root / "AppData"
+            setup = self.setup_copy(root, "new")
+            result = self.run_setup(setup, "-GameDir", str(game), "-NoPictures", appdata=appdata)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            installed = game / "iw7-mod" / "custom_scripts" / "ix" / "core" / "bootstrap.gsc"
+            self.assertIn(f'level.ix.version = "{package_version()}"', installed.read_text())
+
+            result = self.run_setup(setup, "-Update", "-GameDir", str(game), appdata=appdata)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Downloaded Infinite Expansion 9.9.9 from GitHub (checksum verified).", result.stdout)
+            # The new version's setup did the install (its file count, its version).
+            self.assertIn(f"Installed {len(payload_files())} files into", result.stdout)
+            self.assertIn('level.ix.version = "9.9.9"', installed.read_text())
+            record = json.loads((game / "iw7-mod" / "infinite-expansion.json").read_text(encoding="utf-8-sig"))
+            self.assertEqual(record["version"], "9.9.9")
+            # It copied itself over the setup copy the launcher starts.
+            copy = appdata / "InfiniteExpansion" / "Setup"
+            self.assertIn('level.ix.version = "9.9.9"',
+                          (copy / "mods" / "infinite_expansion" / "custom_scripts" / "ix" / "core" / "bootstrap.gsc").read_text())
+            # Only the download it ran from is left.
+            updates = appdata / "InfiniteExpansion" / "Updates"
+            self.assertEqual(len(list(updates.iterdir())), 1)
+            self.assertRegex(next(updates.iterdir()).name, r"^9\.9\.9-[0-9a-f]{8}$")
+
+            # Up to date: nothing is downloaded.
+            result = self.run_setup(setup, "-Update", "-GameDir", str(game), appdata=appdata)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Infinite Expansion 9.9.9 is installed; the newest release is 9.9.9.", result.stdout)
+            self.assertEqual(len(list(updates.iterdir())), 1)
+
+            # Uninstalling removes the downloads too.
+            result = self.run_setup(setup, "-Uninstall", "-GameDir", str(game), appdata=appdata)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse(updates.exists())
+
+    def test_no_release_yet(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _steam, game = make_game(root)
+            result = self.run_setup(self.setup_copy(root, "none"), "-Update", "-GameDir", str(game), appdata=root / "AppData")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("There is no release on GitHub yet.", result.stdout)
+            self.assertFalse((game / "iw7-mod" / "custom_scripts" / "cp" / "ix_main.gsc").exists())
+
+
+SCENARIO_SETTINGS = r"""
+param([string]$Core, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Core
+$r = [ordered]@{}
+$r.before = Get-IXAutoUpdate
+$r.off = Set-IXAutoUpdate $false
+$r.afterOff = Get-IXAutoUpdate
+[IO.File]::AppendAllText((Get-IXSettingsPath), "Other=1`r`n")
+$r.on = Set-IXAutoUpdate $true
+$r.afterOn = Get-IXAutoUpdate
+$r.file = [IO.File]::ReadAllText((Get-IXSettingsPath))
+$r.args = @(@('plain', 'two words', '', 'C:\dir\', 'a"b', 'C:\my dir\') | ForEach-Object { ConvertTo-IXArgument $_ }) -join ' '
+$r.playArgs = ConvertFrom-IXPlayArgs ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('+set ix_debug_log 1')))
+$r.badPlayArgs = ConvertFrom-IXPlayArgs 'not base64!'
+$r.versions = @(@('v0.3.2', '0.3', 'V1.2.3.4', 'latest', '1.2.3.4.5', ' 0.4.0 ') | ForEach-Object { ConvertTo-IXVersion $_ })
+$r.compare = @(@(@('0.3.2', '0.3.1'), @('0.3.1', '0.3.2'), @('0.4', '0.4.0'), @('0.10.0', '0.9.9'), @('v1.0', '0.9'), @('junk', '0.0.1')) | ForEach-Object { Compare-IXVersion $_[0] $_[1] })
+ConvertTo-Json -InputObject $r -Depth 3 | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class UpdateSettings(unittest.TestCase):
+    def test_auto_update_switch_versions_and_arguments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out.json"
+            script = Path(tmp) / "scenario.ps1"
+            script.write_text(SCENARIO_SETTINGS)
+            result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(script), str(CORE), str(out)],
+                                    capture_output=True, text=True, env=dict(os.environ, LOCALAPPDATA=tmp))
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            r = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertEqual((r["before"], r["off"], r["afterOff"], r["on"], r["afterOn"]), (True, True, False, True, True))
+            # Other lines stay; the switch is written once.
+            self.assertEqual(r["file"].split(), ["Other=1", "AutoUpdate=1"])
+            self.assertEqual(split_command_line(r["args"]), ["plain", "two words", "", "C:\\dir\\", 'a"b', "C:\\my dir\\"])
+            self.assertEqual((r["playArgs"], r["badPlayArgs"]), ("+set ix_debug_log 1", ""))
+            # The same rules as the launcher's ParseVersion / CompareVersions.
+            self.assertEqual(r["versions"], ["0.3.2", "0.3", "1.2.3.4", None, None, "0.4.0"])
+            self.assertEqual(r["compare"], [1, -1, 0, 1, 1, -1])
+
+
+WORKFLOW = REPO / ".github" / "workflows" / "release.yml"
+
+FAKE_GH = """#!/bin/sh
+echo "$*" >> "$FAKE_GH_LOG"
+if [ "$1 $2" = "release view" ]; then
+    [ -n "$FAKE_GH_EXISTS" ] && exit 0
+    echo "release not found" >&2
+    exit 1
+fi
+exit 0
+"""
+
+
+class ReleaseWorkflow(unittest.TestCase):
+    """.github/workflows/release.yml: its script, run in a scratch repository
+    with a stand-in for gh, and what the setup expects of its releases."""
+
+    def workflow_script(self):
+        text = WORKFLOW.read_text()
+        match = re.search(r"\n        run: \|\n((?:          .*\n|\n)+)", text)
+        self.assertIsNotNone(match, "the publish step's run: | block")
+        return "\n".join(line[10:] for line in match.group(1).splitlines())
+
+    def run_workflow(self, root, exists=False):
+        log = root / "gh.log"
+        env = dict(os.environ, PATH=f"{root / 'bin'}:{os.environ['PATH']}", FAKE_GH_LOG=str(log),
+                   GITHUB_REPOSITORY="owner/repo", GITHUB_SHA="0123abcd", GH_TOKEN="x")
+        if exists:
+            env["FAKE_GH_EXISTS"] = "1"
+        result = subprocess.run(["bash", "-c", self.workflow_script()], cwd=root / "repo", capture_output=True, text=True, env=env)
+        return result, (log.read_text().splitlines() if log.exists() else [])
+
+    def scratch_repo(self, root, changelog):
+        repo = root / "repo"
+        bootstrap = repo / "mods" / "infinite_expansion" / "custom_scripts" / "ix" / "core" / "bootstrap.gsc"
+        bootstrap.parent.mkdir(parents=True)
+        bootstrap.write_text(re.sub(r'level\.ix\.version = "[^"]+"', 'level.ix.version = "7.7.7"',
+                                    (PACKAGE / "custom_scripts" / "ix" / "core" / "bootstrap.gsc").read_text()))
+        (repo / "installer").mkdir()
+        (repo / "installer" / "IXSetup.ps1").write_text("# setup\n")
+        (repo / "CHANGELOG.md").write_text(changelog)
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+        subprocess.run(git + ["commit", "-q", "-m", "x"], cwd=repo, check=True)
+        (root / "bin").mkdir()
+        (root / "bin" / "gh").write_text(FAKE_GH)
+        (root / "bin" / "gh").chmod(0o755)
+
+    def test_publishes_the_version_once(self):
+        changelog = ("# CHANGELOG\n\n## [Unreleased]\n\n### 7.7.7: the newest (2026-10-08)\n\n**Added**\n- A thing.\n\n"
+                     "### 7.7.6: older (2026-10-07)\n\n- Old.\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.scratch_repo(root, changelog)
+            result, calls = self.run_workflow(root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(calls, [
+                "release view v7.7.7 --repo owner/repo",
+                "release create v7.7.7 Infinite-Expansion-7.7.7.zip --repo owner/repo --target 0123abcd "
+                "--title Infinite Expansion 7.7.7 --notes-file notes.md",
+            ])
+            self.assertEqual((root / "repo" / "notes.md").read_text().strip(), "**Added**\n- A thing.")
+            names = zipfile.ZipFile(root / "repo" / "Infinite-Expansion-7.7.7.zip").namelist()
+            self.assertIn("Infinite-Expansion/installer/IXSetup.ps1", names)
+            self.assertIn("Infinite-Expansion/mods/infinite_expansion/custom_scripts/ix/core/bootstrap.gsc", names)
+            self.assertTrue(all(name.startswith("Infinite-Expansion/") for name in names))
+            # The setup takes that asset: Get-IXLatestRelease's name rule.
+            rule = re.search(r"-notmatch '(\^Infinite-Expansion-[^']+)'", CORE.read_text()).group(1)
+            self.assertRegex("Infinite-Expansion-7.7.7.zip", rule)
+
+    def test_released_versions_are_left_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.scratch_repo(root, "# CHANGELOG\n")
+            result, calls = self.run_workflow(root, exists=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("v7.7.7 is already released.", result.stdout)
+            self.assertEqual(calls, ["release view v7.7.7 --repo owner/repo"])
+
+    def test_notes_fall_back_without_a_changelog_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.scratch_repo(root, "# CHANGELOG\n\n### 7.7.70: another version\n- No.\n")
+            result, _calls = self.run_workflow(root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual((root / "repo" / "notes.md").read_text().strip(), "See CHANGELOG.md.")
+
+    def test_watches_the_real_version_line(self):
+        text = WORKFLOW.read_text()
+        path = re.search(r"paths:\n\s+- (\S+)", text).group(1)
+        self.assertTrue((REPO / path).is_file(), path)
+        sed = re.search(r"version=\$\(sed -n '([^']+)' (\S+)\)", text)
+        self.assertEqual(sed.group(2), path)
+        result = subprocess.run(["sed", "-n", sed.group(1), str(REPO / path)], capture_output=True, text=True, check=True)
+        self.assertEqual(result.stdout.strip(), package_version())
+        self.assertIn("contents: write", text)
+        # Release assets need a SHA-256 the setup can check, and these addresses.
+        self.assertIn("$IXReleaseApi = 'https://api.github.com/repos/qwertymakesstuff/Infinite-Expansion/releases/latest'", CORE.read_text())
+        self.assertIn('"https://api.github.com/repos/qwertymakesstuff/Infinite-Expansion/releases/latest"', GAME_LAUNCHER_SOURCE.read_text())
 
 
 def xaml_tree():
