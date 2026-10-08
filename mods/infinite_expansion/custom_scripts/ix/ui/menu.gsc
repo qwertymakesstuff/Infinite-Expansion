@@ -6,17 +6,21 @@
 // from config.gsc, so the console, the chat commands and the menu always show
 // and change the same thing.
 //
-// Controls, read by polling the buttons as a working IW7 zombies menu does
-// (IW_API_NOTES.md section 8):
-//   ADS + Melee          open (also "!ix menu" in chat)
-//   ADS / Fire           up / down
-//   Use                  open a page, switch, run an action
-//   Frag / Tactical      change a value: more / less
-//   Melee                back; on the first page: close
-// While it is open, the player's weapons, grenades, melee and Use are off, so
-// those buttons only steer the menu. That goes through the stock counters
-// (scripts\engine\utility::allow_weapon and friends), so closing the menu never
-// turns back on what the game itself turned off (last stand, traps).
+// Controls (IW_API_NOTES.md section 8), shown at the bottom of the menu:
+//   ADS + Melee                    open (also "!ix menu" in chat)
+//   W / S, left stick up / down    move up / down (ADS / Fire too)
+//   A / D, left stick left / right change a value: less / more (Tactical / Frag too)
+//   Use or Jump                    open a page, switch, run an action
+//   Melee                          back; on the first page: close
+// The movement keys are read with getnormalizedmovement() while the player is
+// held in place, linked to a point where they stand, as the stock phone booth
+// on Shaolin Shuffle reads them (its player is linked too). The buttons are
+// polled as a working IW7 zombies menu does; Jump arrives as a "+goStand"
+// command notify, as in the phone booth. While the menu is open, the player's
+// weapons, grenades, melee and Use are off, so those buttons only steer the
+// menu. That goes through the stock counters (scripts\engine\utility::
+// allow_weapon and friends), so closing the menu never turns back on what the
+// game itself turned off (last stand, traps).
 //
 // Settings apply to the whole match: only the host changes them, unless the
 // host sets menu_access to everyone. Everyone can look.
@@ -39,6 +43,7 @@ register()
     custom_scripts\ix\core\events::subscribe( "player_laststand", ::on_down );
     custom_scripts\ix\core\events::subscribe( "player_death", ::on_down );
     custom_scripts\ix\core\events::subscribe( "game_end", ::on_game_end );
+    custom_scripts\ix\core\events::subscribe( "player_disconnect", ::on_disconnect );
     custom_scripts\ix\core\chat::add_command( "menu", ::chat_open, "opens the menu" );
 
     level.ix.menu = spawnstruct();
@@ -70,7 +75,7 @@ add_page( id, title, parent )
     return page;
 }
 
-// A setting row; step: how much Frag / Tactical change a number.
+// A setting row; step: how much A / D change a number.
 add_setting( page, id, step )
 {
     setting = custom_scripts\ix\core\config::find( id );
@@ -167,6 +172,8 @@ on_spawn( player )
         state.locked = 0;
         state.stack = [];
         player.ix.menu = state;
+        player notifyonplayercommand( "ix_menu_jump", "+goStand" );
+        player thread listen_jump();
         player thread input_loop();
     }
 
@@ -179,6 +186,41 @@ show_hint()
     self endon( "disconnect" );
     wait 6;
     self iprintln( "Infinite Expansion: hold ADS and press Melee for the menu (or type !ix menu)." );
+
+    if ( uses_gamepad() )
+        self iprintln( "In the menu: the left stick moves and changes values, Use or Jump selects, Melee goes back." );
+    else
+        self iprintln( "In the menu: W / S move, A / D change values, Use or Jump selects, Melee goes back." );
+}
+
+// A controller rather than a keyboard and mouse (the stock check; 1 on a console).
+uses_gamepad()
+{
+    if ( !isdefined( level.console ) )
+        return 0;
+
+    return self scripts\engine\utility::is_player_gamepad_enabled();
+}
+
+// Jump selects: the notify only queues it for the input loop.
+listen_jump()
+{
+    self endon( "disconnect" );
+
+    for (;;)
+    {
+        self waittill( "ix_menu_jump" );
+
+        if ( self.ix.menu.open )
+            self.ix.menu.queued = "use";
+    }
+}
+
+// Left mid-menu: the point they were held at goes too.
+on_disconnect( player, arg )
+{
+    if ( isdefined( player ) && isdefined( player.ix ) && isdefined( player.ix.menu ) && isdefined( player.ix.menu.anchor ) )
+        player.ix.menu.anchor delete();
 }
 
 // Gone, last stand or dead: the menu closes, and gives back what it took.
@@ -228,6 +270,11 @@ can_open()
     if ( isdefined( self.in_afterlife_arcade ) && self.in_afterlife_arcade )
         return 0;
 
+    // Held in place while it is open: not in the air, and not already linked
+    // to something (a ride, a trap) that the hold would take them off.
+    if ( !self isonground() || self islinked() )
+        return 0;
+
     return 1;
 }
 
@@ -249,7 +296,9 @@ open_menu()
     state.top = 0;
     state.stack = [];
     state.confirm = undefined;
+    state.queued = undefined;
     lock( 1 );
+    hold( 1 );
 
     if ( !isdefined( state.hud ) )
         create_hud();
@@ -263,7 +312,9 @@ close_menu()
     state = self.ix.menu;
     state.open = 0;
     state.confirm = undefined;
+    state.queued = undefined;
     hide_hud();
+    hold( 0 );
     lock( 0 );
 }
 
@@ -284,6 +335,45 @@ lock( on )
     self scripts\engine\utility::allow_usability( allow );
 }
 
+// Held where they stand while the menu is open, so the movement keys steer the
+// menu instead of the player: linked to a point at their feet, the way the
+// stock phone booth holds its player (a tag_origin model and
+// playerlinktodelta), but free to look around. Only that link is ever undone.
+hold( on )
+{
+    state = self.ix.menu;
+
+    if ( on )
+    {
+        if ( isdefined( state.anchor ) )
+            return;
+
+        anchor = spawn( "script_model", self.origin );
+        anchor setmodel( "tag_origin" );
+        anchor.angles = ( 0, self.angles[1], 0 );
+        self playerlinktodelta( anchor, "tag_origin", 1, 180, 180, 85, 85 );
+        state.anchor = anchor;
+        return;
+    }
+
+    if ( !isdefined( state.anchor ) )
+        return;
+
+    if ( is_held() )
+        self unlink();
+
+    state.anchor delete();
+    state.anchor = undefined;
+}
+
+// Still held by the menu. The game may have taken them since (a ride, a trap,
+// a teleport); then the menu gives way.
+is_held()
+{
+    state = self.ix.menu;
+    return isdefined( state.anchor ) && self islinked() && self getlinkedparent() == state.anchor;
+}
+
 // ---------------------------------------------------------------------------
 // Input
 
@@ -302,17 +392,33 @@ input_loop()
         {
             held = "";
 
-            // Both let go first, or the ADS still held would move the cursor.
+            // Everything let go first, or the ADS still held (or the player
+            // still walking) would move the cursor.
             if ( self adsbuttonpressed() && self meleebuttonpressed() && self open_menu() )
             {
                 wait_released( "melee" );
                 wait_released( "ads" );
+                wait_released( "move" );
             }
 
             continue;
         }
 
+        if ( !is_held() )
+        {
+            close_menu();
+            held = "";
+            continue;
+        }
+
         button = pressed_button();
+
+        if ( isdefined( state.queued ) )
+        {
+            button = state.queued;
+            state.queued = undefined;
+            held = "";
+        }
 
         if ( button == "" )
         {
@@ -335,27 +441,31 @@ input_loop()
                 wait_released( "use" );
                 held = "";
                 break;
+            case "up":
             case "ads":
                 move_cursor( -1 );
-                hold( "ads", again );
+                repeat_after( button, again );
                 break;
+            case "down":
             case "attack":
                 move_cursor( 1 );
-                hold( "attack", again );
+                repeat_after( button, again );
                 break;
+            case "more":
             case "frag":
                 change_value( 1 );
-                hold( "frag", again );
+                repeat_after( button, again );
                 break;
+            case "less":
             case "tactical":
                 change_value( -1 );
-                hold( "tactical", again );
+                repeat_after( button, again );
                 break;
         }
     }
 }
 
-// The one menu button pressed now, or "". Two buttons of a pair at once count
+// The one menu input given now, or "". Two buttons of a pair at once count
 // as none, so ADS + Melee does not also scroll.
 pressed_button()
 {
@@ -364,6 +474,11 @@ pressed_button()
 
     if ( self usebuttonpressed() )
         return "use";
+
+    direction = move_direction();
+
+    if ( direction != "" )
+        return direction;
 
     ads = self adsbuttonpressed();
     attack = self attackbuttonpressed();
@@ -386,10 +501,39 @@ pressed_button()
     return "";
 }
 
+// The movement keys or left stick: "up", "down", "less", "more", or "".
+// getnormalizedmovement()[0] is forward (+) / back (-), [1] right (+) / left (-),
+// as the stock dodge reads them (zombies_consumables.gsc).
+move_direction()
+{
+    move = self getnormalizedmovement();
+
+    if ( move[0] > 0.5 )
+        return "up";
+
+    if ( move[0] < -0.5 )
+        return "down";
+
+    if ( move[1] > 0.5 )
+        return "more";
+
+    if ( move[1] < -0.5 )
+        return "less";
+
+    return "";
+}
+
 is_pressed( button )
 {
     switch ( button )
     {
+        case "up":
+        case "down":
+        case "more":
+        case "less":
+            return move_direction() == button;
+        case "move":
+            return move_direction() != "";
         case "ads":
             return self adsbuttonpressed();
         case "attack":
@@ -414,7 +558,7 @@ wait_released( button )
 }
 
 // Held down: the first step waits a little longer than the ones after it.
-hold( button, again )
+repeat_after( button, again )
 {
     delay = 0.35;
 
@@ -516,7 +660,7 @@ use_item()
             setting = custom_scripts\ix\core\config::find( item.setting );
 
             // Use switches an on/off setting and steps an enum; numbers change
-            // with Frag / Tactical.
+            // with A / D.
             if ( setting.type == "bool" || setting.type == "enum" )
                 change_value( 1 );
 
@@ -551,7 +695,7 @@ run_action( item )
         draw();
 }
 
-// direction 1: Frag (more, next, on); -1: Tactical (less, previous, off).
+// direction 1: D or Frag (more, next); -1: A or Tactical (less, previous).
 change_value( direction )
 {
     item = current_item();
@@ -641,7 +785,7 @@ watch_settings()
 
 // ---------------------------------------------------------------------------
 // HUD: a panel right of the screen's centre (horzalign "center": 4:3-safe
-// units, with x from the centre), as wide as the 4:3 screen's right half.
+// units, with x from the centre) that ends at the 4:3 screen's right edge.
 
 rows()
 {
@@ -650,7 +794,7 @@ rows()
 
 menu_left()
 {
-    return 96;
+    return 80;
 }
 
 menu_top()
@@ -660,7 +804,7 @@ menu_top()
 
 menu_width()
 {
-    return 224;
+    return 240;
 }
 
 row_height()
@@ -683,6 +827,22 @@ footer_top()
     return help_top() + 3 * 11 + 4;
 }
 
+footer_line()
+{
+    return 11;
+}
+
+// Right edge of the values; > for a page sits at the panel's edge.
+value_right()
+{
+    return menu_left() + menu_width() - 18;
+}
+
+arrow_right()
+{
+    return menu_left() + menu_width() - 6;
+}
+
 accent()
 {
     return ( 0.13, 0.89, 1 );
@@ -691,7 +851,7 @@ accent()
 create_hud()
 {
     hud = spawnstruct();
-    height = footer_top() + 2 * 10 + 4 - menu_top();
+    height = footer_top() + 2 * footer_line() + 4 - menu_top();
     hud.panel = menu_shader( "white", menu_left(), menu_top(), menu_width(), height, ( 0.04, 0.03, 0.08 ), 0.8, 20 );
     hud.edge = menu_shader( "white", menu_left(), menu_top(), menu_width(), 2, accent(), 1, 21 );
     hud.cursor = menu_shader( "white", menu_left() + 2, first_row_top(), menu_width() - 4, row_height(), accent(), 0.25, 21 );
@@ -704,20 +864,27 @@ create_hud()
     {
         top = first_row_top() + row * row_height() + 1;
         hud.labels[row] = menu_text( "left", menu_left() + 8, top, "default", 1, ( 1, 1, 1 ) );
-        hud.values[row] = menu_text( "right", menu_left() + menu_width() - 8, top, "default", 1, ( 1, 1, 1 ) );
+        hud.values[row] = menu_text( "right", value_right(), top, "default", 1, ( 1, 1, 1 ) );
     }
+
+    // < and > around the value on the cursor row: A / D change it.
+    hud.less = menu_text( "right", value_right(), first_row_top() + 1, "default", 1, accent() );
+    hud.less settext( "<" );
+    hud.more = menu_text( "right", arrow_right(), first_row_top() + 1, "default", 1, accent() );
+    hud.more settext( ">" );
 
     hud.help = [];
 
     for ( line = 0; line < 3; line++ )
         hud.help[line] = menu_text( "left", menu_left() + 8, help_top() + line * 11, "default", 0.85, ( 0.8, 0.8, 0.8 ) );
 
+    // The controls: set by show_controls(), for a keyboard or a controller.
     hud.footer = [];
-    hud.footer[0] = menu_text( "left", menu_left() + 8, footer_top(), "default", 0.75, ( 0.55, 0.55, 0.55 ) );
-    hud.footer[0] settext( "ADS / Fire: move     Use: select" );
-    hud.footer[1] = menu_text( "left", menu_left() + 8, footer_top() + 10, "default", 0.75, ( 0.55, 0.55, 0.55 ) );
-    hud.footer[1] settext( "Frag / Tactical: change     Melee: back" );
+    hud.footer[0] = menu_text( "left", menu_left() + 8, footer_top(), "default", 0.8, ( 0.9, 0.9, 0.9 ) );
+    hud.footer[1] = menu_text( "left", menu_left() + 8, footer_top() + footer_line(), "default", 0.8, ( 0.9, 0.9, 0.9 ) );
+    hud.footer[1] settext( "Use or Jump: select     Melee: back" );
     self.ix.menu.hud = hud;
+    self.ix.menu.pad = undefined;
 }
 
 menu_element( alignx, x, y, sort )
@@ -760,7 +927,7 @@ menu_text( alignx, x, y, font, scale, color )
 hud_elements()
 {
     hud = self.ix.menu.hud;
-    list = [ hud.panel, hud.edge, hud.cursor, hud.title, hud.crumb, hud.footer[0], hud.footer[1] ];
+    list = [ hud.panel, hud.edge, hud.cursor, hud.title, hud.crumb, hud.less, hud.more, hud.footer[0], hud.footer[1] ];
 
     foreach ( element in hud.labels )
         list[list.size] = element;
@@ -798,8 +965,7 @@ draw()
     hud.edge.alpha = hud.edge.shown_alpha;
     hud.title.alpha = 1;
     hud.crumb.alpha = 1;
-    hud.footer[0].alpha = 1;
-    hud.footer[1].alpha = 1;
+    show_controls();
 
     for ( row = 0; row < rows(); row++ )
     {
@@ -823,6 +989,8 @@ draw()
         hud.cursor.alpha = hud.cursor.shown_alpha;
     }
 
+    show_arrows();
+
     lines = wrap( item_help( current_item() ), 40, 3 );
 
     for ( line = 0; line < 3; line++ )
@@ -844,10 +1012,12 @@ draw_row( label, value, item )
     label.alpha = 1;
     value.alpha = 1;
     value.color = ( 0.8, 0.8, 0.8 );
+    value.x = value_right();
 
     switch ( item.kind )
     {
         case "page":
+            value.x = arrow_right();
             value settext( ">" );
             return;
         case "action":
@@ -867,37 +1037,101 @@ draw_row( label, value, item )
 
     setting = custom_scripts\ix\core\config::find( item.setting );
 
-    if ( custom_scripts\ix\core\features::is_feature( setting.id ) )
+    if ( unavailable( setting ) )
     {
-        feature = custom_scripts\ix\core\features::find( setting.id );
-
-        if ( custom_scripts\ix\core\features::missing_requirement( feature ) != "" )
-        {
-            label.color = ( 0.5, 0.5, 0.5 );
-            value settext( "N/A" );
-            value.color = ( 0.5, 0.5, 0.5 );
-            return;
-        }
+        label.color = ( 0.5, 0.5, 0.5 );
+        value settext( "N/A" );
+        value.color = ( 0.5, 0.5, 0.5 );
+        return;
     }
 
     if ( setting.type == "bool" )
     {
+        value settext( value_text( setting ) );
+
         if ( setting.value )
-        {
-            value settext( "ON" );
             value.color = ( 0.22, 1, 0.08 );
-        }
         else
-        {
-            value settext( "OFF" );
             value.color = ( 1, 0.18, 0.59 );
-        }
     }
     else
         show_value( value, setting.value );
 
     if ( !may_change() )
         value.color = ( 0.5, 0.5, 0.5 );
+}
+
+// A feature that needs what this map does not have: shown as N/A.
+unavailable( setting )
+{
+    if ( !custom_scripts\ix\core\features::is_feature( setting.id ) )
+        return 0;
+
+    feature = custom_scripts\ix\core\features::find( setting.id );
+    return custom_scripts\ix\core\features::missing_requirement( feature ) != "";
+}
+
+// What a setting row shows as its value.
+value_text( setting )
+{
+    if ( setting.type == "bool" )
+    {
+        if ( setting.value )
+            return "ON";
+
+        return "OFF";
+    }
+
+    return "" + setting.value;
+}
+
+// < and > around the value on the cursor row, when A / D can change it. The
+// text's width is not known to scripts, so < goes by its length (a character
+// of the default font at scale 1 is at most about 6.5 units wide).
+show_arrows()
+{
+    state = self.ix.menu;
+    hud = state.hud;
+    hud.less.alpha = 0;
+    hud.more.alpha = 0;
+    item = current_item();
+
+    if ( !isdefined( item ) || item.kind != "setting" || !may_change() )
+        return;
+
+    setting = custom_scripts\ix\core\config::find( item.setting );
+
+    if ( unavailable( setting ) )
+        return;
+
+    y = first_row_top() + ( state.cursor - state.top ) * row_height() + 1;
+    hud.less.x = value_right() - value_text( setting ).size * 6.5 - 5;
+    hud.less.y = y;
+    hud.more.y = y;
+    hud.less.alpha = 1;
+    hud.more.alpha = 1;
+}
+
+// The controls along the bottom, in the words of the player's device; set
+// again only when they switch between a keyboard and a controller.
+show_controls()
+{
+    state = self.ix.menu;
+    hud = state.hud;
+    pad = uses_gamepad();
+
+    if ( !isdefined( state.pad ) || state.pad != pad )
+    {
+        state.pad = pad;
+
+        if ( pad )
+            hud.footer[0] settext( "Stick up / down: move   left / right: change" );
+        else
+            hud.footer[0] settext( "W / S: move     A / D: change" );
+    }
+
+    hud.footer[0].alpha = 1;
+    hud.footer[1].alpha = 1;
 }
 
 // Numbers with setvalue, words with settext: numbers never become new strings.

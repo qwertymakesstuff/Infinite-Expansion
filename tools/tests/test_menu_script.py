@@ -212,29 +212,47 @@ class MenuScript(unittest.TestCase):
         return {line.split(" ")[0]: line.split(" ", 2)[2] for line in self.run_harness("lobbycard", *options)}
 
     def test_lobby_card_shows_the_chosen_character(self):
-        # A regular character: their card of the selected map, where the stock
-        # lobby shows a special's picture (The Hoff's 798-1054 x 714-970).
+        # A regular character: their card of the selected map, big, in the
+        # bottom right under the one player card (rows of 197 from 165) and
+        # above the social feed line (965).
         pack = "pack=ix_card_zmb_andre,ix_card_disco_andre,ix_card_pam"
-        steps = self.lobby_card("character=andre", pack, "map=cp_zmb", "map2=cp_disco")
-        self.assertEqual(steps["open"], "image=material:ix_card_zmb_andre rect=838 714 1014 970 stock=")
+        steps = self.lobby_card("character=andre", pack, "map=cp_zmb", "map2=cp_disco", "players2=2")
+        self.assertEqual(steps["open"], "image=material:ix_card_zmb_andre rect=1457 475 1788 955 stock=")
         # SELECT SHOW, then back to the lobby: the selected map's card.
-        self.assertEqual(steps["map"], "image=material:ix_card_disco_andre rect=838 714 1014 970 stock=")
-        # Choosing a special in the CHARACTER menu: the stock lobby's own picture, nothing on top.
+        self.assertEqual(steps["map"], "image=material:ix_card_disco_andre rect=1457 475 1788 955 stock=")
+        # A second player: the card fits under both player cards.
+        self.assertEqual(steps["players"], "image=material:ix_card_disco_andre rect=1491 574 1754 955 stock=")
+        # Three or four players fill that column: the card goes where the stock
+        # lobby shows a special character's picture.
+        steps = self.lobby_card("character=andre", pack, "map=cp_zmb", "players=3")
+        self.assertEqual(steps["open"], "image=material:ix_card_zmb_andre rect=837 714 1014 970 stock=")
+
+    def test_lobby_card_shows_special_characters_in_place_of_the_stock_picture(self):
+        pack = "pack=ix_card_zmb_andre,ix_card_pam"
+        # Choosing a special in the CHARACTER menu: their card (Pam Grier's is
+        # 2:1); the stock lobby's own picture stays hidden.
         steps = self.lobby_card("character=andre", pack, "keys=soul_key_3", "choose=8")
-        self.assertEqual(steps["chosen"], "none stock=Pam")
-        # A special chosen earlier shows when the lobby opens, though the stock
-        # lobby has just reset characterSelect; Random shows nothing.
+        self.assertEqual(steps["chosen"], "image=material:ix_card_pam rect=1405 737 1841 955 stock=")
+        # Without the pack, the stock lobby's picture of them: The Hoff's is
+        # square, the others half as wide as high. Chosen earlier, it shows when
+        # the lobby opens, though the stock lobby has just reset characterSelect;
+        # Random shows nothing.
         steps = self.lobby_card("character=hoff", "keys=soul_key_1", "choose=0")
-        self.assertEqual(steps["open"], "none stock=Hoff")
+        self.assertEqual(steps["open"], "image=material:zm_character_select_hoff rect=1495 699 1751 955 stock=")
         self.assertEqual(steps["chosen"], "none stock=")
+        steps = self.lobby_card("character=kevin", "keys=soul_key_2")
+        self.assertEqual(steps["open"], "image=material:zm_character_select_smith rect=1503 475 1743 955 stock=")
+        # A special this player has not unlocked: the game picks, no card.
+        steps = self.lobby_card("character=pam", pack)
+        self.assertEqual(steps["open"], "none stock=")
 
     def test_lobby_card_without_pictures(self):
         steps = self.lobby_card("character=andre", "choose=1")
-        self.assertEqual(steps["open"], "initials=A color=FF9933 panel=838 714 1014 970 alpha=0.45 stock=")
-        self.assertEqual(steps["chosen"], "initials=S color=FF73B3 panel=838 714 1014 970 alpha=0.45 stock=")
+        self.assertEqual(steps["open"], "initials=A color=FF9933 panel=1457 475 1788 955 alpha=0.45 stock=")
+        self.assertEqual(steps["chosen"], "initials=S color=FF73B3 panel=1457 475 1788 955 alpha=0.45 stock=")
         # The team card when the pack has no main card of that map.
         steps = self.lobby_card("character=sally", "pack=ix_icon_zmb_sally", "map=cp_zmb")
-        self.assertEqual(steps["open"], "image=material:ix_icon_zmb_sally rect=798 714 1054 970 stock=")
+        self.assertEqual(steps["open"], "image=material:ix_icon_zmb_sally rect=1495 699 1751 955 stock=")
 
     def test_main_menu_has_no_character_button(self):
         self.assertIn("main buttons 0", self.run_harness("mainmenu"))

@@ -1,6 +1,6 @@
 # FEATURE_STATUS.md
 
-**Statuses:** PLANNED · INVESTIGATING · IN PROGRESS · TESTING · COMPLETE · PARTIAL · BLOCKED (· DEFERRED, N/A, NOT PLANNED)
+**Statuses:** PLANNED · INVESTIGATING · IN PROGRESS · TESTING · COMPLETE · PARTIAL · BLOCKED (· DEFERRED, N/A, NOT PLANNED, REMOVED)
 
 - A feature becomes **COMPLETE** only after it compiles with both iw7-mod compilers **and** is confirmed in-game (`TESTING.md`).
 - **TESTING** means the code is written and passes static checks (`tools/check.py`), but no in-game run has been reported yet.
@@ -54,8 +54,8 @@
 | Lifecycle notifies (`ix_ready`, `ix_player_connected`, `ix_player_spawned`, `ix_shutdown`) | Core | 1 | TESTING | One connect/spawn watcher per player; R-S9 |
 | Compatibility module (raw ids, feature detection) | Core | 1 | TESTING | Fixes the v1.1.0 mislabels (C1, C2); wrappers are exercised by Phases 4 and 6; R-S8 |
 | Logging (`[IX]` console lines, `ix_debug_log`, ring buffer) | Core | 1 | TESTING | R-S1, R-S9 |
-| Feature manager (on/off features, requirements, global and per-player hooks) | Core | 2 | TESTING | `ix/core/features.gsc`; first user: `player_card`; R-C7 |
-| Configuration manager (bool/int/float/enum settings with defaults and ranges, like AAE's `tfoption_*`) | Core | 2 | TESTING | `ix/core/config.gsc`; 9 settings so far; invalid values refused, numbers clamped; R-C1, R-C3, R-C6 |
+| Feature manager (on/off features, requirements, global and per-player hooks) | Core | 2 | TESTING | `ix/core/features.gsc`; in use: `menu` (the player card was the first, removed in 0.3.1); R-C7 |
+| Configuration manager (bool/int/float/enum settings with defaults and ranges, like AAE's `tfoption_*`) | Core | 2 | TESTING | `ix/core/config.gsc`; 8 settings so far; invalid values refused, numbers clamped; R-C1, R-C3, R-C6 |
 | Saved settings + layout version (AAE: save data + `tfoption_master_ver`) | Core | 2 | TESTING | `ix/core/persist.gsc`: archived dvars (`seta ix_<id>`) in the host's config, so it works in the install friends can join; `ix_settings_version` with a migration hook (L38); R-C5 |
 | Live console overrides (`set ix_x v`) | Core | 2 | TESTING | Watcher every 0.5 s; replaces AAE `modvar` / `/d` (L3); R-C2 |
 | Event bus | Core | 2 | TESTING | `ix/core/events.gsc`: 12 events from real IW7 notifies, one listener per source; R-C9, R-Z1 |
@@ -81,20 +81,19 @@
 | Special characters gated by unlocks | Player | 1.5 | TESTING | The stock lobby's stats: soul keys, and for Willard also the merit (L27); checked in the menu and for every pick in the match; setting `character_specials` 0/1/2; R-CH6 |
 | Special characters on any map | Player | 1.5 | TESTING (experimental) | Opt-in setting `character_crossmap`; their models may not exist on other maps (L26); R-CH7 |
 | Stock HUD portrait follows the chosen character | HUD | 1.5 | TESTING | Stock `setmodelfromcustomization` → `zm_player_character` |
-| Player card, bottom right | HUD | 1.5 | TESTING | `ix/ui/player_card.gsc`: the character's picture (the stock team card of the current map, setting `player_card_picture`), name and outfit; the feature `player_card` (off hides it at once) and the settings `player_card_x` / `_y`; R-CH9, R-C7 |
-| Player card picture (in a match) | HUD | 1.5 | BLOCKED | L28 |
+| Player card, bottom right (in a match) | HUD | 1.5 | REMOVED | Removed in 0.3.1 at the project owner's request, with the settings `player_card`, `player_card_picture`, `player_card_x` and `player_card_y` and the menu's HUD page; the lobby card replaces it (R-CH9) |
 
 ## UI (Phase 3) / HUD (Phase 8)
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | GSC menu engine (pages, on/off settings, numbers, words, actions, read-outs) | UI | 3 | TESTING | `ix/ui/menu.gsc`: create-once HUD elements, numbers with `setvalue`, help and range under the list, live refresh when a setting changes anywhere; the feature `menu`; R-M1–R-M8 |
-| Menu controls (open ADS + Melee or `!ix menu`; ADS/Fire, Use, Frag/Tactical, Melee) | UI | 3 | TESTING | Polled like a working IW7 zombies menu; weapon, grenades, melee and Use off while open through the stock counters (L41); R-M1, R-M2 |
-| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, HUD, Menu, Settings, Debug; later phases add theirs (Game / Player / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
+| Menu controls (open ADS + Melee or `!ix menu`; W / S / A / D or the left stick, Use or Jump, Melee; ADS / Fire and Tactical / Frag too) | UI | 3 | TESTING | The movement keys are read with `getnormalizedmovement` while the player is held in place, as the stock phone booth holds its player; the buttons are polled like a working IW7 zombies menu; Jump is a `+goStand` notify. Weapon, grenades, melee and Use are off while open, through the stock counters. The footer names the keys or the stick, and `<` `>` mark a value A / D change (L41); R-M1, R-M2, R-M9, R-M10 |
+| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Menu, Settings, Debug; later phases add theirs (Game / Player / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
 | Reset / defaults from menu | UI | 3 | TESTING | *Reset every setting* (confirm with a second Use, host only); presets come in Phase 11; R-M6 |
 | Host-only changes | UI | 3 | TESTING | Everyone can look; only the host changes, unless `menu_access` is `everyone`; R-M5 |
 | Per-player access list | UI | – | NOT PLANNED | `menu_access` covers host-only versus everyone |
-| Lobby card of the chosen character | UI | 3 | TESTING | The CHARACTER pick's card in the stock lobby, where the game shows a chosen special's picture: the stock picture for specials, the pack's card of the selected show for regular characters, else initials; follows a new pick and SELECT SHOW (L42); R-UI7 |
+| Lobby card of the chosen character | UI | 3 | TESTING | The CHARACTER pick's card, big, in the stock lobby's bottom right under the player list (the lower middle with three or four players): the pack's card (Pam Grier's 2:1), else a special's stock picture, else the team card or initials; the stock special pictures stay hidden; follows a new pick, SELECT SHOW and players joining or leaving (L42, L43); R-UI7 |
 | LUI front-end (lobby-style options) | UI | – | DEFERRED | Client Lua; optional later |
 | HUD: zombie counter (remaining + active) | HUD | 8 | PLANNED | AAE `_zm_counter` |
 | HUD: round, timer, coordinates, speed, weapon/ammo, health | HUD | 8 | PLANNED | |

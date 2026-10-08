@@ -4,6 +4,22 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.3.1: easier menu controls; the lobby card in the bottom right; the in-match card removed (2026-10-08)
+
+**Changed**
+- **Menu controls.** W / S (or the left stick) move up and down, A / D change the highlighted value, Use or Jump selects, Melee goes back. ADS / Fire and Tactical / Frag still work too.
+  - While the menu is open you stand still and can look around: the movement keys steer the menu. The menu holds you the way the game's own phone booth on Shaolin Shuffle holds its player. It opens only while you stand on the ground; if the game itself takes you somewhere while it is open (a ride, a trap), it closes.
+  - The two lines at the bottom name these keys (the stick with a controller), larger and brighter. `<` `>` around the highlighted value show that A / D change it. The panel is a little wider. The hint after the first spawn names the keys too.
+- **Lobby card** moved to the bottom right, under the players' cards, as big as fits there (as in the mockup). It now shows special characters too: their own card from the picture pack, else the game's own picture of them, which no longer also appears in the lower middle. With three or four players it goes to the lower middle. A special the player cannot have shows no card, because the game picks for them.
+
+**Removed**
+- The player card on the right of the screen in a match, with its settings `player_card`, `player_card_picture`, `player_card_x` and `player_card_y` and the menu's HUD page. Values saved for them stay in the game config but are no longer read.
+
+- Version 0.3.1.
+
+**Tests**
+- Menu script tests (14): the lobby card for one, two and three players, special characters in place of the stock picture (also when the stock lobby shows it again), a locked special. The character data test checks the picture pack's specials against the cast instead of the player card's names. 87 tests OK; `check.py` passes (18 scripts).
+
 ### Phase 3: the in-game menu; the lobby's character card; Pam Grier's card (2026-10-08)
 
 **Added**

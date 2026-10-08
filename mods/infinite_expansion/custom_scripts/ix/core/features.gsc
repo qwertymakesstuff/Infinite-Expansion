@@ -5,7 +5,7 @@
 // console (set ix_<id> 1), the chat commands and later the menu all switch it
 // the same way. A module adds a feature in its register() and sets its hooks:
 //
-//   feature = custom_scripts\ix\core\features::add( "player_card", "hud", "Player card", "...", 1 );
+//   feature = custom_scripts\ix\core\features::add( "menu", "ui", "In-game menu", "...", 1 );
 //   feature.on_enable = ::enable_x;     global: runs once when switched on
 //   feature.on_disable = ::disable_x;   global: must undo everything on_enable did
 //   feature.on_player = ::apply_x;      per player, self = player, argument 1/0:

@@ -4,9 +4,9 @@ The special characters' models, slots, lobby ids and unlock stats are copied
 from the decompiled stock scripts; this test re-reads those scripts so a typo
 cannot ship. The CHARACTER menu (ui_scripts/InfiniteExpansion) writes the same
 lobby ids and checks the same unlock stats, so its table is checked too. The
-player card's pictures (character.gsc card_material) must use the same stock
-card names as the setup's picture pack (installer/IXPictures.Core.ps1). Needs
-the stock dump from tools/setup_compilers.sh.
+setup's picture pack (installer/IXPictures.Core.ps1) must take each special
+character's cards from the slot character.gsc gives them. Needs the stock dump
+from tools/setup_compilers.sh.
 
 Run: python3 -m unittest discover -s tools/tests -v
 """
@@ -26,7 +26,6 @@ MENU_ROW = re.compile(r'^\s*\{ key = "(\w+)", (.*?)text = ', re.M | re.S)
 MENU_FIELD = re.compile(r'\b(select|soulKey|merit|portrait) = "?(\w+)"?')
 MAKE_REGULAR = re.compile(r'make_regular\(\s*\d+,\s*"(\w+)"')
 # key, home map, slot, characterSelect, soul key, merit, body, view, head, photo
-CARD_PARTS = re.compile(r'case "(cp_\w+)":\s*return \[ "([^"]*)", "([^"]*)", "([^"]*)" \];')
 PLAN_MAP = re.compile(r"Map = '(cp_\w+)';.*?Main = '([^']+)'; Team = '([^']+)'; Special = (?:'(\w+)'|\$null)")
 PLAN_WILLARD = re.compile(r"Source = '(zm_\w+)'; Name = 'ix_(card|icon)_willard'")
 MAKE_SPECIAL = re.compile(r'make_special\(\s*"(\w+)",\s*"[^"]+",\s*\[[^\]]*\],\s*"(\w+)",\s*(\d+),\s*(\d+),\s*"(\w+)",\s*("\w+"|undefined),\s*"([^"]+)",\s*"([^"]+)",\s*("[^"]+"|undefined),\s*(\d+)\s*\)')
@@ -128,29 +127,22 @@ class CharacterData(unittest.TestCase):
                 self.assertEqual(soul_key, keys[home], f"{key} unlock")
                 self.assertIsNone(unquote(merit), f"{key} needs no merit")
 
-    def test_player_card_pictures_match_the_picture_pack(self):
-        # card_material( entry, kind ): parts[0] + kind + parts[1] + slot + parts[2];
-        # the picture pack copies main and team cards named by the same rule.
-        gsc = CHARACTER_GSC.read_text()
-        body = gsc[gsc.index("\ncard_name_parts( map )\n"):gsc.index("\ncard_material( entry, kind )\n")]
-        parts = {m: (a, b, c) for m, a, b, c in CARD_PARTS.findall(body)}
-        self.assertEqual(set(parts), set(MAPS))
+    def test_picture_pack_specials_match_the_cast(self):
+        # The lobby card and the CHARACTER menu show a special character's own
+        # card from the pack: the setup copies it from slot 5 of their home map,
+        # where character.gsc has them, and Willard Wyler's from slot 6
+        # (patch_cp_zmb, named after the last map). test_installer.py checks
+        # the card names themselves.
         plan = PLAN_MAP.findall(PICTURES_CORE.read_text())
         self.assertEqual({row[0] for row in plan}, set(MAPS))
-        for map_name, main, team, special in plan:
-            slots = [1, 2, 3, 4] + ([5] if special else [])
-            # The setup's specials sit in slot 5 of their home map, as character.gsc has them.
+        specials = [special for _map, _main, _team, special in plan if special]
+        self.assertEqual(sorted(specials), ["elvira", "hoff", "kevin", "pam"])
+        for map_name, _main, _team, special in plan:
             if special:
                 self.assertEqual((self.specials[special][1], int(self.specials[special][2])), (map_name, 5), special)
-            a, b, c = parts[map_name]
-            for slot in slots:
-                self.assertEqual(f"{a}main{b}{slot}{c}", main.format(slot), f"{map_name} slot {slot} main card")
-                self.assertEqual(f"{a}team{b}{slot}{c}", team.format(slot), f"{map_name} slot {slot} team card")
         willard = dict((kind, source) for source, kind in PLAN_WILLARD.findall(PICTURES_CORE.read_text()))
         self.assertEqual(willard, {"card": "zm_main_plyr_6_dlc4", "icon": "zm_team_plyr_6_dlc4"})
-        self.assertIn('return "zm_" + kind + "_plyr_6_dlc4";', gsc)
         self.assertEqual((self.specials["willard"][1], int(self.specials["willard"][2])), ("cp_zmb", 6))
-
 
 if __name__ == "__main__":
     unittest.main()

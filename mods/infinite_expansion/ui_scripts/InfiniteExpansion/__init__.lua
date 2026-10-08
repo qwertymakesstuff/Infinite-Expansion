@@ -29,15 +29,14 @@ end
 local modelPath = "frontEnd.IXCharacter"
 
 -- key: the value stored in ix_character ("random" lets the game pick).
--- color, initials: the picture for characters the game has no picture of
--- (the player card in custom_scripts/ix/ui/player_card.gsc uses the same colors).
+-- color, initials: the picture for characters the game has no picture of.
 -- select: the stock lobby's characterSelect value for a special character.
 -- soulKey, merit: the zombies stats the stock lobby requires before it sets
 -- characterSelect (cpprivatematchmenu.lua; KNOWN_LIMITATIONS.md L27).
 -- portrait: the stock lobby's picture of a special character; tall pictures
 -- are half as wide as they are high, The Hoff's is square.
 -- stock: the stock lobby's element that shows that picture when the special
--- is chosen (cpprivatematchmenu.lua).
+-- is chosen (cpprivatematchmenu.lua); the lobby card takes its place.
 local characters = {
     { key = "random", label = "Random", initials = "?", color = 0xC8C8C8,
       text = "The game picks your character, as usual." },
@@ -296,68 +295,124 @@ local function onHover(element, character)
     Engine.PlaySound(CoD.SFX.SPMinimap)
 end
 
--- The lobby's card of the chosen character. The stock lobby shows a chosen
--- special character's picture in the lower middle (cpprivatematchmenu.lua: The
--- Hoff's 256 x 256 at 798-1054 x 714-970, the others 128 x 256 beside it);
--- the card goes in that place for every character. A special character shows
--- the stock element itself (so nothing is drawn twice); a regular character
--- the main card of the selected map from the pack, as high as The Hoff's
--- picture, else the team card, else the initials; Random shows nothing.
-local lobbyArea = { left = 798, top = 714, size = 256 }
+-- The lobby's card of the chosen character, big, in the bottom right: under
+-- the party's player cards and above the social feed line. In the stock lobby
+-- (cpprivatematchmenu.lua) CPLobbyMembers is 1405-1841 wide from 165 down, its
+-- rows 192 high and 5 apart (cplobbymembers.lua), and SocialFeed is at 965-995.
+-- Three or four players fill that column; then the card goes where the stock
+-- lobby shows a special character's picture (The Hoff's: 798-1054 x 714-970).
+-- The card shows special characters too, so the stock pictures stay hidden.
+local membersLeft, membersRight, membersTop, memberRow = 1405, 1841, 165, 197
+local lobbyCardBottom = 955
+local lobbyMiddle = { left = 798, right = 1054, top = 714, bottom = 970 }
 local lobbyMenu = nil
+local partyCount = nil
 
-local function placeLobbyElement(element, width, height)
-    local left = lobbyArea.left + (lobbyArea.size - width) / 2
-    local top = lobbyArea.top + (lobbyArea.size - height) / 2
-    element:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * (left + width),
-        _1080p * top, _1080p * (top + height))
+-- The pictures' shapes: width / height, and the most height they are drawn at.
+local lobbyShapes = {
+    card = { ratio = 256 / 371, height = 480 }, -- main cards from the pack
+    wide = { ratio = 2, height = 240 }, -- Pam Grier's card (wideCards)
+    tall = { ratio = 0.5, height = 480 }, -- the stock lobby's special pictures
+    square = { ratio = 1, height = 256 }, -- team cards, The Hoff's stock picture
+}
+
+-- How many players the lobby lists (the stock list's own count); 1 if unknown.
+local function lobbyPlayers(controllerIndex)
+    if not partyCount then
+        partyCount = LUI.DataSourceInGlobalModel.new("alwaysLoaded.activeParty.members.count")
+    end
+    local ok, count = pcall(function()
+        return partyCount:GetValue(controllerIndex)
+    end)
+    if ok and type(count) == "number" and count >= 1 then
+        return count
+    end
+    return 1
 end
 
+-- The column under the player cards, or the middle when they leave too little room.
+local function lobbyBox(players)
+    local top = membersTop + math.min(players, 4) * memberRow + 15
+    if lobbyCardBottom - top >= 300 then
+        return { left = membersLeft, right = membersRight, top = top, bottom = lobbyCardBottom }
+    end
+    return lobbyMiddle
+end
+
+-- As big as the shape allows in the box, at its bottom, centred.
+local function placeInBox(element, box, shape)
+    local height = math.min(box.bottom - box.top, shape.height, (box.right - box.left) / shape.ratio)
+    local width = math.floor(height * shape.ratio + 0.5)
+    local left = box.left + math.floor((box.right - box.left - width) / 2)
+    local top = box.bottom - height
+    element:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * (left + width),
+        _1080p * top, _1080p * box.bottom)
+    return left, top, width, height
+end
+
+-- The picture: the main card from the pack, else a special character's stock
+-- picture, else the team card from the pack; nil: none (the initials then).
+local function lobbyPicture(character)
+    local material = packedPicture("ix_card_", character)
+    if material then
+        return material, wideCards[material] and lobbyShapes.wide or lobbyShapes.card
+    end
+    if character.portrait then
+        return character.portrait, character.square and lobbyShapes.square or lobbyShapes.tall
+    end
+    material = packedPicture("ix_icon_", character)
+    if material then
+        return material, lobbyShapes.square
+    end
+    return nil, lobbyShapes.card
+end
+
+-- Random, or a special character this player cannot have: no card (the game
+-- picks the character, as restoreLobbyField leaves it).
 local function refreshLobbyCard(menu)
     local card = menu and menu.IXLobbyCard
     if not card then
         return
     end
-    local character = characterFor(currentKey())
-    -- The stock special pictures follow the saved choice, not only characterSelect.
-    local stockShown = false
-    for i = 1, #characters do
-        local stock = characters[i].stock and menu[characters[i].stock]
-        if stock then
-            local chosen = character == characters[i]
-            stock:SetAlpha(chosen and 1 or 0, 0)
-            stockShown = stockShown or chosen
-        end
-    end
     card.Image:SetAlpha(0, 0)
     card.Panel:SetAlpha(0, 0)
     card.Initials:SetAlpha(0, 0)
-    if not character or character.key == "random" or stockShown then
+    local character = characterFor(currentKey())
+    if not character or character.key == "random" or unavailableReason(character, card.ControllerIndex) then
         return
     end
-    local material, width, height = packedPicture("ix_card_", character), nil, nil
-    if material then
-        width, height = cardSize(material, lobbyArea.size)
-    elseif character.portrait then
-        material = character.portrait
-        width, height = character.square and lobbyArea.size or lobbyArea.size / 2, lobbyArea.size
-    else
-        material = packedPicture("ix_icon_", character)
-        width, height = lobbyArea.size, lobbyArea.size
-    end
+    local box = lobbyBox(lobbyPlayers(card.ControllerIndex))
+    local material, shape = lobbyPicture(character)
     if material then
         card.Image:setImage(RegisterMaterial(material), 0)
-        placeLobbyElement(card.Image, width, height)
+        placeInBox(card.Image, box, shape)
         card.Image:SetAlpha(1, 0)
         return
     end
-    width = cardSize(nil, lobbyArea.size)
-    placeLobbyElement(card.Panel, width, lobbyArea.size)
+    local left, top, width, height = placeInBox(card.Panel, box, shape)
     card.Panel:SetAlpha(0.45, 0)
-    placeLobbyElement(card.Initials, width, 120)
+    local textTop = top + math.floor((height - 120) / 2)
+    card.Initials:SetAnchorsAndPosition(0, 1, 0, 1, _1080p * left, _1080p * (left + width),
+        _1080p * textTop, _1080p * (textTop + 120))
     card.Initials:setText(character.initials, 0)
     card.Initials:SetRGBFromInt(character.color, 0)
     card.Initials:SetAlpha(1, 0)
+end
+
+-- The stock special pictures: hidden for good, whatever the stock lobby's own
+-- sequences set (they call SetAlpha on the element, so this one wins).
+local function hideStockPictures(menu)
+    for i = 1, #characters do
+        local stock = characters[i].stock and menu[characters[i].stock]
+        if stock and not stock.IXHidden then
+            stock.IXHidden = true
+            local setAlpha = stock.SetAlpha
+            stock.SetAlpha = function(self, alpha, ...)
+                return setAlpha(self, 0, ...)
+            end
+            stock:SetAlpha(0, 0)
+        end
+    end
 end
 
 local function writeLobbyField(value)
@@ -679,8 +734,8 @@ local function restoreLobbyField(controllerIndex)
     end
 end
 
-local function addLobbyCard(menu)
-    local card = {}
+local function addLobbyCard(menu, controllerIndex)
+    local card = { ControllerIndex = controllerIndex }
     card.Panel = newPanel("IXLobbyCardPanel", 0x000000, 0, 0, 0, 0, 0)
     menu:addElement(card.Panel)
     card.Initials = newText("IXLobbyCardInitials", 120, FONTS.MainMedium.File, 0, 0, 0, LUI.Alignment.Center)
@@ -692,6 +747,7 @@ local function addLobbyCard(menu)
     menu:addElement(card.Image)
     menu.IXLobbyCard = card
     lobbyMenu = menu
+    pcall(hideStockPictures, menu)
     refreshLobbyCard(menu)
     -- Back from the CHARACTER menu or SELECT SHOW (the card shows the selected
     -- map's card): iw7-mod's MPMainMenu refreshes on the same two events.
@@ -700,6 +756,12 @@ local function addLobbyCard(menu)
             pcall(refreshLobbyCard, element)
         end)
     end
+    -- Players joining or leaving move it (MainMenu/CPMainMenuButtons.lua
+    -- subscribes to a lobby model the same way).
+    lobbyPlayers(controllerIndex)
+    menu:SubscribeToModel(partyCount:GetModel(controllerIndex), function()
+        pcall(refreshLobbyCard, menu)
+    end)
 end
 
 local function onLobbyBuilt(menu, controller)
@@ -717,7 +779,7 @@ local function onLobbyBuilt(menu, controller)
         restoreLobbyField(controllerIndex)
         pcall(refreshLobbyCard, element)
     end)
-    pcall(addLobbyCard, menu)
+    pcall(addLobbyCard, menu, controllerIndex)
 end
 
 local lobbyDecorators = {

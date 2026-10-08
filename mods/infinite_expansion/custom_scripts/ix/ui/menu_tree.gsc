@@ -4,10 +4,10 @@
 // settings. A setting row shows the setting's own label, help and range
 // (config.gsc); a row for a setting that does not exist is skipped, and a page
 // without rows is left out. Later phases add their pages here (Player,
-// Movement, Weapons, Zombies, ...).
+// Movement, Weapons, Zombies, HUD, ...).
 //
 //   add_page( id, title, parent )                    a page, linked from its parent
-//   add_setting( page, setting, step )               step: Frag / Tactical change numbers by it
+//   add_setting( page, setting, step )               step: A / D change numbers by it
 //   add_action( page, label, help, fn, confirm, host_only )
 //   add_info( page, label, help, fn )                fn returns a number or a short word
 
@@ -20,12 +20,6 @@ build()
     add_setting( "characters", "character_specials", 1 );
     add_setting( "characters", "character_crossmap", 1 );
     add_setting( "characters", "character_announce", 1 );
-
-    add_page( "hud", "HUD", "main" );
-    add_setting( "hud", "player_card", 1 );
-    add_setting( "hud", "player_card_picture", 1 );
-    add_setting( "hud", "player_card_x", 8 );
-    add_setting( "hud", "player_card_y", 8 );
 
     add_page( "menu", "Menu", "main" );
     add_setting( "menu", "menu_access", 1 );

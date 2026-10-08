@@ -44,8 +44,7 @@ Infinite-Expansion/                          (repository)
 │               ├── ui/                      ≙ /scripts/ui/
 │               │   ├── menu.gsc             menu engine (pages, items, rendering, input)   (Phase 3)
 │               │   ├── menu_tree.gsc        menu pages (data only)                       (Phase 3)
-│               │   ├── hud.gsc              info HUD (create-once/update)
-│               │   └── player_card.gsc      bottom-right character card              (Phase 1.5)
+│               │   └── hud.gsc              info HUD (create-once/update)
 │               ├── player/                  ≙ /scripts/player/
 │               │   ├── player.gsc           health, god mode, third person, utilities
 │               │   ├── character.gsc        character selection, specials, per-map cast (Phase 1.5)
@@ -124,7 +123,7 @@ iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
 
 ## 4. Core systems (interfaces)
 
-Implemented in Phase 2. Modules call them by path, for example `custom_scripts\ix\core\config::get( "player_card_x" )`; below, `config::` stands for that path.
+Implemented in Phase 2. Modules call them by path, for example `custom_scripts\ix\core\config::get( "character_specials" )`; below, `config::` stands for that path.
 
 ### 4.1 Feature manager (`ix\core\features`)
 
@@ -143,7 +142,7 @@ features::is_enabled(id) / enable(id, source) / disable(id, source) / toggle(id,
 - **Duplicate-registration guard.** Adding the same `id` twice is logged and ignored (the first stays).
 - **Requirements.** `"dvar:<name>"` needs a dvar the client has (`compat::has_dvar`); `"fs_game"` needs the mod loaded from the Mods menu. A feature with a missing requirement stays off, switching it on is refused and logged, and `is_enabled` is 0.
 - **Timing.** Nothing is applied before `ix_ready`, because the stock maps set their callbacks up first. A switch before then only changes the setting.
-- `player_card` (`ui\player_card.gsc`) is the first feature: `on_player(0)` hides the card at once.
+- `menu` (`ui\menu.gsc`) is the feature in use so far: `on_player(0)` closes an open menu at once. (The in-match player card was the first, until it was removed in 0.3.1.)
 
 ### 4.2 Configuration manager (`ix\core\config`)
 
@@ -228,27 +227,29 @@ Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...`
 
   ```text
   add_page( id, title, parent )                    a page, linked from its parent
-  add_setting( page, setting, step )               a setting row; Frag / Tactical change numbers by step
+  add_setting( page, setting, step )               a setting row; A / D change numbers by step
   add_action( page, label, help, fn, confirm, host_only )   confirm: Use twice
   add_info( page, label, help, fn )                a read-out: fn returns a number or a short word
   ```
 
   A setting row takes its label, help, range and value from the setting registry (§4.2), so the menu never hardcodes them; a row for a missing setting is skipped and a page without rows is left out.
-- **Rendering:** a fixed set of HUD elements per player, **created once** on first open: panel, accent edge, title, breadcrumb, 10 rows (label and value), cursor bar, three help lines (the row's help and range, word-wrapped), and a two-line footer with the controls. Opening, closing, and scrolling only change text, values, alpha, and positions; numbers are shown with `setvalue`, so they never become new strings (L12). The panel is right of the screen's centre (`horzalign "center"`, x 96–320, y 96–342).
+- **Rendering:** a fixed set of HUD elements per player, **created once** on first open: panel, accent edge, title, breadcrumb, 10 rows (label and value), cursor bar, three help lines (the row's help and range, word-wrapped), `<` and `>` around the value on the cursor row when the player may change it, and a two-line footer naming the controls in keyboard or controller words (`scripts\engine\utility::is_player_gamepad_enabled`, set again only when the player switches). Opening, closing, and scrolling only change text, values, alpha, and positions; numbers are shown with `setvalue`, so they never become new strings (L12). The panel is right of the screen's centre and ends at the 4:3 screen's right edge (`horzalign "center"`, x 80–320, y 96–343).
 - **State indication:** on/off settings show ON (green) / OFF (pink); numbers and words show their value, with the range in the help lines; a feature whose requirements are missing shows N/A in grey; values the player may not change are grey.
-- **Controls** (AAE-style; avoids every CP action slot), polled every 0.05 s with `adsbuttonpressed`, `attackbuttonpressed`, `usebuttonpressed`, `meleebuttonpressed`, `fragbuttonpressed` and `secondaryoffhandbuttonpressed` (all in both compilers), the way a working IW7 zombies menu reads them (IW_API_NOTES §8):
+- **Controls** (avoid every CP action slot), polled every 0.05 s: the movement keys or left stick with `getnormalizedmovement()` while the player is held in place (below), the buttons with `adsbuttonpressed`, `attackbuttonpressed`, `usebuttonpressed`, `meleebuttonpressed`, `fragbuttonpressed` and `secondaryoffhandbuttonpressed` (all in both compilers) the way a working IW7 zombies menu reads them, and Jump as a `+goStand` command notify, as the stock phone booth listens for it (IW_API_NOTES §8):
 
   | Action | Input |
   |--------|-------|
-  | Open | ADS + Melee (both released before the menu reacts), or `!ix menu` in chat |
-  | Up / down | ADS / Fire; held: repeats after 0.35 s, then every 0.1 s |
-  | Open a page, switch, step a word, run an action | Use |
-  | Change a value | Frag (more / next / on) / Tactical (less / previous / off) |
+  | Open | ADS + Melee (released, and the movement keys too, before the menu reacts), or `!ix menu` in chat |
+  | Up / down | W / S or the left stick (forward / back past half way); ADS / Fire too; held: repeats after 0.35 s, then every 0.1 s |
+  | Change a value | A / D or the left stick (left: less / previous; right: more / next; on/off settings switch); Tactical / Frag too |
+  | Open a page, switch, step a word, run an action | Use or Jump |
   | Back / close | Melee |
+
+  **Held in place.** While it is open, the player is linked to a `tag_origin` script model at their feet with `playerlinktodelta( anchor, "tag_origin", 1, 180, 180, 85, 85 )`: the stock phone booth holds its player the same way (with the view locked; here it stays free), so the movement keys steer the menu instead of the player. The menu opens only on the ground and when the player is not linked to anything already. Each tick checks that the player is still linked to that model; if the game has taken them (a ride, a trap, a teleport), the menu closes. Closing undoes only that link and deletes the model; a disconnect deletes it too.
 
   While it is open, weapons, grenades, melee and Use are off through the stock counters `scripts\engine\utility::allow_weapon`, `allow_offhand_weapons`, `allow_melee` and `allow_usability`, once each way, so closing never undoes what the game itself turned off. It closes on last stand, death, the match's end, and when the `menu` feature is switched off; it cannot open while down, in the afterlife arcade or before `ix_ready`.
 - **Access:** every player can open the menu; settings and host-only actions change only for the host, unless the setting `menu_access` is `everyone`.
-- **Tree (Phase 3):** Characters, HUD, Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Player, Movement, Weapons, Zombies, Quality of Life, Visuals, Utilities and presets.
+- **Tree (Phase 3):** Characters, Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Player, Movement, Weapons, Zombies, HUD, Quality of Life, Visuals, Utilities and presets.
 
 ## 6. HUD design (`ix\ui\hud`)
 
@@ -296,9 +297,9 @@ Multiplayer support was dropped on 2026-10-06; the mod targets the zombies mode 
 ```text
 register()
 {
-    feature = custom_scripts\ix\core\features::add( "player_card", "hud", "Player card", "The card in the bottom-right corner naming your character.", 1 );
-    feature.on_player = ::apply_player_card;
-    custom_scripts\ix\core\config::add_int( "player_card_x", 16, 0, 600, "Player card: right margin", "Distance from the right edge of a 640 x 480 screen.", undefined );
+    feature = custom_scripts\ix\core\features::add( "menu", "ui", "In-game menu", "ADS + Melee opens the menu; !ix menu does too.", 1 );
+    feature.on_player = ::apply_menu;
+    custom_scripts\ix\core\config::add_enum( "menu_access", "host", "host everyone", "Menu: who changes settings", "host: only the host. everyone: every player in the match.", undefined );
     custom_scripts\ix\core\events::subscribe( "player_spawn", ::on_spawn );
 }
 ```

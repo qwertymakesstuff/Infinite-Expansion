@@ -15,9 +15,10 @@
 --                 build=direct      ... by calling MenuBuilder.m_types directly
 --                 boss=1            boss battles are on (BOSS BATTLE button)
 --   menu        the CHARACTER menu: hovers and clicks every row
---   lobbycard   the lobby's card of the chosen character: opens the lobby,
---               chooses row choose=<n> in the CHARACTER menu, then selects
---               map2=<name> in SELECT SHOW and returns (restore_focus)
+--   lobbycard   the lobby's card of the chosen character: opens the lobby
+--               with players=<n> in it (default 1), chooses row choose=<n> in
+--               the CHARACTER menu, then selects map2=<name> in SELECT SHOW
+--               and returns (restore_focus), then players2=<n> are in it
 --   mainmenu    the zombies main menu's button list (iw7-mod's replacement)
 --   name_default / name_custom / name_missing   the Steam name file
 -- Shared options:
@@ -118,6 +119,9 @@ end
 function Element:SetGridDataSource(source)
     self.dataSource = source
 end
+function Element:SubscribeToModel(model, handler)
+    model.subscribers[#model.subscribers + 1] = handler
+end
 function Element:getNumChildren()
     return 0
 end
@@ -133,6 +137,23 @@ end
 -- IW7's UI ------------------------------------------------------------------
 
 local requests = {}
+
+-- Global models: values by path, and who subscribed to each.
+local modelValues = { ["alwaysLoaded.activeParty.members.count"] = tonumber(options.players or "1") }
+local models = {}
+local function globalModel(path)
+    if not models[path] then
+        models[path] = { path = path, subscribers = {} }
+    end
+    return models[path]
+end
+local function setModelValue(path, value)
+    modelValues[path] = value
+    for _, handler in ipairs(globalModel(path).subscribers) do
+        handler(globalModel(path))
+    end
+end
+
 local function newOf()
     return { new = function()
         return newElement()
@@ -175,7 +196,19 @@ LUI = {
     },
     DataSourceInGlobalModel = {
         new = function(path, value)
-            return { path = path, value = value }
+            return {
+                path = path,
+                value = value,
+                GetValue = function(self, controllerIndex)
+                    if modelValues[self.path] ~= nil then
+                        return modelValues[self.path]
+                    end
+                    return self.value
+                end,
+                GetModel = function(self, controllerIndex)
+                    return globalModel(self.path)
+                end,
+            }
         end,
     },
     FlowManager = {
@@ -361,9 +394,11 @@ local function stockPrivateMatchMenu(menu, controller)
     self:addElement(buttons)
     self.CPPrivateMatchButtons = buttons
     -- The special characters' pictures (stock positions); the stock shows the
-    -- one characterSelect names (SecretCharacterSelection).
+    -- one characterSelect names (SecretCharacterSelection), with sequences
+    -- that set the element's alpha (displayHoff / hideHoff ...).
     local pictures = { { "Willard", 5, 886, 1014, 689, 945 }, { "Elvira", 4, 886, 1014, 689, 945 },
         { "Pam", 3, 886, 1014, 689, 945 }, { "Smith", 2, 872, 1000, 661.5, 917.5 }, { "Hoff", 1, 798, 1054, 714, 970 } }
+    self._sequences = {}
     for _, picture in ipairs(pictures) do
         local image = LUI.UIImage.new()
         image.id = picture[1]
@@ -371,6 +406,18 @@ local function stockPrivateMatchMenu(menu, controller)
         image:SetAlpha(stats.characterSelect == picture[2] and 1 or 0)
         self:addElement(image)
         self[picture[1]] = image
+        self._sequences["display" .. picture[1]] = function()
+            image:SetAlpha(1, 0)
+        end
+        self._sequences["hide" .. picture[1]] = function()
+            image:SetAlpha(0, 0)
+        end
+    end
+    -- Its subscription to characterSelect.
+    self.IXStockFollowField = function()
+        for _, picture in ipairs(pictures) do
+            self:AnimateSequence((stats.characterSelect == picture[2] and "display" or "hide") .. picture[1])
+        end
     end
     -- PostLoadFunc: ACTIONS.CharacterSelect(self, controller, 0)
     stats.characterSelect = 0
@@ -452,6 +499,8 @@ elseif scenario == "lobbycard" then
     dofile(script)
     local lobby = openLobby()
     local function report(step)
+        -- The stock lobby shows the picture characterSelect names.
+        lobby.IXStockFollowField()
         local card = lobby.IXLobbyCard
         local shown = "none"
         if card.Image.alpha == 1 then
@@ -481,6 +530,10 @@ elseif scenario == "lobbycard" then
         dvars.ui_mapname = options.map2
         lobby:fire("restore_focus")
         report("map")
+    end
+    if options.players2 then
+        setModelValue("alwaysLoaded.activeParty.members.count", tonumber(options.players2))
+        report("players")
     end
 elseif scenario == "menu" then
     dofile(script)

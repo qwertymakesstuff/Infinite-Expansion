@@ -73,9 +73,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.3.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.3.1 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 12 (0 changed from the default); features: 2; chat: !ix
+[IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -85,16 +85,18 @@ Start a zombies match and open the console (`~`). It should show:
 
 In a match, **hold ADS (aim) and press Melee** to open the menu, or type `!ix menu` in chat. A line after your first spawn reminds you.
 
-| Button | In the menu |
-|--------|-------------|
-| ADS / Fire | Up / down (hold to keep moving) |
-| Use | Open a page, switch a setting on or off, run an action |
-| Frag / Tactical | Change a value: more / less |
-| Melee | Back; on the first page, close |
+| Keyboard | Controller | In the menu |
+|----------|------------|-------------|
+| **W / S** | Left stick up / down | Move up / down (hold to keep moving) |
+| **A / D** | Left stick left / right | Change the highlighted value: less / more |
+| **Use** or **Jump** | Use or Jump | Open a page, switch a setting on or off, run an action |
+| **Melee** | Melee | Back; on the first page, close |
 
-While the menu is open your weapon, grenades, melee and Use are off, so those buttons only steer the menu; closing it gives them back. You can still move. The menu closes by itself if you go down.
+The two lines at the bottom of the menu say the same, and `<` `>` around a value mean A / D change it. ADS / Fire also move up and down, and Tactical / Frag also change a value.
 
-Its pages: **Characters**, **HUD** (the player card), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It opens only while you stand on the ground, and it closes by itself if you go down.
+
+Its pages: **Characters**, **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
 
 ## Settings and chat commands
 
@@ -109,7 +111,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | Chat command | Does |
 |--------------|------|
 | `!ix` | Lists the commands |
-| `!ix list` / `!ix list card` | Every setting with its value / only those whose name contains "card" |
+| `!ix list` / `!ix list character` | Every setting with its value / only those whose name contains "character" |
 | `!ix get <setting>` | Its value, default, valid values and what it does |
 | `!ix set <setting> <value>` | Host: changes it |
 | `!ix on <setting>` / `!ix off <setting>` | Host: switches an on/off setting |
@@ -124,10 +126,6 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `character_specials` | 1 | 0–2 | 0 = no special characters, 1 = the ones each player has unlocked, 2 = all |
 | `character_crossmap` | 0 | 0/1 | **Experimental:** special characters on other maps (from the next map) |
 | `character_announce` | 0 | 0/1 | An "is playing as" line for each player after the intro |
-| `player_card` | 1 | 0/1 | The card in the bottom-right corner; switching it off hides it at once |
-| `player_card_picture` | 1 | 0/1 | The character's picture on that card: their card from the current map, the one the HUD shows for teammates |
-| `player_card_x` | 16 | 0–600 | The card's distance from the right edge (640 × 480 screen) |
-| `player_card_y` | 96 | 0–440 | The card's distance from the bottom edge |
 | `menu` | 1 | 0/1 | The in-game menu; switching it off closes it for everyone |
 | `menu_access` | host | host, everyone | Who may change settings in the menu |
 | `menu_hint` | 1 | 0/1 | The line after your first spawn saying how to open the menu |
@@ -145,7 +143,7 @@ These dvars are not settings, because they are not the host's to set:
 
 In the **Zombies** menu, choose **Solo Match** or **Custom Game**. In the lobby, press **CHARACTER** (under SELECT SHOW) and pick a character before you start the match. The menu shows a picture of the highlighted character, and locked special characters say how to unlock them. You keep that character for the whole match. There is no switching mid-match.
 
-Back in the lobby, the card of the character you picked stays on screen, in the place where the game itself shows a chosen special character's picture (lower middle, right of the buttons). A regular character shows their card from the selected show (from the [picture pack](#character-pictures-automatic-experimental); without it, their initials); a special character shows the game's own picture; Random shows nothing.
+Back in the lobby, a big card of the character you picked shows in the **bottom right**, under the players' cards. A regular character shows their card from the selected show (from the [picture pack](#character-pictures-automatic-experimental); without it, their initials); a special character their own card (without the pack, the game's own picture of them, which then no longer appears in the lower middle); Random shows nothing. With a second player in the lobby the card gets smaller to fit; with three or four there is no room left under the player list, so it moves to the lower middle, where the game shows special characters.
 
 To see what happened to your pick, open the console (`~`) in the match, or read `iw7-mod\logs\console.log` afterwards. The mod writes one line per player, for example `[IX] INFO: character: Alex -> Andre (ix_character)`, or the reason it gave you a random character.
 
@@ -155,11 +153,11 @@ To see what happened to your pick, open the console (`~`) in the match, or read 
 | A special character you have unlocked | You play as them on their own map. On other maps only with the setting `character_crossmap` on | The same. The pick travels with you in the stock lobby setting, so on the character's own map it works even if the host does not have this mod |
 | Random | The game picks | The game picks |
 
-No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. If the host switches on `character_announce` (`!ix on character_announce`), everyone also sees a line such as "Alex is playing as Andre (Rapper)" for each player after the intro. The card in the bottom-right corner shows your own character, with their picture from the current map. A special character from another map (`character_crossmap`) has no picture there.
+No two players can be the same character. If your pick is taken, locked or not allowed on this map, you get a random character and a message says why. If the host switches on `character_announce` (`!ix on character_announce`), everyone also sees a line such as "Alex is playing as Andre (Rapper)" for each player after the intro.
 
 The rules are enforced by the host's copy of the mod. A host without the mod runs the stock game, which hands out a special character on its own map without checking the unlock.
 
-The CHARACTER menu stores your pick in the dvar `ix_character`, applied on your first spawn in matches you host. The host's [settings](#settings-and-chat-commands) `character_select`, `character_specials`, `character_crossmap`, `character_announce` and `player_card` control the rest. `character_crossmap` is **experimental** (The Hoff on any map, for example): their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26), and like `character_select` it takes effect from the next map.
+The CHARACTER menu stores your pick in the dvar `ix_character`, applied on your first spawn in matches you host. The host's [settings](#settings-and-chat-commands) `character_select`, `character_specials`, `character_crossmap` and `character_announce` control the rest. `character_crossmap` is **experimental** (The Hoff on any map, for example): their models may not exist on other maps (`KNOWN_LIMITATIONS.md` L26), and like `character_select` it takes effect from the next map.
 
 ### Character pictures (automatic, experimental)
 
@@ -203,9 +201,9 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 |-------|-------|--------|
 | 0 | Project forensics | **Complete** |
 | 1 | Foundation (entry scripts, bootstrap, compat, check tooling) | **Complete** (in-game test pending) |
-| 1.5 | Characters: choose who you play as, per-map names, special characters, player card | **Complete** (in-game test pending) |
+| 1.5 | Characters: choose who you play as, per-map names, special characters | **Complete** (in-game test pending) |
 | 2 | Core systems (settings, saving, chat commands, events, features, utilities) and the launcher | **Complete** (in-game test pending) |
-| 3 | In-game menu (ADS + Melee), the lobby's character card | **Complete** (in-game test pending) |
+| 3 | In-game menu (ADS + Melee, W / S / A / D), the lobby's character card | **Complete** (in-game test pending) |
 | 4 | Player features | Next |
 | 5 | Movement | Planned |
 | 6 | Weapons | Planned |

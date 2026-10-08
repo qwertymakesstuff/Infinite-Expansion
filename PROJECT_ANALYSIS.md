@@ -527,6 +527,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 3. **The primary UI is a GSC HUD menu.** AAE's main UX is LUI, but IW7 LUI menus would be client-side code that every player needs, and LUI↔GSC traffic is limited to integer notifies and predefined omnvars. The GSC menu works for every client of the host.
    - It covers AAE's lobby options (3.2–3.7) as in-game pages plus the dev tools (3.10).
    - A LUI front-end stays an optional later phase.
+   - *Update 0.3.1, after the first in-game try:* the button-only controls (ADS / Fire to scroll) were hard to find. The menu now steers with the movement keys or left stick while it holds the player in place, as the stock phone booth does (`IW_API_NOTES.md` §8); the AAE-style buttons still work.
 4. **Hooks over file overrides.** AAE ships patched copies of stock scripts. Infinite Expansion uses iw7-mod's `replacefunc` and callback wrapping instead, which avoids redistributing modified stock code and survives game-script differences between maps.
 5. **Zombies (CP) is the primary target**, MP is secondary (host only), and SP is out of scope.
    - *Update 2026-10-06: the project owner dropped MP. The mod is zombies-only.*

@@ -1,1 +1,1 @@
-Infinite Expansion 0.3.0 - modular enhancement framework for Infinite Warfare zombies. In-game menu (ADS + Melee), character selection, settings and !ix chat commands.
+Infinite Expansion 0.3.1 - modular enhancement framework for Infinite Warfare zombies. In-game menu (ADS + Melee), character selection, settings and !ix chat commands.
