@@ -1,0 +1,58 @@
+# Publishes a GitHub release for each new version of Infinite Expansion.
+#
+# When a push changes level.ix.version in bootstrap.gsc (any branch) and there
+# is no release v<version> yet, this creates one at the pushed commit, with
+# Infinite-Expansion-<version>.zip (the repository at that commit under an
+# Infinite-Expansion/ folder, the layout the setup expects) and that version's
+# CHANGELOG.md section as its notes. GitHub lists the zip's SHA-256, which the
+# setup checks. The launcher and the setup update from the newest release
+# (README "Updates"); tools/tests/test_installer.py runs the script below
+# against a stand-in for gh.
+name: Release
+
+on:
+  push:
+    paths:
+      - mods/infinite_expansion/custom_scripts/ix/core/bootstrap.gsc
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish the version in bootstrap.gsc
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^[[:space:]]*level\.ix\.version = "\([0-9][0-9.]*\)";.*$/\1/p' mods/infinite_expansion/custom_scripts/ix/core/bootstrap.gsc)
+          if [ -z "$version" ]; then
+            echo "::error::bootstrap.gsc sets no level.ix.version"
+            exit 1
+          fi
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "v$version is already released."
+            exit 0
+          fi
+          zip="Infinite-Expansion-$version.zip"
+          git archive --format=zip --prefix=Infinite-Expansion/ -o "$zip" HEAD
+          awk -v v="$version" '
+            index($0, "### " v ":") == 1 || index($0, "### " v " ") == 1 { found = 1; next }
+            found && /^##/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "See CHANGELOG.md." > notes.md
+          fi
+          gh release create "v$version" "$zip" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Infinite Expansion $version" --notes-file notes.md
+          echo "Released v$version."
