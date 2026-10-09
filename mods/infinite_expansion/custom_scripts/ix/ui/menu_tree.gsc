@@ -38,6 +38,7 @@ build()
     add_action( "position", "Teleport to crosshair", "To the spot you are looking at. The menu closes. It can put you where the game does not expect you.", custom_scripts\ix\player\position::teleport_to_crosshair, 0, 1 );
 
     add_page( "menu", "Menu", "main" );
+    add_setting( "menu", "menu_open", 1 );
     add_setting( "menu", "menu_access", 1 );
     add_setting( "menu", "menu_hint", 1 );
     add_setting( "menu", "menu", 1 );

@@ -36,6 +36,10 @@ DESCRIBED = re.compile(
 MENU_ACTION = re.compile(r'add_action\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)",\s*[^,]+,\s*([01]),\s*([01])\s*\)')
 MENU_INFO = re.compile(r'add_info\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)"')
 GUEST_NOTE = " Only the host can change it."  # menu.gsc item_help(), for a player who may not change it
+# The keys at the bottom of the menu: small text (fontscale 0.7, about 5 of
+# the 640-wide screen's units a character) in the panel's 224 usable units.
+FOOTER_FUNCTION = re.compile(r"^(footer_\w+_text)\([^)]*\)\s*\{(.*?)^\}", re.M | re.S)
+FOOTER_WIDTH = 44
 
 
 def registered():
@@ -157,6 +161,19 @@ class Settings(unittest.TestCase):
         for row, text in texts.items():
             needed = wrap(text, width)
             self.assertLessEqual(len(needed), lines, f"{row}: {needed}")
+
+    def test_menu_footer_fits(self):
+        found = dict(FOOTER_FUNCTION.findall(MENU.read_text()))
+        self.assertEqual(sorted(found), ["footer_move_text", "footer_open_text", "footer_select_text"])
+        lines = [text for body in found.values() for text in re.findall(r'return "([^"]*)";', body)]
+        self.assertGreaterEqual(len(lines), 6)
+        for line in lines:
+            self.assertLessEqual(len(line), FOOTER_WIDTH, line)
+        # Every way to open the menu has its own line; the last is the fallback.
+        kind, _default, options, _where = self.settings["menu_open"]
+        self.assertEqual(kind, "enum")
+        cases = re.findall(r'case "([a-z_]+)":', found["footer_open_text"])
+        self.assertEqual(cases, options[:-1])
 
     def test_init_line_counts_them(self):
         for path in (README, TESTING):

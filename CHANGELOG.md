@@ -4,6 +4,17 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.4.1: the menu opens with Crouch + Melee; how to open it at each round's start; its keys in small text (2026-10-09)
+
+**Changed**
+- **Opening the menu:** crouch, then press Melee (on a controller: crouch, then the melee button). ADS + Melee also opened the menu whenever you knifed while aiming. The crouch counts once you have been crouched for a moment, so a knife right after a slide does not open it. `!ix menu` in chat still works.
+- *Menu: open with* on the menu's **Menu** page (setting `menu_open`) picks the keys for the whole match: *crouch_melee* (default), *ads_melee* (the old way) or *chat* (only `!ix menu`). Changing it tells everyone the new keys.
+- **How to open it** now shows in the middle of the screen at the start of each round, until you have opened the menu once in the match. A player who joins mid-round sees it a few seconds after spawning. *Menu: hint* switches it off.
+- **The keys at the bottom of the menu** are three lines of small text: moving and changing, selecting and going back, and the keys that open it. A test checks that each line fits the panel.
+
+**Tests**
+- `test_settings.py` also checks the footer's lines (8 tests, 107 in all).
+
 ### 0.4.0: player options (Phase 4) (2026-10-09)
 
 **Added**
