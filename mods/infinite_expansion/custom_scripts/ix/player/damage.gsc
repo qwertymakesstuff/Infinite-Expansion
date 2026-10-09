@@ -1,6 +1,8 @@
 // Infinite Expansion - damage players take: god mode, damage taken, friendly
 // fire, rocket jump.
 //
+// fall_damage (movement.gsc) is applied here too: falls arrive as MOD_FALLING.
+//
 // All of a player's damage in zombies goes through level.callbackplayerdamage
 // (scripts\mp\callbacksetup::codecallback_playerdamage, 12 arguments). The
 // gametype sets scripts\cp\zombies\zombie_damage::callback_zombieplayerdamage;
@@ -55,6 +57,10 @@ wrap_when_ready()
 // self: the player taking the damage. Same arguments as the stock callback.
 on_player_damage( inflictor, attacker, damage, flags, mod, weapon, point, dir, hit_loc, time_offset, model_index, part_name )
 {
+    // Falls, with fall_damage OFF (movement.gsc).
+    if ( isdefined( mod ) && mod == "MOD_FALLING" && !custom_scripts\ix\core\config::get( "fall_damage" ) )
+        return;
+
     // Before god mode: a rocket jump throws a god-mode player too.
     if ( is_rocket_jump( inflictor, attacker, damage, flags, mod, weapon ) )
     {

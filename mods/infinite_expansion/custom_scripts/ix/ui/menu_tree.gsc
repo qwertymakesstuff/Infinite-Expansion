@@ -37,6 +37,21 @@ build()
     add_action( "position", "Go to saved position", "Back to the spot you saved. The menu closes.", custom_scripts\ix\player\position::load_position, 0, 1 );
     add_action( "position", "Teleport to crosshair", "To the spot you are looking at. The menu closes. It can put you where the game does not expect you.", custom_scripts\ix\player\position::teleport_to_crosshair, 0, 1 );
 
+    add_page( "movement", "Movement", "main" );
+    add_setting( "movement", "move_speed", 10 );
+    add_setting( "movement", "gravity", 5 );
+    add_setting( "movement", "wall_run", 1 );
+    add_setting( "movement", "double_jump", 1 );
+    add_setting( "movement", "unlimited_boost", 1 );
+    add_setting( "movement", "mantle", 1 );
+    add_setting( "movement", "legacy_mantle", 1 );
+    add_setting( "movement", "slide", 1 );
+    add_setting( "movement", "bunny_hop", 1 );
+    add_setting( "movement", "fall_damage", 1 );
+    add_setting( "movement", "unlimited_sprint", 1 );
+    add_setting( "movement", "omni_movement", 1 );
+    add_setting( "movement", "air_control", 1 );
+
     add_page( "menu", "Menu", "main" );
     add_setting( "menu", "menu_open", 1 );
     add_setting( "menu", "menu_access", 1 );

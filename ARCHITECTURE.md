@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Infinite Expansion
 
-> **Status: Phases 1–4 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — confirmed in a real match; Phase 3: the in-game menu; Phase 4: player options — compiled and checked, in-game tests pending). Sections 4 and 5 describe what exists; presets (§4.2) and the info HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
+> **Status: Phases 1–5 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — confirmed in a real match; Phase 3: the in-game menu; Phase 4: player options; Phase 5: movement — compiled and checked, in-game tests pending). Sections 4 and 5 describe what exists; presets (§4.2) and the info HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
 
 ## 1. Constraints that shape the design
 
@@ -51,7 +51,7 @@ Infinite-Expansion/                          (repository)
 │               │   ├── damage.gsc           god mode, damage taken, friendly fire, rocket jump (Phase 4)
 │               │   ├── options.gsc          third person, zombies ignore, ejection, points (Phase 4)
 │               │   ├── position.gsc         save / load position, teleport (menu actions) (Phase 4)
-│               │   └── movement.gsc         speed, gravity, sprint/slide/mantle options
+│               │   └── movement.gsc         speed, gravity, wall run, double jump, mantle (Phase 5)
 │               ├── weapons/                 ≙ /scripts/weapons/
 │               │   └── weapons.gsc          ammo, fire-rate, recoil, spread, give/take, info
 │               ├── zombies/                 ≙ /scripts/zombies/
@@ -254,7 +254,7 @@ Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...`
   While it is open, weapons, grenades, melee and Use are off through the stock counters `scripts\engine\utility::allow_weapon`, `allow_offhand_weapons`, `allow_melee` and `allow_usability`, once each way, so closing never undoes what the game itself turned off. It closes on last stand, death, the match's end, and when the `menu` feature is switched off; it cannot open while down, in the afterlife arcade or before `ix_ready`.
 - **Telling players how to open it:** 3 s after each round starts (the `round_start` event), each player who has not opened the menu in this match gets one line in the middle of the screen (`iprintlnbold`), and one in the corner about `!ix menu`; a player who joins a round already running gets it 6 s after spawning; never twice within 30 s (`menu_hint` switches it off). Changing `menu_open` tells everyone the new keys and brings the round-start line back.
 - **Access:** every player can open the menu; settings and host-only actions change only for the host, unless the setting `menu_access` is `everyone`.
-- **Tree:** Characters, Player (Phase 4: nine options and a *Position* page with three host-only actions), Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Movement, Weapons, Zombies, HUD, Quality of Life, Visuals, Utilities and presets.
+- **Tree:** Characters, Player (Phase 4: nine options and a *Position* page with three host-only actions), Movement (Phase 5: thirteen options), Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Weapons, Zombies, HUD, Quality of Life, Visuals, Utilities and presets.
 - **Actions that move the player** (`position.gsc`): the menu's hold is a link, and a linked player cannot be moved, so such an action calls `menu::close_menu_for_move()` first; `menu::is_menu_link(player)` tells it apart from a link the game made (a ride, a trap), which refuses the action.
 
 ## 6. HUD design (`ix\ui\hud`)

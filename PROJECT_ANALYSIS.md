@@ -378,11 +378,11 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Move-speed multiplier | `setdvar("g_speed", 190 × pct)` | **Same dvar** `g_speed` (iw7-mod, replicated), or per-player `setmovespeedscale` | E | DP | PLANNED (Phase 5) |
+| Move-speed multiplier | `setdvar("g_speed", 190 × pct)` | **Same dvar** `g_speed` (iw7-mod, replicated); the stock per-player `setmovespeedscale` multiplies with it | E | DP | TESTING (Phase 5: *Move speed*) |
 | Starting points | `level.player_starting_points` | `level.starting_currency`, which `cp_persistence::get_starting_currency()` reads at each player's first spawn (Director's Cut and the boss-fight-only mode use their own amounts) | E | RI | TESTING (Phase 4) |
 | Player health (1–5 hits) | `zombie_var player_base_health` | *Damage taken* (10–500 percent of each hit) in the damage-callback wrapper; `self.maxhealth` stays the game's (the tough perk and regen set it) | E | RI | TESTING (Phase 4) |
-| EXO movement | `callback::on_connect` handler | IW7 is natively boost/wall-run; toggles `allowdoublejump`, `allowwallrun`; `bg_omnimovement` (develop) | E | N/A / RI | PLANNED (as toggles) |
-| No slide | `on_connect` handler | `self allowslide(0)` | E | DP | PLANNED |
+| EXO movement | `callback::on_connect` handler | IW7 is natively boost/wall-run, but zombies switches double jump, wall run and mantle off at each spawn (`zombies_loadout.gsc`); re-applied `allowdoublejump(1)`, `allowwallrun(1)`, `allowmantle(1)`; `bg_omnimovement` (develop) | E | RI | TESTING (Phase 5: *Wall run*, *Double jump*, *Mantle*; L50) |
+| No slide | `on_connect` handler | `self allowslide(0)`, re-applied (the loadout switches it on at spawn) | E | DP | TESTING (Phase 5: *Slide*) |
 | Friendly fire (reflect/shared/knock-back/can't kill), one-team grief | `zm::register_player_friendly_fire_callback` | Wrap `level.callbackplayerdamage` (on `ix_ready`, after every `main()`); on: the stock `finishplayerdamagewrapper`; reflect: `dodamage` on the shooter; grief: `setmovespeedscale` + a slow-down effect | M | RI | TESTING (Phase 4: off / on / reflect); grief DEFERRED |
 | Rocket jump | Friendly-fire callback + push | Damage-callback wrapper + `setvelocity` on the player's own splash damage that `zombie_damage::get_explosive_damage_on_player` would apply | M | RI | TESTING (Phase 4) |
 | Player health bar (self/ally overhead) | LUI widgets | Self bar: GSC hudelem (`setshader` width). Ally bars: `setwaypoint` + `settargetent` (both compilers), NEEDS TESTING | M | PP | PLANNED |
@@ -477,7 +477,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Teleport menu (save/load, crosshair, sky/ground, nearest zombie, teleport zombies) | Menu actions | `setorigin`, `bullettrace`, `playerphysicstrace`, `getaliveagents` | E | RI | Save / load / crosshair TESTING (Phase 4); the rest PLANNED (Phase 10) |
 | Score / perks / power-ups / weapons / visions | Menu actions | Currency API; `give_zombies_perk`; `drop_loot`; `giveweapon`; `visionsetnakedforplayer` | E | RI | PLANNED |
 | Entity / forge tools | Spawn/place/rotate/delete models | `spawn("script_model")`, `setmodel`, `rotateto`, `delete` | M | RI | PLANNED (Phase 10) |
-| Lobby: super speed / gravity / timescale / no fall damage | dvars | `g_speed`, `bg_gravity`, `setslowmotion`/`timescale`, `jump_enableFallDamage` | E | RI | PLANNED |
+| Lobby: super speed / gravity / timescale / no fall damage | dvars | `g_speed`, `bg_gravity`, `setslowmotion`/`timescale`; falls dropped in the damage callback (`MOD_FALLING`) | E | RI | Speed, gravity, fall damage TESTING (Phase 5); timescale PLANNED (Phase 10) |
 | Disable AI spawners | dvar | Stock dvar `debug_pause_spawning` (read by stock scripts), NEEDS TESTING | E | UNK | INVESTIGATING |
 | Clone player / fun effects | Menu actions | `_meth_8086` (`cloneplayer`); `earthquake`; `hide`/`show` | M | PP | PLANNED (Phase 10) |
 | Aimbot | Menu | Excluded by design (an MP cheating tool; not part of AAE's gameplay feature set) | – | – | NOT PLANNED |
@@ -502,9 +502,9 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | Feature | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|
-| Gravity | `bg_gravity` (1–1000, global) | E | RI | PLANNED |
-| Jump height | No verified dvar | – | UNK | INVESTIGATING |
-| Unlimited sprint / air control / omni-movement | `bg_sprintUnlimited`, `bg_airControl`, `bg_omnimovement` (develop only) | E | PP | PLANNED (feature-detected) |
+| Gravity | `bg_gravity` (1–1000, global) | E | RI | TESTING (Phase 5) |
+| Jump height | No verified dvar; lower gravity jumps higher, double jump adds height | – | PP | PARTIAL (Phase 5, L16) |
+| Unlimited sprint / air control / omni-movement | `bg_sprintUnlimited`, `bg_airControl`, `bg_omnimovement` (develop only) | E | PP | TESTING (Phase 5, feature-detected: N/A on v1.1.0) |
 | Fire-rate / rapid fire | `_meth_85C1(pct)` / `_meth_85C2()` | M | RI / UNK | PLANNED |
 | Recoil / spread | `player_recoilscaleon`, `_meth_822C`; `setspreadoverride`, `_meth_8263` | E | RI | PLANNED |
 | Damage multipliers | Damage-callback wrappers | M | RI | PLANNED |

@@ -4,6 +4,21 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.5.0: movement options (Phase 5) (2026-10-09)
+
+**Added**
+- **Movement page** in the in-game menu (ADS + Melee, then *Movement*). Each option is also a setting for chat and the console, applies to the whole match, and belongs to the host:
+  - **Move speed**: 50 to 300 percent of how fast players run.
+  - **Gravity**: 10 to 125 percent; lower jumps higher and falls slower.
+  - **Wall run** and **Double jump**: Infinite Warfare's multiplayer movement, which zombies switches off. **Unlimited boost** keeps the double jump's boost from running out.
+  - **Mantle**: climb over ledges you jump at (zombies has no mantling), and **Mantle: older style**, iw7-mod's mantle of older Call of Duty games.
+  - **Slide** (off: no sliding), **Bunny hop** (landing at speed keeps your speed) and **Fall damage** (off: falls never hurt).
+  - **Unlimited sprint**, **Omni-movement** and **Air control**: options of iw7-mod's newer (develop) builds; on v1.1.0 they read N/A.
+- The game's own speed, gravity and the rest come back when the match ends.
+
+**Tests**
+- The settings test now covers 31 settings (108 tests in all).
+
 ### 0.4.2: the menu's text appears; ADS + Melee opens it every time (2026-10-09)
 
 **Fixed**

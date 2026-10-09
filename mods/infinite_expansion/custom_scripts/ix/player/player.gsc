@@ -6,6 +6,8 @@
 //   options.gsc     third person, zombies ignore players, players push apart,
 //                   starting points
 //   position.gsc    save / load position, teleport to crosshair (menu actions)
+//   movement.gsc    move speed, gravity, fall damage, slide, wall run, double
+//                   jump, mantle, bunny hop, unlimited boost (Phase 5)
 
 register()
 {
@@ -13,4 +15,5 @@ register()
     custom_scripts\ix\player\character::register();
     custom_scripts\ix\player\damage::register();
     custom_scripts\ix\player\options::register();
+    custom_scripts\ix\player\movement::register();
 }

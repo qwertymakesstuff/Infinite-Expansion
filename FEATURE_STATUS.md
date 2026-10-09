@@ -128,14 +128,17 @@
 | Zombies ignore players (off / host / everyone) | Player | 4 | TESTING | `.ignoreme` kept set, the game's own count (`allow_player_ignore_me`) left alone and restored when off. R-P7 |
 | Player collision (ejection) | Player | 4 | TESTING | `player_ejection` sets iw7-mod's `bg_playerEjection` (global, L20; the game's 1 back at the match's end). R-P8 |
 | Player page in the menu | UI | 4 | TESTING | *Player* with the nine options and a *Position* page. R-P1 |
-| Move-speed multiplier (AAE: same `g_speed`) | Movement | 5 | PLANNED | `g_speed` / `setmovespeedscale` |
-| Gravity | Movement | 5 | PLANNED | `bg_gravity` 1–1000 |
-| Jump height | Movement | 5 | INVESTIGATING | L16 |
-| No slide / no wallrun / no double jump / no mantle | Movement | 5 | PLANNED | `allow*` |
-| Unlimited sprint / omni-movement / air control | Movement | 5 | PLANNED | develop-only dvars (C4), feature-detected |
-| Fall damage toggle | Movement | 5 | PLANNED | `jump_enableFallDamage` |
-| Legacy mantle | Movement | 5 | PLANNED | `mantle_legacy*` |
-| Boost energy tuning | Movement | 5 | INVESTIGATING | `energy_*` semantics |
+| Move speed (AAE: the same `g_speed`) | Movement | 5 | TESTING | `ix/player/movement.gsc`: `move_speed` 50–300 percent of iw7-mod's `g_speed` (190, global, replicated); the stock per-player `setmovespeedscale` multiplies with it. The game's 190 comes back at the match's end (L20). R-MV1 |
+| Gravity | Movement | 5 | TESTING | `gravity` 10–125 percent of `bg_gravity` (800; iw7-mod allows 1–1000). R-MV2 |
+| Jump height | Movement | 5 | PARTIAL | No jump-height dvar exists (L16); lower *Gravity* jumps higher, and *Double jump* adds a boosted second jump |
+| Wall run / double jump / mantle (AAE: "EXO movement") | Movement | 5 | TESTING | The game's own multiplayer movement, which zombies switches off at every spawn (`zombies_loadout.gsc`); re-applied four times a second while the player plays freely (not down, not in the afterlife arcade, not on a ride). L50; R-MV3–R-MV5 |
+| Slide off (AAE: "No slide") | Movement | 5 | TESTING | Raw `allowslide(0)` re-applied; ON never undoes a map's own counted lock (`allow_slide`). R-MV6 |
+| Unlimited boost (boost energy) | Movement | 5 | TESTING | Energy slot 0 (the double jump's; the game gives 400, refilling at 1000 a second) refilled to its maximum four times a second. R-MV4 |
+| Unlimited sprint / omni-movement / air control | Movement | 5 | TESTING | iw7-mod develop builds only (C4): features needing `bg_sprintUnlimited` / `bg_omnimovement` / `bg_airControl` (set to 10, the game's 1); N/A on v1.1.0. R-MV9 |
+| Fall damage toggle | Movement | 5 | TESTING | Falls arrive as `MOD_FALLING` in the mod's damage callback (`damage.gsc`), dropped while `fall_damage` is OFF; no global dvar needed. R-MV8 |
+| Legacy mantle | Movement | 5 | TESTING | iw7-mod's `mantle_legacy` (older games' reach and angle); matters with *Mantle* ON. R-MV5 |
+| Bunny hop | Movement | 5 | TESTING | iw7-mod's `bg_bounces`: landing at speed keeps the speed. R-MV7 |
+| Movement page in the menu | UI | 5 | TESTING | *Movement* with 13 rows (scrolls past eight). R-M14 |
 
 ## Weapons (Phase 6)
 
