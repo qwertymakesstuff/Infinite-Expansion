@@ -95,14 +95,15 @@
 | How the menu opens (`menu_open`: ads_melee, crouch_melee, chat) | UI | 0.4.1 | TESTING | ADS + Melee by default again (0.4.2, as the player asked), on every Melee press (`+melee_zoom` notify; polling alone missed quick taps) while ADS is held or the player aims (`playerads`, so toggle ADS works); in the air on landing; a line says why when it cannot open. *crouch_melee*: after 0.3 s crouched without sliding. R-M11, R-M12 |
 | How to open it, at the start of each round | UI | 0.4.1 | TESTING | `iprintlnbold` 3 s after `round_start`, until the player has opened the menu; late joiners 6 s after spawning; `menu_hint`. R-M13 |
 | The menu's keys in small text at its bottom | UI | 0.4.1 | TESTING | Two lines at fontscale 0.7, keyboard or controller words, with the keys that open it; their width is tested. Not visible in 0.4.0 (too many HUD elements, L49); fixed in 0.4.2. R-M1, R-M14 |
-| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Player (Phase 4, with Position), Menu, Settings, Debug; later phases add theirs (Game / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
-| Reset / defaults from menu | UI | 3 | TESTING | *Reset every setting* (confirm with a second Use, host only); presets come in Phase 11; R-M6 |
+| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Player (with Position), Movement, Weapons, Zombies, HUD, Game, Menu, Settings, Debug (with Information and Drop a power-up); the first page scrolls |
+| Reset / defaults from menu | UI | 3/9 | TESTING | *Reset every setting* (confirm with a second Use, host only); *Reset this page* at the end of every page of options (Phase 9); presets come in Phase 11; R-M6, R-Q1 |
 | Host-only changes | UI | 3 | TESTING | Everyone can look; only the host changes, unless `menu_access` is `everyone`; R-M5 |
 | Per-player access list | UI | – | NOT PLANNED | `menu_access` covers host-only versus everyone |
 | Lobby card of the chosen character | UI | 3 | TESTING | The CHARACTER pick's card, big, in the stock lobby's bottom right under the player list (the lower middle with three or four players): the pack's card (Pam Grier's 2:1), else a special's stock picture, else the team card or initials; the stock special pictures stay hidden; follows a new pick, SELECT SHOW and players joining or leaving (L42, L43); R-UI7 |
 | LUI front-end (lobby-style options) | UI | – | DEFERRED | Client Lua; optional later |
-| HUD: zombie counter (remaining + active) | HUD | 8 | PLANNED | AAE `_zm_counter` |
-| HUD: round, timer, coordinates, speed, weapon/ammo, health | HUD | 8 | PLANNED | |
+| HUD: zombie counter (remaining + active) | HUD | 8 | TESTING | `ix/ui/hud.gsc`, *HUD: zombies*: left this round (`desired_enemy_deaths_this_wave − current_enemy_deaths`) and alive now (live `axis` agents; the stock counter leaves brutes out and drifts on Spaceland). R-H1, R-H4 |
+| HUD: round, speed, health | HUD | 8 | TESTING | *HUD: round*, *HUD: health*, *HUD: speed*; *HUD: side* (left / right) and *HUD: height*; archived elements only, two a row, `setvalue` numbers; hidden while the menu is open, while not playing and over the game's menus (L49). R-H1–R-H3 |
+| HUD: timer, coordinates, weapon/ammo | HUD | 8/10 | PARTIAL | Coordinates on the Debug page's *Information*; the game shows ammo itself. A match timer: `settimerup` is named in both tables but no zombies script uses it: INVESTIGATING |
 | HUD: active modifiers list | HUD | 8 | PLANNED | Also lists changed global dvars (L20) |
 | HUD: low-ammo hint | HUD | 8 | PLANNED | |
 | HUD: player health bar (self) | HUD | 8 | PLANNED | hudelem bar |
@@ -162,19 +163,22 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Zombie speed (default/sprint/super) + super-sprint after 40 rule (AAE) | Zombies | 7 | PLANNED | `level.movemodefunc`, `moveratescale` |
-| Weaker zombies / zombie health cap round (AAE) | Zombies | 7 | PLANNED | Post-spawn scaling |
-| Starting round (AAE) | Zombies | 7 | PLANNED | `level.wave_num`; side effects NEED TESTING |
+| Zombie speed (default / walk / run / sprint) | Zombies | 7 | TESTING | `ix/zombies/agents.gsc`: the mod's hook in front of the stock `level.movemodefunc` of regular zombies and cops (clowns and skeletons keep their own). The game has no faster mode than sprint, so AAE's "super sprint" has no equivalent. L54; R-Z1 |
+| Weaker / tougher zombies (AAE: weaker zombies, health cap round) | Zombies | 7 | TESTING | *Zombie health* 10–1000 percent through the stock health multiplier `level._id_8CB3[type]`, for zombies that spawn afterwards (bosses and brutes keep theirs). A cap round: not built. L54; R-Z2 |
+| Starting round (AAE) | Zombies | 7 | TESTING | `ix/zombies/rounds.gsc`: `level.wave_num` and `last_event_wave` before the first round, as the stock boss-fight-only modes do; from the next match; it counts toward the highest round (L53); R-Z6 |
+| Points multiplier | Zombies | 7 | TESTING | `ix/zombies/points.gsc`: `level.cash_scalar` (kills, hits, the Nuke, windows) times the option; Double Money still doubles. R-Z4 |
+| Power-ups per round | Zombies | 7 | TESTING | `level.powerup_drop_max_per_round` (the game's 5; 0: none from kills). R-Z5 |
+| Start with every perk | Zombies | 7 | TESTING | `ix/zombies/perks.gsc`: the stock permanent-perks reward (`give_permanent_perks`) at each spawn. R-Z7 |
 | Extra points per kill / melee / headshot (AAE) | Zombies | 7 | PLANNED | Agent `on_killed` wrapper |
 | Zombie damage multiplier / melee modifier | Zombies | 7 | PLANNED | Agent `on_damaged` wrapper |
 | BO4 Max Ammo refills clips (AAE) | Zombies | 7 | PLANNED | Hook `ammo_max` |
-| Perk utilities; spawn with perks; perk decay when downed (AAE) | Zombies | 7 | PLANNED | `give_zombies_perk` / `take_zombies_perk` |
+| Perk utilities; spawn with perks; perk decay when downed (AAE) | Zombies | 7 | PARTIAL | Spawn with perks: *Start with perks* (above). Perk decay and per-perk tools: `give_zombies_perk` / `take_zombies_perk`, not built |
 | Currency utilities; share points (AAE) | Zombies | 7 | PLANNED | `cp_persistence` |
-| Power-up spawning (debug) | Zombies | 7/10 | PLANNED | `drop_loot` |
+| Power-up spawning (debug) | Zombies | 10 | TESTING | Debug → *Drop a power-up* (locked): seven power-ups with the stock `drop_loot`, as the Fate & Fortune cards drop them. R-D6 |
 | Bank / weapon locker (AAE) | Zombies | 7 | PLANNED | File I/O (fs_game) |
 | Weapon restore on reconnect/death (AAE) | Zombies | 7 | PLANNED | Per-GUID store |
 | Immortal snail / Gambler events (AAE fun) | Zombies | 7 | PLANNED | |
-| Max spawned zombies / extra zombies (AAE) | Zombies | 7 | INVESTIGATING | Engine agent cap unknown |
+| Max spawned zombies / extra zombies (AAE) | Zombies | 7 | TESTING | *Max zombies alive* 1–64 (`level.max_static_spawned_enemies`, the game's 24) while a round runs; the engine's agent pool may cap it (L54); R-Z3 |
 | Horrific (double-speed) zombies (AAE) | Zombies | 7 | INVESTIGATING | `generalspeedratescale` |
 | Round size algorithm / no spawn delay / no round delay (AAE) | Zombies | 7 | INVESTIGATING | Hashed wave-loop internals |
 | Timed gameplay / Roamer / end-game challenge (AAE) | Zombies | 7 | INVESTIGATING | Same |
@@ -193,14 +197,14 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Chat commands (bank, share, save, tp, ammo, help) | QoL | 9 | PLANNED | iw7-mod `say` notify |
-| Fast restart | QoL | 9 | PLANNED | `map_restart` / `fast_restart` |
-| Timescale | Utilities | 9 | PLANNED | `setslowmotion` / `timescale` |
+| Chat commands (save, tp, ammo, help) | QoL | 9 | TESTING | `ix/qol/qol.gsc`: `!ix refill`, `!ix save`, `!ix load`, `!ix tp` (the menu's actions, same rules); `!ix` lists everything, a few lines a frame. Bank and share: not built. R-Q5 |
+| Restart | QoL | 9 | TESTING | Game → *Restart the match* (host, Use twice): iw7-mod's console `map_restart`. L55; R-Q4 |
+| Timescale | Utilities | 9 | TESTING | Game → *Game speed* 25–200 percent with iw7-mod's `setslowmotion( s, s, 0 )`; the game's speed back at 100 and at the match's end. L55; R-Q2 |
 | Presets (Default/Classic/Enhanced/Testing/Developer/Custom) | Config | 11 | PLANNED | Data maps applied through `config::set`; R-C10 |
-| Feature reset (all / per category) | Config | 9/11 | PLANNED | |
-| Vision presets | Visuals | 9 | PLANNED | `visionsetnakedforplayer` |
+| Feature reset (all / per category) | Config | 9 | TESTING | *Reset every setting* and *Reset this page* (every page of options). R-Q1 |
+| Vision presets | Visuals | – | DEFERRED | `visionsetnakedforplayer` works, but the stock scripts set their own vision at many moments (last stand, afterlife arcade, revives, Rave mode, Dischord glasses, the final boss), and only three names exist on all five maps |
 | Night vision | Visuals | 9 | INVESTIGATING | `_meth_821A` |
-| Pinging / outlines | Visuals | 9 | INVESTIGATING | `cp_outline`, `_meth_8549` |
+| Outlines | Visuals | 9 | TESTING | Game → *Zombie outlines*: every enemy outlined in orange through walls for every player, as the stock outline effects do (`cp_outline::enable_outline_for_player`). Pinging: not built. R-Q3 |
 | Hitmarkers | Visuals | – | INVESTIGATING | IW7 CP has native damage feedback |
 | Overhead map view (AAE keybind) | QoL | 9 | INVESTIGATING | `playerlinkto` camera |
 | Client "disable X" visual toggles (AAE) | Visuals | – | DEFERRED | Client Lua / client dvars, per item |
@@ -210,16 +214,17 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Developer menu gate (never accidental) | Debug | 10 | PLANNED | `ix_dev 1` + host + confirm (AAE: `elmg_cheats`) |
-| UFO / noclip-style fly | Debug | 10 | PLANNED | Script mover |
+| Developer menu gate (never accidental) | Debug | 10 | TESTING | *Developer tools* (`dev_tools`, off): until ON the Debug page's tools read "Locked"; each is host only and asks for a second Use. R-D1 |
+| UFO / noclip-style fly | Debug | – | BLOCKED | iw7-mod's `ufo` / `noclip` are client commands needing `sv_cheats`; the script methods are null in v1.1.0 (L56). A fly mode built from a script mover: not looked into |
 | Teleport tools (save/load, crosshair, nearest zombie, teleport zombies) | Debug | 10 | PLANNED | |
 | Entity tools (spawn/place/rotate/delete models) | Debug | 10 | PLANNED | `spawn`, `setmodel`, `rotateto` |
-| Entity inspector / trace info | Debug | 10 | PLANNED | `bullettrace` |
-| Player / weapon / map / round info, coordinates | Debug | 10 | PLANNED | |
-| Disable AI spawners | Debug | 10 | INVESTIGATING | `debug_pause_spawning` |
+| Entity inspector / trace info | Debug | 10 | TESTING | *What am I looking at?*: `bullettrace` and the entity's fields (kind, agent type, model, health, distance). R-D7 |
+| Player / map / round info, coordinates | Debug | 10 | TESTING | Debug → *Information*: map, players, round, zombies alive and left, position X / Y / Z. Weapon info: not built. R-D7 |
+| Pause zombie spawning | Debug | 10 | TESTING | *Pause / resume spawning* (locked): `level.zombies_paused`, set again while paused (`debug_pause_spawning` is never read by the game). L52; R-D2 |
+| Kill all zombies / end the round / give points | Debug | 10 | TESTING | Locked tools: as the Nuke kills (bosses and brutes spared), the round's kill count set to its goal, `give_player_currency`. R-D3–R-D5 |
 | Clone player / fun effects | Debug | 10 | PLANNED | `_meth_8086`, `earthquake`, `hide` |
 | Spawn testing | Debug | 10 | INVESTIGATING | `spawnnewagent` semantics |
-| Script log viewer | Debug | 10 | PLANNED | Ring buffer of `[IX]` lines |
+| Script log viewer | Debug | 10 | TESTING | `!ix log [n]`: the last 8 (up to 32) `[IX]` lines from the ring buffer, to the player who asked. R-D8 |
 | Performance information | Debug | 10 | INVESTIGATING | Server-side only |
 | 3D debug drawing | Debug | – | BLOCKED | L2 |
 | Aimbot (in AAE's dev menu) | Debug | – | NOT PLANNED | MP cheating tool; excluded by design |

@@ -103,15 +103,31 @@ on_chat( player, message )
     }
 }
 
+// A few lines a frame: the game drops a reply when a player's command buffer
+// is full (IW_API_NOTES.md section 19). Runs in its own thread (events.gsc).
 help( player )
 {
-    player tell( "Infinite Expansion " + level.ix.version + " commands:" );
-    player tell( prefix() + " list [word]  |  " + prefix() + " get <setting>" );
-    player tell( prefix() + " set <setting> <value>  |  " + prefix() + " on/off <setting>" );
-    player tell( prefix() + " reset <setting> | all  (changes: host only)" );
+    lines = [];
+    lines[lines.size] = "Infinite Expansion " + level.ix.version + " commands:";
+    lines[lines.size] = prefix() + " list [word]  |  " + prefix() + " get <setting>";
+    lines[lines.size] = prefix() + " set <setting> <value>  |  " + prefix() + " on/off <setting>";
+    lines[lines.size] = prefix() + " reset <setting> | all  (changes: host only)";
 
     foreach ( name in level.ix.chat.order )
-        player tell( prefix() + " " + name + "  " + level.ix.chat.commands[name].usage );
+        lines[lines.size] = prefix() + " " + name + "  " + level.ix.chat.commands[name].usage;
+
+    for ( i = 0; i < lines.size; i++ )
+    {
+        if ( i > 0 && i % 4 == 0 )
+        {
+            wait 0.05;
+
+            if ( !isdefined( player ) )
+                return;
+        }
+
+        player tell( lines[i] );
+    }
 }
 
 // "id=value" pairs, a few per chat line.

@@ -18,6 +18,7 @@ modules()
     list[list.size] = custom_scripts\ix\player\player::register;
     list[list.size] = custom_scripts\ix\weapons\weapons::register;
     list[list.size] = custom_scripts\ix\zombies\zombies::register;
+    list[list.size] = custom_scripts\ix\qol\qol::register;
     list[list.size] = custom_scripts\ix\debug\debug::register;
     list[list.size] = custom_scripts\ix\ui\ui::register;
     return list;

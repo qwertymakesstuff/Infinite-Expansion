@@ -4,9 +4,8 @@ The phase plan. `README.md` lists every phase with its status; this file holds t
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 0–6 | Forensics, foundation, characters, core systems, in-game menu, player options, movement, weapons | Built (in-game tests pending; `README.md`, `TESTING.md`) |
-| 7–10 | Zombies, HUD, quality of life, debug tools | In progress |
-| 11–13 | Configuration presets, polish, testing | Planned (`FEATURE_STATUS.md`) |
+| 0–10 | Forensics, foundation, characters, core systems, in-game menu, player options, movement, weapons, zombies options, info HUD, quality of life, developer tools | Built (in-game tests pending; `README.md`, `PLAYTEST_CHECKLIST.md`, `TESTING.md`) |
+| 11–13 | Configuration presets, polish, testing | Planned, 11 next (`FEATURE_STATUS.md`) |
 | 14 | **Guided Easter egg mode**: an optional in-game guide to each map's main Easter egg quest | Planned, **not started** (below) |
 | 15–22 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Planned, **not started** (below) |
 

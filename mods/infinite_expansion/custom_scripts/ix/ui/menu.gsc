@@ -912,6 +912,13 @@ run_action( item )
         return;
     }
 
+    if ( locked( item ) )
+    {
+        self iprintln( "Switch on " + custom_scripts\ix\core\config::find( item.needs ).label + " first." );
+        draw();
+        return;
+    }
+
     if ( isdefined( item.confirm ) && item.confirm && !( isdefined( state.confirm ) && state.confirm == item.label ) )
     {
         state.confirm = item.label;
@@ -980,6 +987,25 @@ close_action()
 reset_all_action()
 {
     custom_scripts\ix\core\config::reset_all( "menu, " + self.name );
+}
+
+// "Reset this page" (menu_tree.gsc add_reset): the settings on the page the
+// player is on back to their defaults; other pages keep theirs.
+reset_page_action()
+{
+    page = current_page();
+    count = 0;
+
+    foreach ( item in page.items )
+    {
+        if ( item.kind != "setting" || !custom_scripts\ix\core\config::exists( item.setting ) )
+            continue;
+
+        custom_scripts\ix\core\config::reset_default( item.setting, "menu, " + self.name );
+        count++;
+    }
+
+    self iprintln( page.title + ": " + count + " settings back to their defaults." );
 }
 
 changed_count_info()
@@ -1286,7 +1312,13 @@ draw_row( label, value, item )
             value settext( ">" );
             return;
         case "action":
-            if ( isdefined( self.ix.menu.confirm ) && self.ix.menu.confirm == item.label )
+            if ( locked( item ) )
+            {
+                label.color = ( 0.5, 0.5, 0.5 );
+                value settext( "Locked" );
+                value.color = ( 0.5, 0.5, 0.5 );
+            }
+            else if ( isdefined( self.ix.menu.confirm ) && self.ix.menu.confirm == item.label )
             {
                 value settext( "Use again" );
                 value.color = ( 1, 0.4, 0.4 );
@@ -1334,6 +1366,16 @@ unavailable( setting )
 
     feature = custom_scripts\ix\core\features::find( setting.id );
     return custom_scripts\ix\core\features::missing_requirement( feature ) != "";
+}
+
+// An action that needs an on/off setting ON (item.needs; the Debug page's
+// tools need dev_tools), while that setting is OFF.
+locked( item )
+{
+    if ( item.kind != "action" || !isdefined( item.needs ) || !custom_scripts\ix\core\config::exists( item.needs ) )
+        return 0;
+
+    return !custom_scripts\ix\core\config::get( item.needs );
 }
 
 // What a setting row shows as its value.
@@ -1477,6 +1519,9 @@ item_help( item )
 
     if ( ( item.kind == "setting" || ( item.kind == "action" && isdefined( item.host_only ) && item.host_only ) ) && !may_change() )
         text = text + " Only the host can change it.";
+
+    if ( locked( item ) )
+        text = text + " Locked: " + custom_scripts\ix\core\config::find( item.needs ).label + " is OFF.";
 
     return text;
 }

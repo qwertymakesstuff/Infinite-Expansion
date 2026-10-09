@@ -352,7 +352,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Server→client dvar bridge | Client sys-state `"deadshot_keyline"` carrying `dvar,<name>,<value>` | Native `setclientdvar(s)` (both compilers); client acceptance of cheat-flagged dvars UNK | E | RI / UNK | PLANNED |
 | LUI notifications (score popups) | `luinotifyevent(&"aae_score_event", …)` + CSV table | GSC HUD text; LUI only through predefined omnvars, or later client Lua | M | PP | PLANNED (HUD) |
 | String tables | `gamedata/tables/common/*.csv` | `tablelookup` works on stock tables; **new** tables need a fastfile, so data is inlined in GSC | E | PP | Design note |
-| Dev/cheat menu gate | dvar `elmg_cheats`, host verification | `ix_dev` dvar + host-only + in-menu confirm | E | RI | PLANNED (Phase 10) |
+| Dev/cheat menu gate | dvar `elmg_cheats`, host verification | Setting `dev_tools` (dvar `ix_dev_tools`, off) + host only + a second Use; locked rows read "Locked" | E | RI | TESTING (Phase 10) |
 | Developer console | BO3 lacks one (T7Overcharged adds tooling) | Provided by iw7-mod (`~`) | – | DP | N/A (exists) |
 | Engine extension (T7Overcharged DLL) | Native DLL, asset limits, Discord SDK | iw7-mod is the equivalent layer; a mod cannot ship DLLs | – | N/A | N/A |
 
@@ -360,8 +360,8 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Starting round | Sets `level.start_round`/`round_number`, recomputes zombie speed/health, `zm::set_round_number` | Set `level.wave_num` before the first wave; health scales per spawn from `wave_num`; push omnvar `zombie_wave_number` | M | RI / UNK | PLANNED (side effects NEED TESTING) |
-| Zombie counter | `_zm_counter.gsc` + LUI widget | GSC HUD: `desired_enemy_deaths_this_wave − current_enemy_deaths`, `current_num_spawned_enemies` | E | RI | PLANNED (Phase 8) |
+| Starting round | Sets `level.start_round`/`round_number`, recomputes zombie speed/health, `zm::set_round_number` | `level.wave_num` and `last_event_wave` before the wave loop's first pass (the stock boss-fight-only modes do the same); health, speed and count follow per spawn; the loop sends the omnvar itself | M | RI | TESTING (Phase 7; side effects L53) |
+| Zombie counter | `_zm_counter.gsc` + LUI widget | GSC HUD: `desired_enemy_deaths_this_wave − current_enemy_deaths`; alive = live `axis` agents (`current_num_spawned_enemies` leaves brutes out and drifts) | E | RI | TESTING (Phase 8) |
 | Hitmarkers (+ sound styles) | `elmg_hitmarker.gsc`, custom sounds | IW7 CP already has damage feedback (`scripts\cp\cp_damage::updatedamagefeedback`); other titles' sounds need assets | E | PP | INVESTIGATING (likely native) |
 | Score events | LUI popups via `luinotifyevent` + CSV | GSC HUD popup near crosshair from kill events | M | PP | PLANNED |
 | Timed gameplay | `level.round_wait_func` override, no round delay, HUD timer | Wave-loop internals are hashed (`_id_E81B`, `_id_13BCB`); needs `replacefunc` research | H | PP | INVESTIGATING |
@@ -393,10 +393,10 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Zombie speed (default/sprint/super sprint) | dvar `zm_speed` → `set_zombie_run_cycle_override_value("super_sprint")` | `level.movemodefunc[agent_type]` → `"sprint"`; "super" = sprint + `self.moveratescale > 1` (stock uses 1.15) | M | RI | PLANNED (Phase 7) |
-| Disable super sprinters after round 40 | AAE makes all zombies super sprint from round 40 | Rule inside the same move-mode hook | E | RI | PLANNED |
+| Zombie speed (default/sprint/super sprint) | dvar `zm_speed` → `set_zombie_run_cycle_override_value("super_sprint")` | The mod's hook in front of the stock `level.movemodefunc[type]` (regular zombies and cops): walk / run / sprint. IW7 has no mode past sprint; `moveratescale` is reset by the stock loop at each mode change, so "super sprint" is not built | M | RI | TESTING (Phase 7; sprint and slower) |
+| Disable super sprinters after round 40 | AAE makes all zombies super sprint from round 40 | IW7 has no super sprint: nothing to disable | – | – | NOT NEEDED |
 | Horrific zombies (double speed for all actions) | Thread | `moveratescale` / `generalspeedratescale` (fields seen in `zombie_agent.gsc`), NEEDS TESTING | M | PP / UNK | INVESTIGATING |
-| Weaker zombies / health-cap round | Patched stock `zombie_utility` health math | Scale or clamp `.maxhealth`/`.health` right after spawn | M | RI | PLANNED |
+| Weaker zombies / health-cap round | Patched stock `zombie_utility` health math | The stock health multiplier `level._id_8CB3[type]` (empty in the game), read at each spawn: *Zombie health* 10–1000 percent. A cap round: not built | M | RI | Health TESTING (Phase 7); cap round PLANNED |
 | Max spawned zombies (24 → N) | `level.zombie_ai_limit`, `zombie_actor_limit`, `zombie_max_ai` | `level.max_static_spawned_enemies` (stock 24); engine agent cap unknown | H | PP / UNK | INVESTIGATING |
 | Extra points per kill / melee / headshot | `zombie_vars` score bonuses | Agent `on_killed` wrapper + `give_player_currency` | M | RI | PLANNED |
 | No spawn delay | Spawn-delay function | Spawn pacing internal to `zombies_spawning` (hashed `_id_8454`) | H | PP | INVESTIGATING |
@@ -422,7 +422,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Spawn with Perkaholic / Quick Revive | Spawn handlers | `scripts\cp\zombies\zombies_perk_machines::give_zombies_perk(...)` per perk | E | RI | PLANNED |
+| Spawn with Perkaholic / Quick Revive | Spawn handlers | The stock permanent-perks reward `scripts\cp\gametypes\zombie::give_permanent_perks` at each spawn (every perk of the map) | E | RI | TESTING (Phase 7) |
 | Perk limit | `tfoption_no_perk_lim` | No perk cap found in IW7 CP scripts | – | N/A / UNK | INVESTIGATING |
 | Bigger Mule Kick (4 weapons) | `level.additionalprimaryweapon_limit = 4` | Mule Munchies (`perk_machine_more`) via `give_more_perk`; needs `replacefunc` | M | PP | INVESTIGATING |
 | Time-based perk decay when downed | Thread on down | `last_stand` notify + `take_zombies_perk` over time | M | RI | PLANNED |
@@ -465,7 +465,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Custom keybinds (flashlight, drop points, third person, map view, split door cost, …) | LUI key-binding UI | GSC cannot create new binds. Use `notifyonplayercommand` on **existing** commands, or chat commands players can bind (`bind <key> "say /cmd"`) | M | PP | PLANNED (as chat commands) |
 | Drop/share points | Keybind | Chat command `/share` + `give_player_currency` / `take_player_currency` | E | RI | PLANNED |
 | Overhead map view | Keybind | Link the player to a high script origin camera (`playerlinkto`) | M | PP / UNK | INVESTIGATING |
-| Chat commands (`/bal /dep /transfer /save /tp /ammo /ee /?`) | `self waittill("chat", msg)` | iw7-mod `say` notify (`level waittill("say", player, msg)`, v1.0.3+). The router and the `!ix` settings commands exist (`ix\core\chat`, Phase 2); these gameplay commands come with their features | E | RI | PLANNED (router: TESTING) |
+| Chat commands (`/bal /dep /transfer /save /tp /ammo /ee /?`) | `self waittill("chat", msg)` | iw7-mod `say` notify (`level waittill("say", player, msg)`, v1.0.3+): `!ix` settings commands (Phase 2), `!ix save` / `load` / `tp` / `refill` (Phase 9), `!ix log` (Phase 10); bank and transfer come with those features | E | RI | TESTING (save, tp, ammo, help); bank PLANNED |
 | Weapon inspect / redraw | Third-party script | Already provided by iw7-mod (`startweaponinspection`, actionslot 8) | – | DP | N/A (exists) |
 
 ### 3.10 Dev/cheat menu (`elmg_cheats`)
@@ -473,11 +473,11 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
 | God mode / unlimited ammo / refill | Menu toggles | God mode: the damage-callback wrapper drops the damage (no zombies script uses `enableinvulnerability`); ammo: what the Infinite Ammo and Max Ammo power-ups do, as a loop; refill: Max Ammo for everyone | E | RI | God mode TESTING (Phase 4); ammo and refill TESTING (Phase 6) |
-| UFO / noclip | Menu toggle | Link to a script mover, fly with button polling | M | RI | PLANNED (Phase 10) |
+| UFO / noclip | Menu toggle | iw7-mod's `ufo` / `noclip` are client commands needing `sv_cheats`; the script methods are null in v1.1.0 (L56). A script-mover fly mode is not looked into | M | NCP | BLOCKED (Phase 10) |
 | Teleport menu (save/load, crosshair, sky/ground, nearest zombie, teleport zombies) | Menu actions | `setorigin`, `bullettrace`, `playerphysicstrace`, `getaliveagents` | E | RI | Save / load / crosshair TESTING (Phase 4); the rest PLANNED (Phase 10) |
-| Score / perks / power-ups / weapons / visions | Menu actions | Currency API; `give_zombies_perk`; `drop_loot`; `giveweapon`; `visionsetnakedforplayer` | E | RI | PLANNED |
+| Score / perks / power-ups / weapons / visions | Menu actions | *Give yourself 10,000 points* (`give_player_currency`) and *Drop a power-up* (`drop_loot`, seven kinds) in the locked developer tools; perks per player, weapons and visions not built (the stock scripts set their own visions often) | E | RI | Points, power-ups TESTING (Phase 10); the rest PLANNED |
 | Entity / forge tools | Spawn/place/rotate/delete models | `spawn("script_model")`, `setmodel`, `rotateto`, `delete` | M | RI | PLANNED (Phase 10) |
-| Lobby: super speed / gravity / timescale / no fall damage | dvars | `g_speed`, `bg_gravity`, `setslowmotion`/`timescale`; falls dropped in the damage callback (`MOD_FALLING`) | E | RI | Speed, gravity, fall damage TESTING (Phase 5); timescale PLANNED (Phase 10) |
+| Lobby: super speed / gravity / timescale / no fall damage | dvars | `g_speed`, `bg_gravity`, iw7-mod's `setslowmotion( s, s, 0 )`; falls dropped in the damage callback (`MOD_FALLING`) | E | RI | Speed, gravity, fall damage TESTING (Phase 5); timescale TESTING (Phase 9) |
 | Disable AI spawners | dvar | Stock dvar `debug_pause_spawning` (read by stock scripts), NEEDS TESTING | E | UNK | INVESTIGATING |
 | Clone player / fun effects | Menu actions | `_meth_8086` (`cloneplayer`); `earthquake`; `hide`/`show` | M | PP | PLANNED (Phase 10) |
 | Aimbot | Menu | Excluded by design (an MP cheating tool; not part of AAE's gameplay feature set) | – | – | NOT PLANNED |
@@ -508,11 +508,11 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Fire-rate / rapid fire | `_meth_85C1(pct)` / `_meth_85C2()` (stock: the Berserk passive's 65) | M | RI | TESTING (Phase 6) |
 | Recoil / spread | `player_recoilscaleon`, `_meth_822C`; `setspreadoverride`, `_meth_8263` (no stock use) | E | RI / UNK | Recoil TESTING (Phase 6); spread INVESTIGATING |
 | Damage multipliers | Damage-callback wrappers | M | RI | PLANNED |
-| Coordinates / speed / weapon HUD | `self.origin`, `getvelocity`, `getcurrentweapon` | E | RI | PLANNED |
+| Coordinates / speed / weapon HUD | `self.origin`, `getvelocity`, `getcurrentweapon` | E | RI | Speed (HUD), coordinates (Debug → Information) TESTING (Phases 8, 10); weapon PLANNED |
 | FPS display | Not readable from server GSC | – | NCP | BLOCKED — IW LIMITATION |
 | 3D debug drawing | `line` / `print3d` are release stubs | – | NCP | BLOCKED — IW LIMITATION |
-| Entity inspector / trace info | `bullettrace` + entity fields | M | RI | PLANNED |
-| Fast restart | `map_restart` / `executecommand("fast_restart")` | E | RI / UNK | PLANNED |
+| Entity inspector / trace info | `bullettrace` + entity fields | M | RI | TESTING (Phase 10: *What am I looking at?*) |
+| Restart | iw7-mod's console `map_restart` through `executecommand` | E | RI / UNK | TESTING (Phase 9; what carries over in zombies is L55) |
 
 ---
 

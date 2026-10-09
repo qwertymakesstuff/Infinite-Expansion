@@ -4,8 +4,8 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phase 6 (weapons) complete — not yet run in-game.**
-> [Weapon options](#weapon-options): unlimited ammo and grenades, fire rate, no recoil, max ammo at spawn and a refill for everyone. [Movement options](#movement-options): move speed, gravity, wall run, double jump, mantle, slide, bunny hop, unlimited boost and fall damage. [Player options](#player-options): god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points and position tools, all in the in-game menu (ADS + Melee), which shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
+> **Status: Phases 7–10 (zombies, HUD, quality of life, developer tools) complete — not yet run in-game.**
+> [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
 
@@ -88,9 +88,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.6.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.10.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 36 (0 changed from the default); features: 4; chat: !ix
+[IX] INFO: settings: 52 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -113,7 +113,7 @@ The bottom of the menu lists these keys in two lines of small text, with the key
 
 While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It closes by itself if you go down.
 
-Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Movement** ([movement options](#movement-options)), **Weapons** ([weapon options](#weapon-options)), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Movement** ([movement options](#movement-options)), **Weapons** ([weapon options](#weapon-options)), **Zombies** ([zombies options](#zombies-options)), **HUD** ([the info HUD](#the-info-hud)), **Game** ([game options](#game-options)), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug** ([developer tools](#developer-tools)). The first page scrolls past its eighth row. Every page of options ends with **Reset this page** (Use twice), which puts only that page's options back to their defaults. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
 
 ## Player options
 
@@ -166,6 +166,55 @@ The **Weapons** page of the menu (also settings for chat and the console). Like 
 
 Every option goes back to the game's own behaviour when you switch it off or reset it. The ammo options do what the game's own Max Ammo and Infinite Ammo power-ups do; fire rate and recoil leave the game's own changes alone (the Berserk passive's faster firing, recoil-reducing weapons, Deadeye Dewdrops).
 
+## Zombies options
+
+The **Zombies** page of the menu (also settings for chat and the console). Like every setting, they apply to the whole match and belong to the host.
+
+| Option | What it does |
+|--------|--------------|
+| **Zombie speed** | *default*: the game's mix, faster each round. *walk*, *run* or *sprint*: every regular zombie and cop moves that way (clowns and skeletons keep their own). Back to *default*, zombies already out keep their speed; new ones move as the game picks |
+| **Zombie health** | Percent of the game's zombie health (10–1000), for zombies that spawn from then on. Bosses and brutes keep theirs |
+| **Max zombies alive** | Most zombies out at once (1–64; the game's 24). Many more can slow the game down |
+| **Points multiplier** | Percent of the points kills and hits give (0–1000); Double Money still doubles them |
+| **Power-ups per round** | Most power-ups zombies drop in a round (0–20; the game's 5). Power-ups the game hands out otherwise (an event round's last zombie, Fate & Fortune cards, quests) still come |
+| **Starting round** | The round the **next** match starts at (1–100). It counts toward your highest round in your stats; pair it with *Starting points* on the Player page |
+| **Start with perks** | Every player gets every perk of the map a second after spawning (without Up N' Atoms in solo), as the game's own permanent-perks reward does. Perks lost when you go down stay lost |
+
+Every option goes back to the game's own behaviour when you switch it off or reset it.
+
+## The info HUD
+
+The **HUD** page of the menu turns on numbers at the side of the screen, each on its own: **HUD: round**, **HUD: zombies** (left this round, and alive now), **HUD: health** and **HUD: speed** (units a second). **HUD: side** puts them on the left or the right, and **HUD: height** moves them up or down. They hide while the menu is open, while you are dead or spectating, and over the game's own menus. All are off by default.
+
+## Game options
+
+The **Game** page of the menu:
+
+| Option | What it does |
+|--------|--------------|
+| **Game speed** | Percent of the speed of the whole match (25–200): 50 is slow motion. Back to the game's speed at 100 and when the match ends |
+| **Zombie outlines** | Every player sees zombies outlined in orange, also through walls |
+| **Restart the match** | An action (host only, Use twice): the map starts over from the first round, for everyone (the console's `map_restart`) |
+
+Chat shortcuts for the menu's actions, for the host (or everyone, when *Menu: who changes settings* is *everyone*): `!ix refill` (*Refill ammo*), `!ix save` and `!ix load` (save a position and go back to it), `!ix tp` (teleport to where you look).
+
+## Developer tools
+
+The **Debug** page of the menu, for testing. Its tools are **locked** until the host switches **Developer tools** on; each is host only and asks for a second Use, so none can happen by accident.
+
+| Tool | What it does |
+|------|--------------|
+| **Information** | A page of read-outs: the map, players, round, zombies alive and left, and your position (X, Y, Z). Always there |
+| **Zombie spawning** | Read-out: *on*, *paused* (by this menu) or *game paused* (the map is holding them) |
+| **Pause / resume spawning** | No new zombies until you resume; the ones out stay. Switching *Developer tools* off resumes too |
+| **Kill all zombies** | As a Nuke, without points or power-ups: bosses and brutes are spared |
+| **End this round** | Kills the round's zombies, and the next round starts as usual. Refused while the map holds the round (a boss fight, a quest) |
+| **Give yourself 10,000 points** | As it says |
+| **Drop a power-up** | A page: Max Ammo, Nuke, Insta-Kill, Double Money, Fire Sale, Carpenter or Infinite Ammo, dropped in front of you. It does not count toward the round's power-ups |
+| **What am I looking at?** | Names the thing in your crosshair (its kind, model and distance). Always there |
+
+`!ix log` in chat shows anyone the mod's last 8 log lines (`!ix log 20`: the last 20, at most 32). Flying (UFO, noclip) is not possible from the mod's scripts (`KNOWN_LIMITATIONS.md` L56).
+
 ## Settings and chat commands
 
 Every option of the mod is a **setting** with a type, a default and a valid range. Change one in any of three ways:
@@ -186,6 +235,8 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `!ix reset <setting>` / `!ix reset all` | Host: back to the default |
 | `!ix version` | The mod's version |
 | `!ix menu` | Opens the in-game menu |
+| `!ix refill` / `!ix save` / `!ix load` / `!ix tp` | The menu's *Refill ammo*, *Save position*, *Go to saved position* and *Teleport to crosshair* (host, or everyone with *Menu: who changes settings* *everyone*) |
+| `!ix log [n]` | The mod's last n log lines (8, at most 32) |
 
 | Setting | Default | Range | Effect |
 |---------|---------|-------|--------|
@@ -225,6 +276,22 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `fire_rate` | 100 | 50–300 | Percent of how fast every weapon fires |
 | `no_recoil` | 0 | 0/1 | No recoil |
 | `start_max_ammo` | 0 | 0/1 | Max ammo a second after every spawn |
+| `zombie_speed` | default | default, walk, run, sprint | How regular zombies and cops move |
+| `zombie_health` | 100 | 10–1000 | Percent of the game's zombie health, for zombies that spawn afterwards |
+| `max_zombies` | 24 | 1–64 | Most zombies alive at once (24 is the game's) |
+| `points_multiplier` | 100 | 0–1000 | Percent of the points kills and hits give |
+| `powerup_limit` | 5 | 0–20 | Most power-ups that drop from kills in a round |
+| `start_round` | 1 | 1–100 | The round the next match starts at |
+| `start_perks` | 0 | 0/1 | Every perk of the map at each spawn |
+| `hud_round` | 0 | 0/1 | The round number on screen |
+| `hud_zombies` | 0 | 0/1 | Zombies left this round and alive now, on screen |
+| `hud_health` | 0 | 0/1 | Your health on screen |
+| `hud_speed` | 0 | 0/1 | Your speed on screen |
+| `hud_side` | left | left, right | Which side of the screen the HUD's numbers are on |
+| `hud_height` | 0 | -150–150 | Moves the HUD's numbers up (more) or down (less) |
+| `game_speed` | 100 | 25–200 | Percent of the speed of the whole match |
+| `zombie_outlines` | 0 | 0/1 | Zombies outlined through walls, for everyone |
+| `dev_tools` | 0 | 0/1 | Unlocks the Debug page's developer tools |
 
 These dvars are not settings, because they are not the host's to set:
 
@@ -287,6 +354,7 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | `ARCHITECTURE.md` | Module layout, init flow, the core systems (settings, events, features, chat commands), and how to add a feature |
 | `FEATURE_STATUS.md` | Every planned feature and its status |
 | `ROADMAP.md` | The phase plan, with the full scope of the phases not started yet (14: the guided Easter egg mode; 15–22: the fun features) |
+| `PLAYTEST_CHECKLIST.md` | What to try in a real match, short, with what should happen |
 | `TESTING.md` | Verification levels, verification log, runtime test checklist |
 | `CHANGELOG.md` | History |
 | `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests |
@@ -304,11 +372,11 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 4 | Player options: god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points, position tools | **Complete** (in-game test pending) |
 | 5 | Movement: move speed, gravity, wall run, double jump, mantle, slide, bunny hop, unlimited boost, fall damage | **Complete** (in-game test pending) |
 | 6 | Weapons: unlimited ammo and grenades, fire rate, no recoil, max ammo at spawn, refill | **Complete** (in-game test pending) |
-| 7 | Zombies | Next |
-| 8 | HUD | Planned |
-| 9 | Quality of life | Planned |
-| 10 | Debug / developer mode | Planned |
-| 11 | Configuration presets | Planned |
+| 7 | Zombies: zombie speed and health, most zombies alive, points multiplier, power-ups per round, starting round, start with perks | **Complete** (in-game test pending) |
+| 8 | HUD: round, zombies left and alive, health, speed | **Complete** (in-game test pending) |
+| 9 | Quality of life: *Reset this page*, game speed, zombie outlines, restart, chat shortcuts | **Complete** (in-game test pending) |
+| 10 | Developer tools (locked): spawning, kill all, end the round, points, power-ups, read-outs, the log | **Complete** (in-game test pending) |
+| 11 | Configuration presets | Next |
 | 12 | Polish | Planned |
 | 13 | Testing | Planned |
 | 14 | Guided Easter egg mode: an optional in-game guide to each map's main Easter egg quest | Planned, not started (`ROADMAP.md`) |

@@ -4,7 +4,8 @@ Every setting is registered in GSC with config::add_bool/add_int/add_float/
 add_enum (or features::add, which adds an on/off setting). The menu
 (ix/ui/menu_tree.gsc) names settings by id and quietly skips an id that does
 not exist, so a typo would hide a row; README.md lists every setting with its
-default and range, and the init line in README.md and TESTING.md counts them.
+default and range, and the init line in README.md, TESTING.md and
+PLAYTEST_CHECKLIST.md counts them.
 The menu shows a row's help under the list, word-wrapped into a few short
 lines, and drops what does not fit. This test reads the scripts as text and
 holds all of that together.
@@ -19,8 +20,10 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "mods" / "infinite_expansion" / "custom_scripts"
 MENU = SCRIPTS / "ix" / "ui" / "menu.gsc"
 MENU_TREE = SCRIPTS / "ix" / "ui" / "menu_tree.gsc"
+INFO_HUD = SCRIPTS / "ix" / "ui" / "hud.gsc"
 README = REPO / "README.md"
 TESTING = REPO / "TESTING.md"
+PLAYTEST = REPO / "PLAYTEST_CHECKLIST.md"
 
 ADD = re.compile(r'config::add_(bool|int|float|enum)\(\s*"([a-z0-9_]+)",\s*("[^"]*"|-?[\d.]+),\s*(?:("[^"]*")|(-?[\d.]+),\s*(-?[\d.]+))?')
 FEATURE = re.compile(r'features::add\(\s*"([a-z0-9_]+)",\s*"[^"]*",\s*"[^"]*",\s*"[^"]*",\s*([01])\s*\)')
@@ -33,7 +36,11 @@ DESCRIBED = re.compile(
     r'|config::add_enum\(\s*"([a-z0-9_]+)",\s*"[^"]*",\s*"[^"]*"'
     r'|features::add\(\s*"([a-z0-9_]+)",\s*"[^"]*")'
     r',\s*"([^"]*)",\s*"([^"]*)"')
-MENU_ACTION = re.compile(r'add_action\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)",\s*[^,]+,\s*([01]),\s*([01])\s*\)')
+# The page is a quoted id, or "page" in a helper of menu_tree.gsc (add_reset).
+MENU_ACTION = re.compile(r'add_action\(\s*(?:"([a-z0-9_]+)"|page),\s*"([^"]*)",\s*"([^"]*)",\s*[^,]+,\s*([01]),\s*([01])\s*\)')
+# A developer tool: host only, Use twice, locked until the setting it needs is ON.
+MENU_DEV_ACTION = re.compile(r'add_dev_action\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)",')
+DEV_GATE = "dev_tools"
 MENU_INFO = re.compile(r'add_info\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)"')
 GUEST_NOTE = " Only the host can change it."  # menu.gsc item_help(), for a player who may not change it
 # The keys at the bottom of the menu: small text (fontscale 0.7, about 5 of
@@ -46,6 +53,9 @@ FOOTER_WIDTH = 44
 # (KNOWN_LIMITATIONS.md L49).
 HUD_NOT_ARCHIVED = 26
 HUD_ALL = 28
+# The info HUD (Phase 8) uses archived elements only, two a row (a label and a
+# number), so it never takes the menu's non-archived ones.
+INFO_HUD_ROWS = 5
 
 
 def registered():
@@ -64,16 +74,21 @@ def registered():
     return settings
 
 
-def helps():
-    """{id: help} for every setting the scripts register."""
+def described():
+    """{id: (label, help)} for every setting the scripts register."""
     found = {}
     for path in sorted(SCRIPTS.rglob("*.gsc")):
         if path.name == "features.gsc":
             continue
         for match in DESCRIBED.finditer(path.read_text()):
             setting = next(group for group in match.groups()[:4] if group)
-            found[setting] = match.group(6)
+            found[setting] = (match.group(5), match.group(6))
     return found
+
+
+def helps():
+    """{id: help} for every setting the scripts register."""
+    return {setting: help_text for setting, (_label, help_text) in described().items()}
 
 
 def menu_number(name):
@@ -161,6 +176,12 @@ class Settings(unittest.TestCase):
             texts[setting] = text + GUEST_NOTE
         for _page, label, help_text, _confirm, host_only in MENU_ACTION.findall(tree):
             texts[label] = help_text + (GUEST_NOTE if host_only == "1" else "")
+        self.assertIn("Reset this page", texts)
+        # menu.gsc item_help() adds, for a locked tool, which setting unlocks it.
+        locked_note = " Locked: " + described()[DEV_GATE][0] + " is OFF."
+        self.assertIn('" Locked: " + custom_scripts\\ix\\core\\config::find( item.needs ).label + " is OFF."', MENU.read_text())
+        for _page, label, help_text in MENU_DEV_ACTION.findall(tree):
+            texts[label] = help_text + GUEST_NOTE + locked_note
         for _page, label, help_text in MENU_INFO.findall(tree):
             texts[label] = help_text
         self.assertGreater(len(texts), 20)
@@ -201,8 +222,19 @@ class Settings(unittest.TestCase):
         for name in ("labels", "values", "help", "footer"):
             self.assertIn("hud." + name, listed)
 
+    def test_info_hud_uses_archived_elements_only(self):
+        text = INFO_HUD.read_text()
+        made = re.findall(r"newclienthudelem\(", text)
+        self.assertEqual(len(made), 1, "every info HUD element comes from hud_text()")
+        body = re.search(r"^hud_text\([^)]*\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
+        self.assertIn("element.archived = 1;", body)
+        self.assertNotIn("archived = 0", text)
+        rows = re.search(r"^wanted_rows\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
+        self.assertLessEqual(len(re.findall(r'rows\[rows\.size\] = "', rows)), INFO_HUD_ROWS)
+        self.assertEqual(len(re.findall(r"= hud_text\(", text)), 2, "a label and a number per row")
+
     def test_init_line_counts_them(self):
-        for path in (README, TESTING):
+        for path in (README, TESTING, PLAYTEST):
             counts = re.findall(r"settings: (\d+) \(0 changed from the default\)", path.read_text())
             self.assertTrue(counts, path.name)
             for count in counts:

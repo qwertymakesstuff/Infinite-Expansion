@@ -44,7 +44,8 @@ Infinite-Expansion/                          (repository)
 │               ├── ui/                      ≙ /scripts/ui/
 │               │   ├── menu.gsc             menu engine (pages, items, rendering, input)   (Phase 3)
 │               │   ├── menu_tree.gsc        menu pages (data only)                       (Phase 3)
-│               │   └── hud.gsc              info HUD (create-once/update)
+│               │   ├── ui.gsc               the module: registers the files above and below (Phase 1)
+│               │   └── hud.gsc              info HUD: round, zombies, health, speed        (Phase 8)
 │               ├── player/                  ≙ /scripts/player/
 │               │   ├── player.gsc           the module: registers the files below          (Phase 1)
 │               │   ├── character.gsc        character selection, specials, per-map cast (Phase 1.5)
@@ -57,10 +58,17 @@ Infinite-Expansion/                          (repository)
 │               │   ├── ammo.gsc             unlimited ammo / grenades, max ammo, refill   (Phase 6)
 │               │   └── handling.gsc         fire rate, no recoil                         (Phase 6)
 │               ├── zombies/                 ≙ /scripts/zombies/
-│               │   ├── zombies.gsc          speed, health, counts, spawn tuning
-│               │   └── rounds.gsc           round utilities and round hooks
-│               └── debug/                   ≙ /scripts/debug/   (gated)
-│                   └── debug.gsc            inspector, trace info, perf/log read-outs
+│               │   ├── zombies.gsc          the module; round and zombie counts           (Phase 7)
+│               │   ├── agents.gsc           zombie speed, zombie health, max alive         (Phase 7)
+│               │   ├── rounds.gsc           starting round                                 (Phase 7)
+│               │   ├── points.gsc           points multiplier, power-ups per round        (Phase 7)
+│               │   └── perks.gsc            every perk at each spawn                       (Phase 7)
+│               ├── qol/                     quality of life
+│               │   ├── qol.gsc              the module; chat shortcuts                     (Phase 9)
+│               │   └── game.gsc             game speed, zombie outlines, restart          (Phase 9)
+│               └── debug/                   ≙ /scripts/debug/   (locked)
+│                   ├── debug.gsc            the module; dev_tools, !ix log, read-outs     (Phase 10)
+│                   └── tools.gsc            spawning, kill all, end round, points, power-ups, inspector (Phase 10)
 ├── Infinite Expansion Setup.cmd             double-click: opens the setup window (Windows)
 ├── Build Character Pictures.cmd             double-click: builds the picture pack again (the setup builds it once)
 ├── installer/                               one-click setup: IXSetup.ps1 (WPF window), IXSetup.Core.ps1

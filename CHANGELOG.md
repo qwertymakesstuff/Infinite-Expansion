@@ -4,6 +4,33 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.10.0: zombies options, info HUD, quality of life and developer tools (Phases 7–10) (2026-10-09)
+
+**Added**
+- **Zombies page** in the in-game menu (ADS + Melee, then *Zombies*). Each option is also a setting for chat and the console, applies to the whole match, and belongs to the host:
+  - **Zombie speed**: default (the game's mix), walk, run or sprint, for regular zombies and cops.
+  - **Zombie health**: 10 to 1000 percent of the game's, for zombies that spawn from then on.
+  - **Max zombies alive**: 1 to 64 at once (the game's 24).
+  - **Points multiplier**: 0 to 1000 percent of the points kills and hits give; Double Money still doubles.
+  - **Power-ups per round**: 0 to 20 (the game's 5).
+  - **Starting round**: the round the next match starts at.
+  - **Start with perks**: every perk of the map a second after each spawn.
+- **The info HUD** (*HUD* page): the round, zombies left this round and alive now, your health and your speed, each on its own, on the left or the right of the screen and at the height you choose. Off by default.
+- **Game page**: **Game speed** (25 to 200 percent, slow motion included), **Zombie outlines** (every zombie outlined through walls, for everyone) and **Restart the match** (host only, Use twice).
+- **Reset this page** at the end of every page of options: only that page goes back to its defaults.
+- **Chat shortcuts**: `!ix refill`, `!ix save`, `!ix load`, `!ix tp` do what the menu's actions do; `!ix log` shows the mod's last log lines.
+- **Developer tools** (*Debug* page), locked until the host switches *Developer tools* on, each host only and asking for a second Use: pause or resume zombie spawning, kill all zombies (as a Nuke, without points), end the round, give yourself 10,000 points, drop any of seven power-ups; plus read-outs (map, players, round, zombies, your position) and *What am I looking at?*.
+- `PLAYTEST_CHECKLIST.md`: what to try in a real match, short, with what should happen.
+
+**Changed**
+- The menu's first page lists Zombies, HUD and Game too, and scrolls past its eighth row.
+- `!ix` sends its list of commands a few lines at a time, so the game does not drop any.
+
+**Not in this version**
+- Flying (UFO, noclip): not possible from the mod's scripts (`KNOWN_LIMITATIONS.md` L56).
+- A "super sprint" zombie speed: the game has no faster mode than sprint.
+- Vision presets: the game sets its own visions too often for a mod's to last.
+
 ### Roadmap: Phase 14, the guided Easter egg mode, added; the fun features move to 15–22 (2026-10-09)
 
 - New Phase 14, not started: an optional Guided Mode, off by default and set before a map, that guides players through each map's main Easter egg quest with objectives, hints, directions, hint levels and a small HUD panel, from one verified guide per map. It never completes a step for the player. Its full scope is in `ROADMAP.md`; `README.md` and `FEATURE_STATUS.md` list it.
