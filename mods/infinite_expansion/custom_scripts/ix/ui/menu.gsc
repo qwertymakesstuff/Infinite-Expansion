@@ -8,7 +8,7 @@
 //
 // Controls (IW_API_NOTES.md section 8), listed in small text at the bottom of
 // the menu:
-//   Crouch + Melee                 open (menu_open; "!ix menu" in chat always)
+//   ADS + Melee                    open (menu_open; "!ix menu" in chat always)
 //   W / S, left stick up / down    move up / down (ADS / Fire too)
 //   A / D, left stick left / right change a value: less / more (Tactical / Frag too)
 //   Use or Jump                    open a page, switch, run an action
@@ -17,7 +17,9 @@
 // held in place, linked to a point where they stand, as the stock phone booth
 // on Shaolin Shuffle reads them (its player is linked too). The buttons are
 // polled as a working IW7 zombies menu does; Jump arrives as a "+goStand"
-// command notify, as in the phone booth. While the menu is open, the player's
+// command notify, as in the phone booth, and so does every Melee press
+// ("+melee_zoom", the melee command the stock zombies scripts listen to), so
+// a tap between two polls still opens the menu. While the menu is open, the player's
 // weapons, grenades, melee and Use are off, so those buttons only steer the
 // menu. That goes through the stock counters (scripts\engine\utility::
 // allow_weapon and friends), so closing the menu never turns back on what the
@@ -27,27 +29,31 @@
 // host sets menu_access to everyone. Everyone can look.
 //
 // The HUD elements are made once, on the first opening, and then only change
-// their text, values and alpha (KNOWN_LIMITATIONS.md L12).
+// their text, values and alpha (KNOWN_LIMITATIONS.md L12). A player sees only
+// so many HUD elements that are not "archived" (about 28 in IW7 zombies, the
+// number a working IW7 menu keeps to; L49), so the menu has 26 of them and 2
+// archived ones, and the stock game's own elements still fit.
 //
-// Opening (menu_open): crouch_melee opens it when a player who has been
-// crouched for a moment, not sliding, presses Melee (a slide ends crouched,
-// and a knife right after it must not open the menu); ads_melee is the old
-// ADS + Melee, which a knife while aiming also pressed; chat leaves only
-// "!ix menu". At the start of every round, a player who has not opened the
-// menu yet in this match is told how, in the middle of the screen.
+// Opening (menu_open): ads_melee opens it on Melee while ADS is held or the
+// player is aiming (playerads, so toggle ADS works too); crouch_melee on Melee
+// after a moment crouched, not sliding (a slide ends crouched); chat leaves
+// only "!ix menu". In the air it opens on landing, within a second; when it
+// cannot open (down, on a ride, ...), a line says why. At the start of every
+// round, a player who has not opened the menu yet in this match is told how,
+// in the middle of the screen.
 //
 // Settings:
-//   menu         1             feature: the menu; 0 closes it for everyone
-//   menu_access  host          host: only the host changes settings; everyone: all players
-//   menu_open    crouch_melee  crouch_melee / ads_melee / chat: how it opens
-//   menu_hint    1             at each round's start, how to open it, until opened
+//   menu         1          feature: the menu; 0 closes it for everyone
+//   menu_access  host       host: only the host changes settings; everyone: all players
+//   menu_open    ads_melee  ads_melee / crouch_melee / chat: how it opens
+//   menu_hint    1          at each round's start, how to open it, until opened
 
 register()
 {
     feature = custom_scripts\ix\core\features::add( "menu", "ui", "In-game menu", "Opens with the keys of Menu: open with, or !ix menu in chat.", 1 );
     feature.on_player = ::apply_menu;
     custom_scripts\ix\core\config::add_enum( "menu_access", "host", "host everyone", "Menu: who changes settings", "host: only the host. everyone: every player in the match.", undefined );
-    custom_scripts\ix\core\config::add_enum( "menu_open", "crouch_melee", "crouch_melee ads_melee chat", "Menu: open with", "Crouch, then Melee; or hold ADS, then Melee; or only !ix menu in chat.", ::on_open_changed );
+    custom_scripts\ix\core\config::add_enum( "menu_open", "ads_melee", "ads_melee crouch_melee chat", "Menu: open with", "Hold ADS, then Melee; or crouch, then Melee; or only !ix menu in chat.", ::on_open_changed );
     custom_scripts\ix\core\config::add_bool( "menu_hint", 1, "Menu: hint", "At the start of each round, how to open the menu, until you have opened it.", undefined );
     custom_scripts\ix\core\events::subscribe( "player_spawn", ::on_spawn );
     custom_scripts\ix\core\events::subscribe( "round_start", ::on_round_start );
@@ -185,7 +191,10 @@ on_spawn( player )
         state.opened = 0;
         player.ix.menu = state;
         player notifyonplayercommand( "ix_menu_jump", "+goStand" );
+        player notifyonplayercommand( "ix_menu_melee", "+melee_zoom" );
+        player notifyonplayercommand( "ix_menu_melee", "+melee_breath" );
         player thread listen_jump();
+        player thread listen_melee();
         player thread input_loop();
     }
 
@@ -249,10 +258,10 @@ open_words()
 {
     switch ( custom_scripts\ix\core\config::get( "menu_open" ) )
     {
-        case "crouch_melee":
-            return "Crouch + Melee";
         case "ads_melee":
             return "ADS + Melee";
+        case "crouch_melee":
+            return "Crouch + Melee";
     }
 
     return "";
@@ -305,6 +314,22 @@ listen_jump()
     }
 }
 
+// Every Melee press, also one too short for the input loop's polls: with the
+// open keys held, the input loop opens the menu on its next tick.
+listen_melee()
+{
+    self endon( "disconnect" );
+
+    for (;;)
+    {
+        self waittill( "ix_menu_melee" );
+        state = self.ix.menu;
+
+        if ( !state.open && open_keys_held() )
+            state.open_request = gettime();
+    }
+}
+
 // Left mid-menu: the point they were held at goes too.
 on_disconnect( player, arg )
 {
@@ -338,33 +363,49 @@ apply_menu( enabled )
 
 chat_open( words )
 {
-    if ( !isdefined( self.ix ) || !isdefined( self.ix.menu ) )
+    if ( !isdefined( self.ix ) || !isdefined( self.ix.menu ) || self.ix.menu.open )
         return;
 
-    if ( !self.ix.menu.open && !self open_menu() )
+    problem = open_problem();
+
+    if ( problem == "" )
+        self open_menu();
+    else if ( problem == "-" )
         self tell( "The menu cannot open now." );
+    else
+        self tell( problem );
 }
 
 can_open()
 {
+    return open_problem() == "";
+}
+
+// Why the menu cannot open now: "" when it can; "-" when nothing need be
+// said (the menu is off, the match is not ready, the player is not playing).
+open_problem()
+{
     if ( !level.ix.ready || !custom_scripts\ix\core\features::is_enabled( "menu" ) )
-        return 0;
+        return "-";
 
     if ( !isdefined( self.sessionstate ) || self.sessionstate != "playing" )
-        return 0;
+        return "-";
 
     if ( isdefined( self.inlaststand ) && self.inlaststand )
-        return 0;
+        return "The menu cannot open while you are down.";
 
     if ( isdefined( self.in_afterlife_arcade ) && self.in_afterlife_arcade )
-        return 0;
+        return "The menu cannot open in the afterlife arcade.";
 
-    // Held in place while it is open: not in the air, and not already linked
-    // to something (a ride, a trap) that the hold would take them off.
-    if ( !self isonground() || self islinked() )
-        return 0;
+    // Held in place while it is open: not linked to something already (a
+    // ride, a trap) that the hold would take them off, and not in the air.
+    if ( self islinked() )
+        return "The menu cannot open while the game is moving you.";
 
-    return 1;
+    if ( !self isonground() )
+        return "The menu opens when you are on the ground.";
+
+    return "";
 }
 
 may_change()
@@ -403,6 +444,7 @@ close_menu()
     state.open = 0;
     state.confirm = undefined;
     state.queued = undefined;
+    state.open_request = undefined;
     hide_hud();
     hold( 0 );
     lock( 0 );
@@ -497,13 +539,18 @@ input_loop()
             held = "";
             track_crouch();
 
-            // Everything let go first, or the ADS still held (or the player
-            // still walking) would move the cursor.
-            if ( open_pressed() && self open_menu() )
+            if ( open_wanted() )
             {
+                // Everything let go first, or the ADS still held (or the
+                // player still walking) would move the cursor.
+                if ( self open_after_landing() )
+                {
+                    wait_released( "ads" );
+                    wait_released( "move" );
+                }
+
                 wait_released( "melee" );
-                wait_released( "ads" );
-                wait_released( "move" );
+                state.open_request = undefined;
             }
 
             continue;
@@ -540,6 +587,9 @@ input_loop()
                 go_back();
                 wait_released( "melee" );
                 held = "";
+
+                // The press that closed the menu does not open it again.
+                state.open_request = undefined;
                 break;
             case "use":
                 use_item();
@@ -570,18 +620,58 @@ input_loop()
     }
 }
 
-// The keys of menu_open, pressed now (the menu is closed).
-open_pressed()
+// The open keys: a Melee press the notify caught in the last half second, or
+// Melee seen held now, with the other key of menu_open.
+open_wanted()
+{
+    state = self.ix.menu;
+
+    if ( isdefined( state.open_request ) )
+    {
+        recent = gettime() - state.open_request <= 500;
+        state.open_request = undefined;
+
+        if ( recent )
+            return 1;
+    }
+
+    return self meleebuttonpressed() && open_keys_held();
+}
+
+// The key that goes with Melee: ADS held or aiming (playerads, as the stock
+// weapon scripts read it; toggle ADS leaves the button up while aiming), or a
+// moment crouched.
+open_keys_held()
 {
     switch ( custom_scripts\ix\core\config::get( "menu_open" ) )
     {
-        case "crouch_melee":
-            return self meleebuttonpressed() && crouched_a_moment();
         case "ads_melee":
-            return self adsbuttonpressed() && self meleebuttonpressed();
+            return self adsbuttonpressed() || self playerads() > 0.3;
+        case "crouch_melee":
+            return crouched_a_moment();
     }
 
     return 0;
+}
+
+// Opens the menu; in the air (a jump, a slide's hop), on landing within a
+// second. When it cannot open, a line says why.
+open_after_landing()
+{
+    for ( waited = 0; waited < 1 && isalive( self ) && !self isonground(); waited += 0.05 )
+        wait 0.05;
+
+    problem = open_problem();
+
+    if ( problem != "" )
+    {
+        if ( problem != "-" )
+            self iprintln( problem );
+
+        return 0;
+    }
+
+    return self open_menu();
 }
 
 // Since when the player has been crouched without sliding (getstance and
@@ -928,9 +1018,11 @@ watch_settings()
 // HUD: a panel right of the screen's centre (horzalign "center": 4:3-safe
 // units, with x from the centre) that ends at the 4:3 screen's right edge.
 
+// Eight rows (longer pages scroll): with the help and the keys, the menu
+// stays inside the HUD elements a player can see (L49).
 rows()
 {
-    return 10;
+    return 8;
 }
 
 menu_left()
@@ -980,10 +1072,10 @@ footer_top()
     return help_top() + help_lines() * 11 + 4;
 }
 
-// The keys, in small text under the help: three lines.
+// The keys, in small text under the help: two lines.
 footer_lines()
 {
-    return 3;
+    return 2;
 }
 
 footer_line()
@@ -1011,8 +1103,10 @@ create_hud()
 {
     hud = spawnstruct();
     height = footer_top() + footer_lines() * footer_line() + 4 - menu_top();
-    hud.panel = menu_shader( "white", menu_left(), menu_top(), menu_width(), height, ( 0.04, 0.03, 0.08 ), 0.8, 20 );
-    hud.edge = menu_shader( "white", menu_left(), menu_top(), menu_width(), 2, accent(), 1, 21 );
+
+    // Made in order of importance, and all but the last two help lines not
+    // archived: a player sees only so many elements of each kind (L49).
+    hud.panel = menu_shader( "white", menu_left(), menu_top(), menu_width(), height, ( 0.04, 0.03, 0.08 ), 0.85, 20 );
     hud.cursor = menu_shader( "white", menu_left() + 2, first_row_top(), menu_width() - 4, row_height(), accent(), 0.25, 21 );
     hud.title = menu_text( "left", menu_left() + 8, menu_top() + 6, "objective", 1.2, accent() );
     hud.crumb = menu_text( "left", menu_left() + 8, menu_top() + 22, "default", 0.9, ( 0.7, 0.7, 0.7 ) );
@@ -1032,22 +1126,28 @@ create_hud()
     hud.more = menu_text( "right", arrow_right(), first_row_top() + 1, "default", 1, accent() );
     hud.more settext( ">" );
 
-    hud.help = [];
-
-    for ( line = 0; line < help_lines(); line++ )
-        hud.help[line] = menu_text( "left", menu_left() + 8, help_top() + line * 11, "default", 0.85, ( 0.8, 0.8, 0.8 ) );
-
     // The keys, in small text: set by show_controls(), for a keyboard or a
     // controller, and for the keys that open the menu.
     hud.footer = [];
 
     for ( line = 0; line < footer_lines(); line++ )
-        hud.footer[line] = menu_text( "left", menu_left() + 8, footer_top() + line * footer_line(), "default", 0.7, ( 0.78, 0.78, 0.78 ) );
+        hud.footer[line] = menu_text( "left", menu_left() + 8, footer_top() + line * footer_line(), "default", 0.7, ( 0.85, 0.85, 0.85 ) );
 
-    hud.footer[1] settext( footer_select_text() );
+    hud.help = [];
+
+    for ( line = 0; line < help_lines(); line++ )
+    {
+        hud.help[line] = menu_text( "left", menu_left() + 8, help_top() + line * 11, "default", 0.85, ( 0.8, 0.8, 0.8 ) );
+
+        // Only long help needs the last lines.
+        if ( line >= 2 )
+            hud.help[line].archived = 1;
+    }
+
     self.ix.menu.hud = hud;
     self.ix.menu.pad = undefined;
     self.ix.menu.open_keys = undefined;
+    custom_scripts\ix\core\log::debug( "menu: " + hud_elements().size + " HUD elements for " + self.name );
 }
 
 menu_element( alignx, x, y, sort )
@@ -1090,7 +1190,7 @@ menu_text( alignx, x, y, font, scale, color )
 hud_elements()
 {
     hud = self.ix.menu.hud;
-    list = [ hud.panel, hud.edge, hud.cursor, hud.title, hud.crumb, hud.less, hud.more ];
+    list = [ hud.panel, hud.cursor, hud.title, hud.crumb, hud.less, hud.more ];
 
     foreach ( element in hud.footer )
         list[list.size] = element;
@@ -1128,7 +1228,6 @@ draw()
     hud.title settext( page.title );
     hud.crumb settext( crumb( page ) );
     hud.panel.alpha = hud.panel.shown_alpha;
-    hud.edge.alpha = hud.edge.shown_alpha;
     hud.title.alpha = 1;
     hud.crumb.alpha = 1;
     show_controls();
@@ -1297,7 +1396,7 @@ show_controls()
     if ( !isdefined( state.open_keys ) || state.open_keys != keys )
     {
         state.open_keys = keys;
-        hud.footer[2] settext( footer_open_text( keys ) );
+        hud.footer[1] settext( footer_open_text( keys ) );
     }
 
     foreach ( element in hud.footer )
@@ -1308,27 +1407,22 @@ show_controls()
 footer_move_text( pad )
 {
     if ( pad )
-        return "Left stick: move and change values";
+        return "Stick: move and change    Use / Jump: select";
 
-    return "W / S: move    A / D: change";
-}
-
-footer_select_text()
-{
-    return "Use or Jump: select    Melee: back / close";
+    return "W/S: move   A/D: change   Use/Jump: select";
 }
 
 footer_open_text( keys )
 {
     switch ( keys )
     {
-        case "crouch_melee":
-            return "Open: Crouch + Melee    or !ix menu in chat";
         case "ads_melee":
-            return "Open: ADS + Melee    or !ix menu in chat";
+            return "Melee: back / close    Open: ADS + Melee";
+        case "crouch_melee":
+            return "Melee: back / close    Open: Crouch + Melee";
     }
 
-    return "Open: !ix menu in chat";
+    return "Melee: back / close    Open: !ix menu";
 }
 
 // Numbers with setvalue, words with settext: numbers never become new strings.

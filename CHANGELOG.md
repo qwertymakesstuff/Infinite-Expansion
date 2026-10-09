@@ -4,6 +4,18 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.4.2: the menu's text appears; ADS + Melee opens it every time (2026-10-09)
+
+**Fixed**
+- **The menu's text did not appear** (in-game report). A player sees only so many HUD elements, about 28 per script in Infinite Warfare zombies, and the menu used 33 (34 in 0.4.1). The ones made last, including the help under the list and the keys at the bottom, were simply not drawn. The menu now uses 28, the most important first: eight rows at a time (longer pages scroll), no accent line, and two lines of keys. A test keeps it within that budget.
+- **ADS + Melee did not always open the menu.** The menu checked the buttons every 0.05 seconds, so a quick tap of Melee could fall between two checks. Now every Melee press counts, and aiming counts too (toggle ADS works). In the air the menu opens as you land, and when it cannot open (while you are down, on a ride), a line says why.
+
+**Changed**
+- **ADS + Melee is the default way to open the menu again**, as asked. Crouch + Melee and chat only are still on the menu's **Menu** page (*Menu: open with*).
+
+**Tests**
+- `test_settings.py` checks the menu's HUD element count (9 tests, 108 in all).
+
 ### 0.4.1: the menu opens with Crouch + Melee; how to open it at each round's start; its keys in small text (2026-10-09)
 
 **Changed**

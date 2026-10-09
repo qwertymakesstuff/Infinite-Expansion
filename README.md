@@ -5,7 +5,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
 > **Status: Phase 4 (player options) complete — not yet run in-game.**
-> [Player options](#player-options): god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points and position tools, all in the in-game menu (crouch, then Melee), which shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
+> [Player options](#player-options): god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points and position tools, all in the in-game menu (ADS + Melee), which shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ What the setup does for you:
 | Starts the game | **PLAY** starts the game through the launcher, which waits for Steam. iw7-mod's first start downloads the rest of its own files; then pick Zombies in the main menu |
 | Keeps the mod up to date | When the window opens, it asks GitHub for a newer version; so does the launcher each time it starts the game. See [Updates](#updates) |
 
-The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, look for the CHARACTER button in the lobby after **Solo Match** or **Custom Game**, and open the menu in a match: crouch, then press Melee (`TESTING.md` §4).
+The mod does **not** appear in the game's **Mods** menu. That menu lists only `mods\` folders, and this install loads by itself. To check that it works, look for the CHARACTER button in the lobby after **Solo Match** or **Custom Game**, and open the menu in a match with ADS + Melee (`TESTING.md` §4).
 
 INSTALL also sets your in-game name to your Steam name. iw7-mod calls everyone "Unknown Soldier" otherwise. A name you already chose with `name <new name>` in the console stays.
 
@@ -88,7 +88,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.4.1 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.4.2 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: settings: 18 (0 changed from the default); features: 1; chat: !ix
 [IX] INFO: ready
@@ -98,9 +98,9 @@ Start a zombies match and open the console (`~`). It should show:
 
 ## The in-game menu
 
-In a match, **crouch, then press Melee** to open the menu, or type `!ix menu` in chat. At the start of each round, until you have opened it once, a line in the middle of the screen says how.
+In a match, **aim (ADS) and press Melee** to open the menu, or type `!ix menu` in chat. Every Melee press counts, also a quick tap, and so does aiming with toggle ADS. In the air the menu opens as you land; when it cannot open (while you are down, on a ride), a line says why. At the start of each round, until you have opened it once, a line in the middle of the screen says how.
 
-*Menu: open with* (on the menu's **Menu** page) changes the keys for the whole match: *crouch_melee* (the default), *ads_melee* (hold ADS, then press Melee, as before 0.4.1; a knife while aiming opened it too) or *chat* (only `!ix menu`). The crouch counts once you have been crouched for a moment, so a knife right after a slide does not open the menu.
+*Menu: open with* (on the menu's **Menu** page) changes the keys for the whole match: *ads_melee* (the default), *crouch_melee* (crouch, then Melee: a knife while aiming does not open it; the crouch counts after a moment, so a knife right after a slide does not either) or *chat* (only `!ix menu`).
 
 | Keyboard | Controller | In the menu |
 |----------|------------|-------------|
@@ -109,9 +109,9 @@ In a match, **crouch, then press Melee** to open the menu, or type `!ix menu` in
 | **Use** or **Jump** | Use or Jump | Open a page, switch a setting on or off, run an action |
 | **Melee** | Melee | Back; on the first page, close |
 
-The bottom of the menu lists these keys in small text, with the keys that open it, and `<` `>` around a value mean A / D change it. ADS / Fire also move up and down, and Tactical / Frag also change a value.
+The bottom of the menu lists these keys in two lines of small text, with the keys that open it, and `<` `>` around a value mean A / D change it. ADS / Fire also move up and down, and Tactical / Frag also change a value. A page longer than eight rows scrolls.
 
-While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It opens only while you stand on the ground, and it closes by itself if you go down.
+While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It closes by itself if you go down.
 
 Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
 
@@ -163,7 +163,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `character_announce` | 0 | 0/1 | An "is playing as" line for each player after the intro |
 | `menu` | 1 | 0/1 | The in-game menu; switching it off closes it for everyone |
 | `menu_access` | host | host, everyone | Who may change settings in the menu |
-| `menu_open` | crouch_melee | crouch_melee, ads_melee, chat | How the menu opens: crouch, then Melee; hold ADS, then Melee; or only `!ix menu` |
+| `menu_open` | ads_melee | ads_melee, crouch_melee, chat | How the menu opens: aim, then Melee; crouch, then Melee; or only `!ix menu` |
 | `menu_hint` | 1 | 0/1 | At the start of each round, a line saying how to open the menu, until you have opened it |
 | `god_mode` | off | off, host, everyone | No damage at all, for the host or every player |
 | `damage_taken` | 100 | 10–500 | Percent of the damage players take |
@@ -249,7 +249,7 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 1 | Foundation (entry scripts, bootstrap, compat, check tooling) | **Complete** (in-game test pending) |
 | 1.5 | Characters: choose who you play as, per-map names, special characters | **Complete** (in-game test pending) |
 | 2 | Core systems (settings, saving, chat commands, events, features, utilities) and the launcher | **Complete** (in-game test pending) |
-| 3 | In-game menu (crouch + Melee, W / S / A / D), the lobby's character card | **Complete** (in-game test pending) |
+| 3 | In-game menu (ADS + Melee, W / S / A / D), the lobby's character card | **Complete** (in-game test pending) |
 | 4 | Player options: god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points, position tools | **Complete** (in-game test pending) |
 | 5 | Movement | Next |
 | 6 | Weapons | Planned |

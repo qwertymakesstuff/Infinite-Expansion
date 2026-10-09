@@ -23,7 +23,7 @@
 | Checker test suite | Tooling | 1 | COMPLETE | `tools/tests/test_check.py` (12 tests; `bad_mod` / `good_mod` fixtures) |
 | Cast data test (character table vs. stock scripts, the menu, and the picture pack's card names) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (7 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
-| Settings test (every setting in the menu and README, valid defaults, help that fits the menu, the init line's count) | Tooling | 4 | COMPLETE | `tools/tests/test_settings.py` (8 tests; checked to fail on a missing row, a wrong count, help that does not fit and a footer line that is too long) |
+| Settings test (every setting in the menu and README, valid defaults, help that fits the menu, the init line's count) | Tooling | 4 | COMPLETE | `tools/tests/test_settings.py` (9 tests; checked to fail on a missing row, a wrong count, help that does not fit, a footer line that is too long and a menu over its HUD element budget) |
 
 ## Installer (Windows)
 
@@ -90,11 +90,11 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| GSC menu engine (pages, on/off settings, numbers, words, actions, read-outs) | UI | 3 | TESTING | `ix/ui/menu.gsc`: create-once HUD elements, numbers with `setvalue`, help and range under the list (four lines, enough for every row: `test_settings.py`), live refresh when a setting changes anywhere; the feature `menu`; R-M1–R-M8 |
+| GSC menu engine (pages, on/off settings, numbers, words, actions, read-outs) | UI | 3 | TESTING | `ix/ui/menu.gsc`: create-once HUD elements, numbers with `setvalue`, help and range under the list (four lines, enough for every row: `test_settings.py`), 28 HUD elements, the most a player sees (L49; the text did not appear with 33 in 0.4.0), 8 rows with scrolling, live refresh when a setting changes anywhere; the feature `menu`; R-M1–R-M8 |
 | Menu controls (open: crouch, then Melee, or `!ix menu`; W / S / A / D or the left stick, Use or Jump, Melee; ADS / Fire and Tactical / Frag too) | UI | 3 | TESTING | The movement keys are read with `getnormalizedmovement` while the player is held in place, as the stock phone booth holds its player; the buttons are polled like a working IW7 zombies menu; Jump is a `+goStand` notify. Weapon, grenades, melee and Use are off while open, through the stock counters. The footer names the keys or the stick, and `<` `>` mark a value A / D change (L41); R-M1, R-M2, R-M9, R-M10 |
-| How the menu opens (`menu_open`: crouch_melee, ads_melee, chat) | UI | 0.4.1 | TESTING | Crouch + Melee by default (ADS + Melee, the old way, also opened it on a knife while aiming); the crouch counts after 0.3 s without sliding (`getstance`, `issprintsliding`). R-M11, R-M12 |
+| How the menu opens (`menu_open`: ads_melee, crouch_melee, chat) | UI | 0.4.1 | TESTING | ADS + Melee by default again (0.4.2, as the player asked), on every Melee press (`+melee_zoom` notify; polling alone missed quick taps) while ADS is held or the player aims (`playerads`, so toggle ADS works); in the air on landing; a line says why when it cannot open. *crouch_melee*: after 0.3 s crouched without sliding. R-M11, R-M12 |
 | How to open it, at the start of each round | UI | 0.4.1 | TESTING | `iprintlnbold` 3 s after `round_start`, until the player has opened the menu; late joiners 6 s after spawning; `menu_hint`. R-M13 |
-| The menu's keys in small text at its bottom | UI | 0.4.1 | TESTING | Three lines at fontscale 0.7, keyboard or controller words, with the keys that open it; their width is tested. R-M1 |
+| The menu's keys in small text at its bottom | UI | 0.4.1 | TESTING | Two lines at fontscale 0.7, keyboard or controller words, with the keys that open it; their width is tested. Not visible in 0.4.0 (too many HUD elements, L49); fixed in 0.4.2. R-M1, R-M14 |
 | Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Player (Phase 4, with Position), Menu, Settings, Debug; later phases add theirs (Game / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
 | Reset / defaults from menu | UI | 3 | TESTING | *Reset every setting* (confirm with a second Use, host only); presets come in Phase 11; R-M6 |
 | Host-only changes | UI | 3 | TESTING | Everyone can look; only the host changes, unless `menu_access` is `everyone`; R-M5 |

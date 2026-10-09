@@ -40,6 +40,12 @@ GUEST_NOTE = " Only the host can change it."  # menu.gsc item_help(), for a play
 # the 640-wide screen's units a character) in the panel's 224 usable units.
 FOOTER_FUNCTION = re.compile(r"^(footer_\w+_text)\([^)]*\)\s*\{(.*?)^\}", re.M | re.S)
 FOOTER_WIDTH = 44
+# HUD elements a player sees: a working IW7 zombies menu (Synergy, S8) keeps
+# 28 of its own non-archived and puts the rest in the archived set; the menu
+# stays below that, so the stock game's own elements still fit
+# (KNOWN_LIMITATIONS.md L49).
+HUD_NOT_ARCHIVED = 26
+HUD_ALL = 28
 
 
 def registered():
@@ -164,9 +170,9 @@ class Settings(unittest.TestCase):
 
     def test_menu_footer_fits(self):
         found = dict(FOOTER_FUNCTION.findall(MENU.read_text()))
-        self.assertEqual(sorted(found), ["footer_move_text", "footer_open_text", "footer_select_text"])
+        self.assertEqual(sorted(found), ["footer_move_text", "footer_open_text"])
         lines = [text for body in found.values() for text in re.findall(r'return "([^"]*)";', body)]
-        self.assertGreaterEqual(len(lines), 6)
+        self.assertGreaterEqual(len(lines), 5)
         for line in lines:
             self.assertLessEqual(len(line), FOOTER_WIDTH, line)
         # Every way to open the menu has its own line; the last is the fallback.
@@ -174,6 +180,26 @@ class Settings(unittest.TestCase):
         self.assertEqual(kind, "enum")
         cases = re.findall(r'case "([a-z_]+)":', found["footer_open_text"])
         self.assertEqual(cases, options[:-1])
+
+    def test_menu_hud_fits_the_element_budget(self):
+        text = MENU.read_text()
+        body = re.search(r"^create_hud\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
+        single = re.findall(r"hud\.\w+ = menu_(?:shader|text)\(", body)
+        per_row = re.findall(r"hud\.\w+\[row\] = menu_(?:shader|text)\(", body)
+        footer = re.findall(r"hud\.footer\[line\] = menu_text\(", body)
+        help_lines = re.findall(r"hud\.help\[line\] = menu_text\(", body)
+        self.assertEqual((len(footer), len(help_lines)), (1, 1))
+        total = len(single) + len(per_row) * menu_number("rows") + menu_number("footer_lines") + menu_number("help_lines")
+        archived_from = int(re.search(r"if \( line >= (\d+) \)\s*hud\.help\[line\]\.archived = 1;", body).group(1))
+        archived = menu_number("help_lines") - archived_from
+        self.assertLessEqual(total, HUD_ALL)
+        self.assertLessEqual(total - archived, HUD_NOT_ARCHIVED)
+        # Every element the menu makes is in the list it hides and shows.
+        listed = re.search(r"^hud_elements\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
+        for name in re.findall(r"hud\.(\w+) = menu_(?:shader|text)\(", body):
+            self.assertIn("hud." + name, listed)
+        for name in ("labels", "values", "help", "footer"):
+            self.assertIn("hud." + name, listed)
 
     def test_init_line_counts_them(self):
         for path in (README, TESTING):

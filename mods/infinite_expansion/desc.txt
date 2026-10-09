@@ -1,1 +1,1 @@
-Infinite Expansion 0.4.1 - modular enhancement framework for Infinite Warfare zombies. In-game menu (crouch, then Melee), player options (god mode, damage, third person, friendly fire, rocket jump), character selection, settings and !ix chat commands.
+Infinite Expansion 0.4.2 - modular enhancement framework for Infinite Warfare zombies. In-game menu (ADS + Melee), player options (god mode, damage, third person, friendly fire, rocket jump), character selection, settings and !ix chat commands.
