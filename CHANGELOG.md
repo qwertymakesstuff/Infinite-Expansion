@@ -4,6 +4,11 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Roadmap: Phase 14, the guided Easter egg mode, added; the fun features move to 15–22 (2026-10-09)
+
+- New Phase 14, not started: an optional Guided Mode, off by default and set before a map, that guides players through each map's main Easter egg quest with objectives, hints, directions, hint levels and a small HUD panel, from one verified guide per map. It never completes a step for the player. Its full scope is in `ROADMAP.md`; `README.md` and `FEATURE_STATUS.md` list it.
+- The fun features (emotes, fun toys, randomizer, favorites and presets, FUN menu, secrets, co-op show-off features, their tests) move from Phases 14–21 to 15–22, unchanged.
+
 ### 0.6.0: weapon options (Phase 6) (2026-10-09)
 
 **Added**

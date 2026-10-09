@@ -224,23 +224,38 @@
 | 3D debug drawing | Debug | – | BLOCKED | L2 |
 | Aimbot (in AAE's dev menu) | Debug | – | NOT PLANNED | MP cheating tool; excluded by design |
 
-## Fun features (Phases 14–21, not started)
+## Guided Easter egg mode (Phase 14, not started)
+
+The full scope is in `ROADMAP.md`. Nothing here is started; every guide step is verified before it is shown, and a step that cannot be verified is marked as needing research.
+
+| Feature | Category | Phase | Status | Notes |
+|---------|----------|-------|--------|-------|
+| Guided Mode toggle before a map (OFF by default, remembered, never switched on by an update) and in the in-game menu | Guided | 14 | PLANNED | The zombies lobby already has the mod's CHARACTER button (Lua UI); settings persist as archived dvars (L38) |
+| One verified guide per map (Spaceland, Rave in the Redwoods, Shaolin Shuffle, Attack of the Radioactive Thing, The Beast from Beyond), as data apart from the code | Guided | 14 | PLANNED | Only verified steps; the rest marked as needing research |
+| Contextual objectives and hints; automatic progress only where the game exposes it, else Next / Previous / Mark complete / Full guide | Guided | 14 | PLANNED | Never assumes a step is done |
+| Locations and directions; markers only for targets the game can locate | Guided | 14 | PLANNED | No guessed coordinates |
+| Hint levels: Minimal, Standard (default), Detailed, Full Walkthrough | Guided | 14 | PLANNED | |
+| Guided Mode HUD panel (hide, minimize, position, size, opacity where possible) | Guided | 14 | PLANNED | Shares the HUD element budget (L49) |
+| Co-op: local guidance; shared or synchronized progress only where reliable | Guided | 14 | PLANNED | No pretend synchronization |
+| "GUIDED MODE UNAVAILABLE" on maps without a verified guide | Guided | 14 | PLANNED | Never another map's guide |
+
+## Fun features (Phases 15–22, not started)
 
 The full scope is in `ROADMAP.md`. Nothing here is started; each feature is verified against the game first, and dropped or marked BLOCKED if the game cannot support it.
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Emote menu (wheel, browse, favorites, random, settings, preview) and categories | Fun | 14 | PLANNED | Study AAE's emotes first; only animations IW7 really has (L13) |
-| Emote preview and radial emote wheel | Fun | 14 | PLANNED | If technically possible; else the closest stable alternative |
-| Emote safety (death, down, revive, weapon change, rounds, teleports, menus, interrupts) | Fun | 14 | PLANNED | Never trap the player in an animation |
-| Fun player and movement effects (super jump, gravity, speed, spin, poses, landings, third person, size) | Fun | 15 | PLANNED | Shares mechanisms with Phases 4–5; global dvars restored (L17, L20) |
-| Fun zombie effects (speed, health, size, freeze, launch, random) | Fun | 15 | PLANNED | Only what the game exposes; each tested alone |
-| Fun weapon effects (rapid or slow fire, infinite ammo, magazine, damage, recoil, one-shot) | Fun | 15 | PLANNED | Separate from the Phase 6 weapon system |
-| Visual effects and miscellaneous toys | Fun | 15 | PLANNED | |
-| Zombies randomizer, with RESET RANDOMIZER | Fun | 16 | PLANNED | Only supported systems |
-| Favorites and presets of fun features | Fun | 17 | PLANNED | Persist only if reliable (L38), else per session; related to Phase 11 |
-| FUN menu section and polish | Fun | 18 | PLANNED | Menu root title to settle ("ALL-SPECTRUM" in the request) |
-| Secret feature manager and easter eggs | Fun | 19 | PLANNED | Hidden from the normal menus; reversible |
-| Co-op social and show-off features | Fun | 20 | PLANNED | No pretend synchronization; local where it cannot sync |
-| Fun feature test checklist | Testing | 21 | PLANNED | Goes into `TESTING.md` with the features |
+| Emote menu (wheel, browse, favorites, random, settings, preview) and categories | Fun | 15 | PLANNED | Study AAE's emotes first; only animations IW7 really has (L13) |
+| Emote preview and radial emote wheel | Fun | 15 | PLANNED | If technically possible; else the closest stable alternative |
+| Emote safety (death, down, revive, weapon change, rounds, teleports, menus, interrupts) | Fun | 15 | PLANNED | Never trap the player in an animation |
+| Fun player and movement effects (super jump, gravity, speed, spin, poses, landings, third person, size) | Fun | 16 | PLANNED | Shares mechanisms with Phases 4–5; global dvars restored (L17, L20) |
+| Fun zombie effects (speed, health, size, freeze, launch, random) | Fun | 16 | PLANNED | Only what the game exposes; each tested alone |
+| Fun weapon effects (rapid or slow fire, infinite ammo, magazine, damage, recoil, one-shot) | Fun | 16 | PLANNED | Separate from the Phase 6 weapon system |
+| Visual effects and miscellaneous toys | Fun | 16 | PLANNED | |
+| Zombies randomizer, with RESET RANDOMIZER | Fun | 17 | PLANNED | Only supported systems |
+| Favorites and presets of fun features | Fun | 18 | PLANNED | Persist only if reliable (L38), else per session; related to Phase 11 |
+| FUN menu section and polish | Fun | 19 | PLANNED | Menu root title to settle ("ALL-SPECTRUM" in the request) |
+| Secret feature manager and easter eggs | Fun | 20 | PLANNED | Hidden from the normal menus; reversible |
+| Co-op social and show-off features | Fun | 21 | PLANNED | No pretend synchronization; local where it cannot sync |
+| Fun feature test checklist | Testing | 22 | PLANNED | Goes into `TESTING.md` with the features |
 

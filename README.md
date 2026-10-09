@@ -286,7 +286,7 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | `KNOWN_LIMITATIONS.md` | Engine, client, compiler, and environment limits, with workarounds |
 | `ARCHITECTURE.md` | Module layout, init flow, the core systems (settings, events, features, chat commands), and how to add a feature |
 | `FEATURE_STATUS.md` | Every planned feature and its status |
-| `ROADMAP.md` | The phase plan, with the full scope of the phases not started yet (14–21: the fun features) |
+| `ROADMAP.md` | The phase plan, with the full scope of the phases not started yet (14: the guided Easter egg mode; 15–22: the fun features) |
 | `TESTING.md` | Verification levels, verification log, runtime test checklist |
 | `CHANGELOG.md` | History |
 | `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests |
@@ -311,14 +311,15 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 11 | Configuration presets | Planned |
 | 12 | Polish | Planned |
 | 13 | Testing | Planned |
-| 14 | Emotes: menu, wheel, preview, favorites | Planned, not started (`ROADMAP.md`) |
-| 15 | Fun toys: player, movement, zombie, weapon and visual effects | Planned, not started |
-| 16 | Zombies randomizer | Planned, not started |
-| 17 | Favorites and presets of the fun features | Planned, not started |
-| 18 | FUN menu polish | Planned, not started |
-| 19 | Secrets and easter eggs | Planned, not started |
-| 20 | Co-op social and show-off features | Planned, not started |
-| 21 | Fun feature testing | Planned, not started |
+| 14 | Guided Easter egg mode: an optional in-game guide to each map's main Easter egg quest | Planned, not started (`ROADMAP.md`) |
+| 15 | Emotes: menu, wheel, preview, favorites | Planned, not started (`ROADMAP.md`) |
+| 16 | Fun toys: player, movement, zombie, weapon and visual effects | Planned, not started |
+| 17 | Zombies randomizer | Planned, not started |
+| 18 | Favorites and presets of the fun features | Planned, not started |
+| 19 | FUN menu polish | Planned, not started |
+| 20 | Secrets and easter eggs | Planned, not started |
+| 21 | Co-op social and show-off features | Planned, not started |
+| 22 | Fun feature testing | Planned, not started |
 
 ## Development
 
