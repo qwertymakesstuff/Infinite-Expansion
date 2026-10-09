@@ -21,6 +21,22 @@ build()
     add_setting( "characters", "character_crossmap", 1 );
     add_setting( "characters", "character_announce", 1 );
 
+    add_page( "player", "Player", "main" );
+    add_setting( "player", "god_mode", 1 );
+    add_setting( "player", "damage_taken", 10 );
+    add_setting( "player", "third_person", 1 );
+    add_setting( "player", "zombies_ignore", 1 );
+    add_setting( "player", "rocket_jump", 1 );
+    add_setting( "player", "rocket_jump_power", 25 );
+    add_setting( "player", "friendly_fire", 1 );
+    add_setting( "player", "starting_points", 500 );
+    add_setting( "player", "player_ejection", 1 );
+
+    add_page( "position", "Position", "player" );
+    add_action( "position", "Save position", "Remembers where you stand, until the match ends.", custom_scripts\ix\player\position::save_position, 0, 1 );
+    add_action( "position", "Go to saved position", "Back to the spot you saved. The menu closes.", custom_scripts\ix\player\position::load_position, 0, 1 );
+    add_action( "position", "Teleport to crosshair", "To the spot you are looking at. The menu closes. It can put you where the game does not expect you.", custom_scripts\ix\player\position::teleport_to_crosshair, 0, 1 );
+
     add_page( "menu", "Menu", "main" );
     add_setting( "menu", "menu_access", 1 );
     add_setting( "menu", "menu_hint", 1 );

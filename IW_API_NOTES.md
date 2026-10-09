@@ -148,6 +148,11 @@ Ordering and helper traps `[DUMP]`:
 - `level.callbackplayerkilled`, `level.callbackplayerconnect`, `level.callbackplayerdisconnect`, `level.callbackplayerlaststand` (CP), `level.callbackfinishweaponchange` (when defined).
 - Agents: `codecallback_agentdamaged` calls `self [[ level.agentfunc ]]("on_damaged")`, which reads `level.agent_funcs[agent_type]["on_damaged"]`. The same pattern applies to `"on_killed"`. Maps override these per type (`generic_zombie`, `zombie_brute`, `c6`, `the_hoff`, `slasher`, `skeleton`, `ratking`, `zombie_sasquatch`).
 - Wrapping pattern: store the original pointer, install a wrapper that adjusts arguments, and call the original. Do this **after** map scripts have run (section 2, ordering).
+- **The player damage callback in zombies, in detail** (Phase 4, `ix/player/damage.gsc`) `[DUMP]`:
+  - Only `scripts\mp\callbacksetup::codecallback_playerdamage` calls it in CP (the other callers are MP scripts). It is set by `cp_globallogic::setupcallbacks()` (`::defaultplayerdamage`), then by `zombie.gsc` / `escape.gsc` `main()` (`zombie_damage::callback_zombieplayerdamage`), then by the `main()` of `cp_rave`, `cp_disco`, `cp_town` and `cp_final` (`cp_<map>_damage::callback_<map>zombieplayerdamage`). Nothing sets it later, so the mod wraps it on `ix_ready` (after every `main()`).
+  - All five callbacks share `scripts\cp\zombies\zombie_damage` helpers: `shouldtakedamage(damage, attacker, weapon, flags)` (false with `level.disableplayerdamage`; for some weapons by name: Venom-X, IMS, fireworks, the sentry minigun, the robot's projectile, the electric trap, a homing bolas spray; for damage flags 256 and 258; in last stand; during the spawn damage shield; with `ability_invulnerable`; from N.E.I.L.; off the grid; fast travelling; on the boat), `isfriendlyfire(victim, attacker)` (one player's damage to another is zeroed outside hardcore; in hardcore a ricochet goes back to the shooter with `dodamage(damage, origin, attacker, inflictor, mod)`), and `finishplayerdamagewrapper(…13 arguments…)`, whose 11th argument is a fraction (0.0 in the stock calls) and which ends in `finishplayerdamage`.
+  - A player's own splash damage (`MOD_EXPLOSIVE`, `MOD_GRENADE_SPLASH`, `MOD_PROJECTILE_SPLASH`) goes through `get_explosive_damage_on_player(inflictor, attacker, damage, flags, mod, weapon)`: scaled down for grenades and launchers, at most 80, and 0 for the wonder weapons (Shredder, Face Melter, Dischord, Head Cutter), the Armageddon meteor and a G18 above level 2. The callbacks also zero by name the harpoons, `iw7_acid_rain_projectile_zm`, Venom-X, the shuriken (`cp_disco`), fireworks and IMS projectiles; the boom perk and the fortified passive (sliding or crouched) make a player's own blasts harmless.
+  - Kill triggers on `cp_zmb` and `cp_final` do not use damage: the maps' trigger loops call `cp_damage::onplayertouchkilltrigger`, which puts the player into last stand at a safe spot.
 
 ## 6. Zombies (CP) internals `[DUMP]`
 
@@ -163,6 +168,8 @@ Ordering and helper traps `[DUMP]`:
 | Zombie speed | `self.movemode` ∈ {`slow_walk`,`walk`,`run`,`sprint`} chosen by `calulatezombiemovemode()` (sic); per-type override hook `level.movemodefunc[agent_type]` (re-evaluated in the agent loop); `self.moveratescale` (stock speed-up uses 1.15) |
 | Zombie spawned | `level notify("agent_spawned", ...)` occurs in stock spawning |
 | Currency | `scripts\cp\cp_persistence::get_player_currency()`, `set_player_currency(n)`, `give_player_currency(n, …)`, `take_player_currency(n, …)`, `get_player_max_currency()` |
+| Starting points | `zombie.gsc` `onspawnplayer()` → `get_starting_currency(player)`: a player back from spectating keeps their own points (`starting_currency_after_revived_from_spectator`), then `level.direct_to_boss_fight` 20,000, then Director's Cut (`getrankedplayerdata("cp", "dc")`) 25,000, else `cp_persistence::get_starting_currency()` = `level.starting_currency`, or 500 when undefined (only `escape.gsc` sets it, to 0). `wait_to_set_player_currency` gives it a second later; the cap is `set_player_max_currency(999999)` |
+| Zombies leaving a player alone | `self.ignoreme`. The game counts its own reasons with `scripts\cp\utility::allow_player_ignore_me(on)` in `self.enabledignoreme` (last stand, fast travel, …), and `onspawnplayer()` resets both to 0 |
 | Power-ups | `scripts\cp\loot::drop_loot(origin, player, contentRef, …)`, 6 params. `origin` is snapped with `getclosestpointonnavmesh`, and `contentRef == "none"` returns 0. Refs found in stock CP scripts (`loot.gsc`, `zombies_consumables.gsc`, `zombies_pillage.gsc`): `instakill_30`, `kill_50`, `ammo_max`, `fire_30`, `infinite_20`, `grenade_30`, `cash_2`, `board_windows` |
 | Spawning agents | `scripts\mp\mp_agent::spawnnewagent(...)` (6 params), `spawn_scripted_agent(...)`, `spawn_regular_agent(...)` (argument semantics must be read before use) |
 | Restart | console commands `map_restart` / `fast_restart` exist (iw7-mod `party.cpp` executes and patches them); run from GSC with `executecommand(...)`; the function `map_restart(...)` also exists |
@@ -210,16 +217,18 @@ Ordering and helper traps `[DUMP]`:
 | Fall damage | dvar `jump_enableFallDamage` (bool) `[MOD]` | global |
 | Mantle | `mantle_legacy`, `mantle_legacyMaxAngle` (0–90, IW6 60), `mantle_legacyReach` (16–128, IW6 54.9) `[MOD]` | global |
 | Bounces | `bg_bounces`, `bg_bounceMinFallSpeed` (0–1000) `[MOD]` | global |
-| Player ejection (collision) | `bg_playerEjection` (bool) `[MOD]` | global |
+| Player ejection (collision) | `bg_playerEjection` (bool, default 1, replicated: players standing inside each other are pushed apart; the same in v1.1.0 and develop `gameplay.cpp`) `[MOD]` | global |
 | Omni-movement / unlimited sprint / air control | `bg_omnimovement`, `bg_sprintUnlimited`, `bg_airControl` (0–100). **develop only**: feature-detect with `getdvar(n) != ""` `[MOD develop]` | global |
 | Ability toggles | `allowjump`, `allowsprint`, `allowslide`, `allowwallrun`, `allowdoublejump`, `allowmantle`, `allowprone`, `allowcrouch`, `allowstand`, `allowads`, `allowfire`, `allowmelee` | per player |
 | Boost energy | `energy_setmax`, `energy_getmax`, `energy_setrestorerate` | per player |
 | Velocity / position | `getvelocity`, `setvelocity`, `isonground`, `isonladder`, `ismantling`, `iswallrunning`, `setorigin`, `setplayerangles`, `getplayerangles`, `getstance`, `setstance` | per player |
 | Control | `freezecontrols(b)`, `playerlinkto(ent)`, `unlink()`, `disableweapons()`, `enableweapons()` | per player |
-| Third person | `_meth_845E` (`setcamerathirdperson`); or client dvar `cg_thirdPerson` (CHEAT, client-only, not on dedicated) plus `cg_thirdPersonAngle` / `cg_thirdPersonRange` `[MOD thirdperson.cpp]` | per player / host |
+| Third person | `_meth_845E` (`setcamerathirdperson`; stock MP scripts switch it on and off: `super_reaper`, `archreaper`, `mortar_mount`, `class`; the mod calls it through `compat::third_person`); or client dvar `cg_thirdPerson` (CHEAT, client-only, not on dedicated) plus `cg_thirdPersonAngle` / `cg_thirdPersonRange` `[MOD thirdperson.cpp]` | per player / host |
 | FOV (client prefs) | `cg_fov` (1–160), `cg_fovScale` (0.1–2), `cg_fovMin` (saved client dvars) `[MOD fov.cpp]` | client |
 | Timescale | `setslowmotion(...)` (iw7-mod) or dvar `timescale` (0.001–1000, CHEAT, replicated) `[MOD timescale.cpp]` | global |
-| Viewmodel offset | `cg_gun_x/y/z` (client) `[MOD]` | client |
+| Viewmodel offset | `cg_gun_x/y/z` (float, -800 to 800, no flags: each player's own game, not saved; whether `setclientdvar` reaches them is UNK) `[MOD gameplay.cpp]` | client |
+| Throwing a player | `setvelocity(getvelocity() + v)`; the stock `zombies_weapons::fling_zombie` throws along `vectornormalize(self.origin - source.origin)` plus an upward part `[DUMP]` | per player |
+| Placing a player | `bullettrace(start, end, 0, ignore)` → `["position"]`, `["fraction"]` (1: nothing hit, `cp_weapon.gsc`), `["surfacetype"]` ("none" for the sky, MP `vanguard.gsc`); `playerphysicstrace(start, end)` returns where a player-sized box stops (MP `playerlogic.gsc` places players with it) `[DUMP]` | per player |
 
 ## 10. Weapons and damage
 
@@ -231,7 +240,7 @@ Ordering and helper traps `[DUMP]`:
   - Spread: `setspreadoverride(n)` and `_meth_8263()`.
   - Kick: `setviewkickscale(f)`.
 - **Health:**
-  - Invulnerability: `enableinvulnerability()` and **`_meth_80A1()`** (disable).
+  - Invulnerability: `enableinvulnerability()` and **`_meth_80A1()`** (disable). No zombies script uses them; the mod's god mode drops the damage in the damage callback instead (§5.3).
   - Damage and death: `dodamage(...)`, `suicide()`.
   - Fields: `self.health` / `self.maxhealth`.
   - Perks: `setperk` / `unsetperk` / `_meth_8181` (hasperk).

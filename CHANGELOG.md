@@ -4,6 +4,31 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.4.0: player options (Phase 4) (2026-10-09)
+
+**Added**
+- **Player page** in the in-game menu (ADS + Melee, then *Player*). Each option is also a setting for chat and the console, applies to the whole match, and belongs to the host:
+  - **God mode**: off, host (only the host takes no damage) or everyone.
+  - **Damage taken**: 10 to 500 percent of the damage players take; 100 is the game's own.
+  - **Third person**: off, host or everyone.
+  - **Zombies ignore players**: off, host or everyone.
+  - **Rocket jump** and **Rocket jump: power**: your own explosions that would hurt you (launchers, grenades) throw you up and away instead. The ones the game already makes harmless to you, such as the wonder weapons, still do nothing.
+  - **Friendly fire**: off (the game's own: players cannot hurt each other), on (they can, and can down each other) or reflect (whoever shoots a teammate takes the damage).
+  - **Starting points**: 0 to 999,999 (the game gives 500), for players who spawn for the first time after the change. Director's Cut keeps its own 25,000.
+  - **Players push apart**: on, as in the game; off lets players stand inside each other.
+  - **Position** page: *Save position*, *Go to saved position* and *Teleport to crosshair*. Host only, unless *Menu: who changes settings* is *everyone*; the menu closes first; refused while down. A teleport can put you where the game does not expect a player.
+- Version 0.4.0: the first release that reaches 0.3.2 installs by itself, through the desktop shortcut.
+
+**Fixed**
+- The help under the menu's list has four lines instead of three. Longer help was cut off without a sign: a guest never saw the end of "Only the host can change it." on three Characters rows.
+
+**Not in this version**
+- *Gun position* is not a setting, because it differs per player: iw7-mod's `cg_gun_x`, `cg_gun_y` and `cg_gun_z` move the weapon in each player's own console.
+- The one-team grief mode is deferred.
+
+**Tests**
+- New `tools/tests/test_settings.py` (7 tests, 106 in all). It checks that every setting has a valid default, a menu row and a README row, and that the init line counts them. It also checks that every row's help fits the menu's lines, including the guest's note.
+
 ### Roadmap: Phases 14–21 added (2026-10-09)
 
 - Eight new phases for the fun features, planned after Phases 4–13 and not started: emotes (14), fun toys (15), a zombies randomizer (16), favorites and presets (17), FUN menu polish (18), secrets and easter eggs (19), co-op social features (20) and their tests (21). Their full scope and ground rules are in the new `ROADMAP.md`; `README.md` and `FEATURE_STATUS.md` list them.

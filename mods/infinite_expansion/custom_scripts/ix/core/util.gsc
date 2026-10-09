@@ -111,3 +111,15 @@ starts_with( text, prefix )
 {
     return text.size >= prefix.size && getsubstr( text, 0, prefix.size ) == prefix;
 }
+
+// For a setting whose words are off / host / everyone: whether it is on for
+// this player.
+applies_to( id, player )
+{
+    scope = custom_scripts\ix\core\config::get( id );
+
+    if ( scope == "everyone" )
+        return 1;
+
+    return scope == "host" && is_valid_player( player ) && player ishost();
+}

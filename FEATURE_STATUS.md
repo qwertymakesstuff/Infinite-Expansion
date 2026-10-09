@@ -23,6 +23,7 @@
 | Checker test suite | Tooling | 1 | COMPLETE | `tools/tests/test_check.py` (12 tests; `bad_mod` / `good_mod` fixtures) |
 | Cast data test (character table vs. stock scripts, the menu, and the picture pack's card names) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (7 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
+| Settings test (every setting in the menu and README, valid defaults, help that fits the menu, the init line's count) | Tooling | 4 | COMPLETE | `tools/tests/test_settings.py` (7 tests; checked to fail on a missing row, a wrong count and help that does not fit) |
 
 ## Installer (Windows)
 
@@ -89,9 +90,9 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| GSC menu engine (pages, on/off settings, numbers, words, actions, read-outs) | UI | 3 | TESTING | `ix/ui/menu.gsc`: create-once HUD elements, numbers with `setvalue`, help and range under the list, live refresh when a setting changes anywhere; the feature `menu`; R-M1–R-M8 |
+| GSC menu engine (pages, on/off settings, numbers, words, actions, read-outs) | UI | 3 | TESTING | `ix/ui/menu.gsc`: create-once HUD elements, numbers with `setvalue`, help and range under the list (four lines, enough for every row: `test_settings.py`), live refresh when a setting changes anywhere; the feature `menu`; R-M1–R-M8 |
 | Menu controls (open ADS + Melee or `!ix menu`; W / S / A / D or the left stick, Use or Jump, Melee; ADS / Fire and Tactical / Frag too) | UI | 3 | TESTING | The movement keys are read with `getnormalizedmovement` while the player is held in place, as the stock phone booth holds its player; the buttons are polled like a working IW7 zombies menu; Jump is a `+goStand` notify. Weapon, grenades, melee and Use are off while open, through the stock counters. The footer names the keys or the stick, and `<` `>` mark a value A / D change (L41); R-M1, R-M2, R-M9, R-M10 |
-| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Menu, Settings, Debug; later phases add theirs (Game / Player / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
+| Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Player (Phase 4, with Position), Menu, Settings, Debug; later phases add theirs (Game / Zombie / Weapon / Perk / Power-up / Modes, as AAE's "Custom Mutations") |
 | Reset / defaults from menu | UI | 3 | TESTING | *Reset every setting* (confirm with a second Use, host only); presets come in Phase 11; R-M6 |
 | Host-only changes | UI | 3 | TESTING | Everyone can look; only the host changes, unless `menu_access` is `everyone`; R-M5 |
 | Per-player access list | UI | – | NOT PLANNED | `menu_access` covers host-only versus everyone |
@@ -112,16 +113,18 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| God mode | Player | 4 | PLANNED | `enableinvulnerability` / `_meth_80A1` |
-| Player health (AAE 1–5 hits) | Player | 4 | PLANNED | `.maxhealth`; regen interaction NEEDS TESTING |
-| Starting points | Player | 4 | PLANNED | `set_player_currency` (CP) |
-| Friendly-fire modes / one-team grief | Player | 4 | PLANNED | Damage-callback wrapper |
-| Rocket jump | Player | 4 | PLANNED | Callback + `setvelocity` |
-| Third person (incl. back-of-head) | Player | 4 | PLANNED | `_meth_845E` |
-| Gun (arm) position | Player | 4 | INVESTIGATING | `cg_gun_x/y/z` via `setclientdvar` |
-| Teleport / position utilities | Player | 4 | PLANNED | `setorigin`, traces |
-| Zombies ignore player | Player | 4 | PLANNED | `self.ignoreme` |
-| Player collision (ejection) | Player | 4 | PLANNED | `bg_playerEjection` (global) |
+| God mode (off / host / everyone) | Player | 4 | TESTING | `ix/player/damage.gsc`: the mod's damage callback, put in front of the map's own on `ix_ready`, drops the damage (`IW_API_NOTES.md` §5.3; no stock zombies script uses `enableinvulnerability`, so the mod does not either). L47; R-P2 |
+| Damage taken (AAE's player health: 1–5 hits) | Player | 4 | TESTING | `damage_taken` 10–500 percent of every hit, in the same callback; `.maxhealth` stays the game's (the tough perk and health regen set it). R-P3 |
+| Starting points | Player | 4 | TESTING | `ix/player/options.gsc`: `level.starting_currency`, which the stock `cp_persistence::get_starting_currency()` reads at each player's first spawn; Director's Cut, the boss-fight-only mode and a player back from spectating keep the game's amounts (L48). R-P9 |
+| Friendly fire (off / on / reflect) | Player | 4 | TESTING | Same callback: *on* applies a teammate's hit with the stock `finishplayerdamagewrapper` (last stand included); *reflect* gives it to the shooter with `dodamage`. R-P4 |
+| One-team grief (shots slow teammates) | Player | – | DEFERRED | Needs a slow-down effect that zombies maps load; not looked into yet |
+| Rocket jump (and its power) | Player | 4 | TESTING | Same callback: your own splash damage throws you with `setvelocity`, as the stock `fling_zombie` throws zombies, instead of hurting you. R-P5 |
+| Third person (off / host / everyone) | Player | 4 | TESTING | `compat::third_person` (`_meth_845E`, `setcamerathirdperson`), applied on every spawn. R-P6 |
+| Gun (arm) position | Player | – | DEFERRED | iw7-mod's `cg_gun_x/y/z` are dvars of each player's own game; whether `setclientdvar` from the host's scripts reaches them is unknown, and the offset is each player's own choice, which the match-wide settings cannot hold yet (L46). README names the console commands |
+| Teleport / position utilities | Player | 4 | TESTING | `ix/player/position.gsc`: save / go to a position, teleport to the crosshair (`bullettrace`, `playerphysicstrace`, `setorigin`); menu actions, host only; refused while down, dead or moved by the game (L45). R-P10 |
+| Zombies ignore players (off / host / everyone) | Player | 4 | TESTING | `.ignoreme` kept set, the game's own count (`allow_player_ignore_me`) left alone and restored when off. R-P7 |
+| Player collision (ejection) | Player | 4 | TESTING | `player_ejection` sets iw7-mod's `bg_playerEjection` (global, L20; the game's 1 back at the match's end). R-P8 |
+| Player page in the menu | UI | 4 | TESTING | *Player* with the nine options and a *Position* page. R-P1 |
 | Move-speed multiplier (AAE: same `g_speed`) | Movement | 5 | PLANNED | `g_speed` / `setmovespeedscale` |
 | Gravity | Movement | 5 | PLANNED | `bg_gravity` 1–1000 |
 | Jump height | Movement | 5 | INVESTIGATING | L16 |

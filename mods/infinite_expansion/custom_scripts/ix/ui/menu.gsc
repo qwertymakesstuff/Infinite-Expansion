@@ -374,6 +374,20 @@ is_held()
     return isdefined( state.anchor ) && self islinked() && self getlinkedparent() == state.anchor;
 }
 
+// For other modules: whether this player's link is only the menu holding them.
+is_menu_link( player )
+{
+    return isdefined( player.ix ) && isdefined( player.ix.menu ) && player is_held();
+}
+
+// For an action that moves the player (position.gsc): the menu closes, which
+// lets go of them.
+close_menu_for_move()
+{
+    if ( isdefined( self.ix ) && isdefined( self.ix.menu ) && self.ix.menu.open )
+        close_menu();
+}
+
 // ---------------------------------------------------------------------------
 // Input
 
@@ -822,9 +836,21 @@ help_top()
     return first_row_top() + rows() * row_height() + 6;
 }
 
+// The row's help and range, word-wrapped: room for the longest help with
+// " Only the host can change it." after it (tools/tests/test_settings.py).
+help_lines()
+{
+    return 4;
+}
+
+help_width()
+{
+    return 40;
+}
+
 footer_top()
 {
-    return help_top() + 3 * 11 + 4;
+    return help_top() + help_lines() * 11 + 4;
 }
 
 footer_line()
@@ -875,7 +901,7 @@ create_hud()
 
     hud.help = [];
 
-    for ( line = 0; line < 3; line++ )
+    for ( line = 0; line < help_lines(); line++ )
         hud.help[line] = menu_text( "left", menu_left() + 8, help_top() + line * 11, "default", 0.85, ( 0.8, 0.8, 0.8 ) );
 
     // The controls: set by show_controls(), for a keyboard or a controller.
@@ -991,9 +1017,9 @@ draw()
 
     show_arrows();
 
-    lines = wrap( item_help( current_item() ), 40, 3 );
+    lines = wrap( item_help( current_item() ), help_width(), help_lines() );
 
-    for ( line = 0; line < 3; line++ )
+    for ( line = 0; line < help_lines(); line++ )
     {
         if ( line < lines.size )
         {

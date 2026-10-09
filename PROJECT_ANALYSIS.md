@@ -379,12 +379,12 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
 | Move-speed multiplier | `setdvar("g_speed", 190 × pct)` | **Same dvar** `g_speed` (iw7-mod, replicated), or per-player `setmovespeedscale` | E | DP | PLANNED (Phase 5) |
-| Starting points | `level.player_starting_points` | `scripts\cp\cp_persistence::set_player_currency(n)` on first spawn | E | RI | PLANNED |
-| Player health (1–5 hits) | `zombie_var player_base_health` | `self.maxhealth`/`self.health`; stock dvar `scr_player_maxhealth`; CP regen interaction UNK | E | RI / UNK | PLANNED |
+| Starting points | `level.player_starting_points` | `level.starting_currency`, which `cp_persistence::get_starting_currency()` reads at each player's first spawn (Director's Cut and the boss-fight-only mode use their own amounts) | E | RI | TESTING (Phase 4) |
+| Player health (1–5 hits) | `zombie_var player_base_health` | *Damage taken* (10–500 percent of each hit) in the damage-callback wrapper; `self.maxhealth` stays the game's (the tough perk and regen set it) | E | RI | TESTING (Phase 4) |
 | EXO movement | `callback::on_connect` handler | IW7 is natively boost/wall-run; toggles `allowdoublejump`, `allowwallrun`; `bg_omnimovement` (develop) | E | N/A / RI | PLANNED (as toggles) |
 | No slide | `on_connect` handler | `self allowslide(0)` | E | DP | PLANNED |
-| Friendly fire (reflect/shared/knock-back/can't kill), one-team grief | `zm::register_player_friendly_fire_callback` | Wrap `level.callbackplayerdamage` (after map init); `scr_team_fftype`; grief: `setmovespeedscale` + `shellshock` | M | RI | PLANNED |
-| Rocket jump | Friendly-fire callback + push | Damage-callback wrapper + `setvelocity` on self-explosive damage | M | RI | PLANNED |
+| Friendly fire (reflect/shared/knock-back/can't kill), one-team grief | `zm::register_player_friendly_fire_callback` | Wrap `level.callbackplayerdamage` (on `ix_ready`, after every `main()`); on: the stock `finishplayerdamagewrapper`; reflect: `dodamage` on the shooter; grief: `setmovespeedscale` + a slow-down effect | M | RI | TESTING (Phase 4: off / on / reflect); grief DEFERRED |
+| Rocket jump | Friendly-fire callback + push | Damage-callback wrapper + `setvelocity` on the player's own splash damage that `zombie_damage::get_explosive_damage_on_player` would apply | M | RI | TESTING (Phase 4) |
 | Player health bar (self/ally overhead) | LUI widgets | Self bar: GSC hudelem (`setshader` width). Ally bars: `setwaypoint` + `settargetent` (both compilers), NEEDS TESTING | M | PP | PLANNED |
 | Damage analysis / damage numbers | Wrapper on `level.callbackactordamage` + LUI | Wrap agent `on_damaged`; short-lived hudelems (budget risk L12) | M | PP | PLANNED |
 | No HUD | Option | `setclientdvar("cg_draw2d", 0)` (stock dvar); acceptance UNK | E | UNK | INVESTIGATING |
@@ -403,7 +403,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Round size algorithm | Custom formula | `level.desired_enemy_deaths_this_wave` computed by hashed `_id_8455` | H | PP | INVESTIGATING |
 | Special-enemy modifiers | Round composition change | IW7 event waves per map | H | UNK | INVESTIGATING |
 | Zombie juke (BO1) | Custom spawn logic enabling BO3's built-in AI behaviour attributes `can_juke` / `spark_behavior` (stock animations) | IW7's zombie ASM has no juke behaviour or animations | H | NCP | BLOCKED — IW LIMITATION |
-| Zombies ignore a player (dev menu) | `self.ignoreme = 1` | **Same field** `self.ignoreme` (49 stock uses) | E | DP | PLANNED |
+| Zombies ignore a player (dev menu) | `self.ignoreme = 1` | **Same field** `self.ignoreme` (49 stock uses); the stock count `.enabledignoreme` left alone | E | DP | TESTING (Phase 4: off / host / everyone) |
 
 ### 3.5 Weapon and Mystery Box options
 
@@ -449,8 +449,8 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
 | UI colour / HUD format / scale / flat UI | LUI on the stock HUD | Our GSC HUD is themeable; restyling the **stock** IW7 LUI HUD needs client Lua | H | PP | DEFERRED |
-| Gun (arm) position | Client option | iw7-mod client dvars `cg_gun_x/y/z` via `setclientdvar` (acceptance UNK) | E | RI / UNK | PLANNED |
-| Back-of-head / third person | Keybind + LUI crosshair | `_meth_845E` (`setcamerathirdperson`, per player); 3rd-person crosshair (LUI) NCP | E | RI | PLANNED |
+| Gun (arm) position | Client option | iw7-mod client dvars `cg_gun_x/y/z` via `setclientdvar` (acceptance UNK); a per-player choice | E | RI / UNK | DEFERRED (per-player options, L46) |
+| Back-of-head / third person | Keybind + LUI crosshair | `_meth_845E` (`setcamerathirdperson`, per player); 3rd-person crosshair (LUI) NCP | E | RI | TESTING (Phase 4: a setting, off / host / everyone) |
 | In-game timer / movement-speed stats / system time | LUI | GSC HUD (`settimer`, `getvelocity`, `gettime`); system time UNK | E | RI | PLANNED |
 | Low-ammo hint / grenade countdown | LUI | GSC: `getweaponammoclip` vs `weaponclipsize` + hudelem | E | RI | PLANNED |
 | "Disable X" visual toggles (hints, flashes, letterbox, subtitles, …) | LUI / client dvars | Mostly stock-LUI behaviour; only toggles backed by real client dvars are possible | – | PP | DEFERRED (per item) |
@@ -472,9 +472,9 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| God mode / unlimited ammo / refill | Menu toggles | `enableinvulnerability` / `_meth_80A1`; `player_sustainAmmo` or a refill loop | E | RI | PLANNED (Phase 4/6) |
+| God mode / unlimited ammo / refill | Menu toggles | God mode: the damage-callback wrapper drops the damage (no zombies script uses `enableinvulnerability`); ammo: `player_sustainAmmo` or a refill loop | E | RI | God mode TESTING (Phase 4); ammo PLANNED (Phase 6) |
 | UFO / noclip | Menu toggle | Link to a script mover, fly with button polling | M | RI | PLANNED (Phase 10) |
-| Teleport menu (save/load, crosshair, sky/ground, nearest zombie, teleport zombies) | Menu actions | `setorigin`, `bullettrace`, `getaliveagents` | E | RI | PLANNED |
+| Teleport menu (save/load, crosshair, sky/ground, nearest zombie, teleport zombies) | Menu actions | `setorigin`, `bullettrace`, `playerphysicstrace`, `getaliveagents` | E | RI | Save / load / crosshair TESTING (Phase 4); the rest PLANNED (Phase 10) |
 | Score / perks / power-ups / weapons / visions | Menu actions | Currency API; `give_zombies_perk`; `drop_loot`; `giveweapon`; `visionsetnakedforplayer` | E | RI | PLANNED |
 | Entity / forge tools | Spawn/place/rotate/delete models | `spawn("script_model")`, `setmodel`, `rotateto`, `delete` | M | RI | PLANNED (Phase 10) |
 | Lobby: super speed / gravity / timescale / no fall damage | dvars | `g_speed`, `bg_gravity`, `setslowmotion`/`timescale`, `jump_enableFallDamage` | E | RI | PLANNED |

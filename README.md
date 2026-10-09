@@ -4,8 +4,8 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phase 3 (in-game menu) complete — not yet run in-game.**
-> The in-game menu (ADS + Melee) shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
+> **Status: Phase 4 (player options) complete — not yet run in-game.**
+> [Player options](#player-options): god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points and position tools, all in the in-game menu (ADS + Melee), which shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
 
 ## Requirements
 
@@ -88,9 +88,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.3.2 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.4.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 8 (0 changed from the default); features: 1; chat: !ix
+[IX] INFO: settings: 17 (0 changed from the default); features: 1; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -111,7 +111,25 @@ The two lines at the bottom of the menu say the same, and `<` `>` around a value
 
 While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It opens only while you stand on the ground, and it closes by itself if you go down.
 
-Its pages: **Characters**, **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+
+## Player options
+
+The **Player** page of the menu (also settings for chat and the console, see below). They apply to the whole match and belong to the host, like every setting.
+
+| Option | What it does |
+|--------|--------------|
+| **God mode** | No damage at all. *host*: only the host; *everyone*: every player |
+| **Damage taken** | Percent of the damage players take: 50 makes everyone twice as tough, 200 half as tough |
+| **Third person** | The camera behind the player. *host* or *everyone*, like god mode |
+| **Zombies ignore players** | Zombies leave those players alone. *host* or *everyone* |
+| **Rocket jump** | Your own explosions (launchers, grenades) throw you up and away instead of hurting you; **Rocket jump: power** sets how far. The ones the game already makes harmless to you, such as the wonder weapons, still do nothing |
+| **Friendly fire** | *off*: players cannot hurt each other, as in the game. *on*: they can, and can down each other. *reflect*: whoever shoots a teammate takes the damage |
+| **Starting points** | Points each player starts with (the game gives 500). Players already in the match keep theirs; set it before the match, or it applies to players who join later. A player with Director's Cut on still gets its 25,000, and the boss-fight-only mode its 20,000 |
+| **Players push apart** | The game pushes players apart when they stand inside each other; OFF lets them overlap |
+| **Position** | *Save position*, *Go to saved position*, *Teleport to crosshair*: the menu closes and you are moved. Host only, unless *Menu: who changes settings* is *everyone*. A teleport can put you where the game does not expect a player (`KNOWN_LIMITATIONS.md` L45) |
+
+Every option goes back to the game's own behaviour when you switch it off or reset it. *Gun position* is not a setting yet, because it differs per player: iw7-mod's `cg_gun_x`, `cg_gun_y` and `cg_gun_z` move your weapon on your own screen (console, for example `cg_gun_x 3`).
 
 ## Settings and chat commands
 
@@ -144,6 +162,15 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `menu` | 1 | 0/1 | The in-game menu; switching it off closes it for everyone |
 | `menu_access` | host | host, everyone | Who may change settings in the menu |
 | `menu_hint` | 1 | 0/1 | The line after your first spawn saying how to open the menu |
+| `god_mode` | off | off, host, everyone | No damage at all, for the host or every player |
+| `damage_taken` | 100 | 10–500 | Percent of the damage players take |
+| `third_person` | off | off, host, everyone | The camera behind the player |
+| `zombies_ignore` | off | off, host, everyone | Zombies leave those players alone |
+| `rocket_jump` | 0 | 0/1 | Your own explosions throw you instead of hurting you |
+| `rocket_jump_power` | 100 | 50–300 | Percent of that throw |
+| `friendly_fire` | off | off, on, reflect | Whether players can hurt each other, or whoever shoots a teammate is hurt instead |
+| `starting_points` | 500 | 0–999999 | Points each player starts with |
+| `player_ejection` | 1 | 0/1 | Players standing inside each other are pushed apart (iw7-mod's `bg_playerEjection`) |
 
 These dvars are not settings, because they are not the host's to set:
 
@@ -220,8 +247,8 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 1.5 | Characters: choose who you play as, per-map names, special characters | **Complete** (in-game test pending) |
 | 2 | Core systems (settings, saving, chat commands, events, features, utilities) and the launcher | **Complete** (in-game test pending) |
 | 3 | In-game menu (ADS + Melee, W / S / A / D), the lobby's character card | **Complete** (in-game test pending) |
-| 4 | Player features | In progress |
-| 5 | Movement | Planned |
+| 4 | Player options: god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points, position tools | **Complete** (in-game test pending) |
+| 5 | Movement | Next |
 | 6 | Weapons | Planned |
 | 7 | Zombies | Planned |
 | 8 | HUD | Planned |

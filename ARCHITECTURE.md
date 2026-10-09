@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Infinite Expansion
 
-> **Status: Phases 1–3 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — confirmed in a real match; Phase 3: the in-game menu — compiled and checked, in-game test pending). Sections 4 and 5 describe what exists; presets (§4.2) and the info HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
+> **Status: Phases 1–4 implemented** (Phase 1: entry scripts, bootstrap, logging, compat, `tools/check.py`; Phase 2: event bus, settings, saving, feature manager, chat commands, utilities — confirmed in a real match; Phase 3: the in-game menu; Phase 4: player options — compiled and checked, in-game tests pending). Sections 4 and 5 describe what exists; presets (§4.2) and the info HUD (§6) remain plans for later phases. This design follows from the verified IW7 facts in `IW_API_NOTES.md` and the AAE v3.9.5 analysis (`PROJECT_ANALYSIS.md` §1). Section 10 maps AAE's components onto this design.
 
 ## 1. Constraints that shape the design
 
@@ -46,8 +46,11 @@ Infinite-Expansion/                          (repository)
 │               │   ├── menu_tree.gsc        menu pages (data only)                       (Phase 3)
 │               │   └── hud.gsc              info HUD (create-once/update)
 │               ├── player/                  ≙ /scripts/player/
-│               │   ├── player.gsc           health, god mode, third person, utilities
+│               │   ├── player.gsc           the module: registers the files below          (Phase 1)
 │               │   ├── character.gsc        character selection, specials, per-map cast (Phase 1.5)
+│               │   ├── damage.gsc           god mode, damage taken, friendly fire, rocket jump (Phase 4)
+│               │   ├── options.gsc          third person, zombies ignore, ejection, points (Phase 4)
+│               │   ├── position.gsc         save / load position, teleport (menu actions) (Phase 4)
 │               │   └── movement.gsc         speed, gravity, sprint/slide/mantle options
 │               ├── weapons/                 ≙ /scripts/weapons/
 │               │   └── weapons.gsc          ammo, fire-rate, recoil, spread, give/take, info
@@ -99,7 +102,7 @@ iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
         ├─ thread wait_until_ready: first "connected" + waittillframeend
         │     → level.ix.ready = 1, notify "ix_ready"
         │     → features: global features that are on start (on_enable)
-        │     (later) wrap map-owned callbacks
+        │     → player/damage.gsc wraps the map's level.callbackplayerdamage (Phase 4)
         ├─ thread watch_players: every "connected"
         │     → self.ix = { spawn_count }, notify "ix_player_connected"
         │     → spawn watcher thread: notify "ix_player_spawned" on every "spawned_player"
@@ -191,7 +194,7 @@ One listener thread exists per source notify (per player for player events), sta
 
 ### 4.4 Utilities (`ix\core\util`, `ix\core\log`, `ix\core\compat`)
 
-- **util:** `is_valid_player`, `is_human`, `dvar_string`, `join(items, separator)`, `parse_bool(text)`, `is_number(text, allow_fraction)`, `array_contains(items, value)`, `starts_with(text, prefix)`. Single characters are taken with `getsubstr(text, i, i + 1)`, as the stock scripts do.
+- **util:** `is_valid_player`, `is_human`, `dvar_string`, `join(items, separator)`, `parse_bool(text)`, `is_number(text, allow_fraction)`, `array_contains(items, value)`, `starts_with(text, prefix)`, `applies_to(setting, player)` (for an off / host / everyone setting: whether it is on for that player). Single characters are taken with `getsubstr(text, i, i + 1)`, as the stock scripts do.
 - **log:** `ix\core\log::info/warn/error/debug(msg)`, which calls `print("[IX] LEVEL: …")` (iw7-mod console) and keeps the last 32 lines in `level.ix.log` (`log::recent()`). Debug output is gated by the setting `debug_log` (dvar `ix_debug_log`).
 - **compat:** the **only** place raw ids appear, each with its real name in a comment:
   - `god_off()` → `_meth_80A1`
@@ -234,7 +237,7 @@ Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...`
   ```
 
   A setting row takes its label, help, range and value from the setting registry (§4.2), so the menu never hardcodes them; a row for a missing setting is skipped and a page without rows is left out.
-- **Rendering:** a fixed set of HUD elements per player, **created once** on first open: panel, accent edge, title, breadcrumb, 10 rows (label and value), cursor bar, three help lines (the row's help and range, word-wrapped), `<` and `>` around the value on the cursor row when the player may change it, and a two-line footer naming the controls in keyboard or controller words (`scripts\engine\utility::is_player_gamepad_enabled`, set again only when the player switches). Opening, closing, and scrolling only change text, values, alpha, and positions; numbers are shown with `setvalue`, so they never become new strings (L12). The panel is right of the screen's centre and ends at the 4:3 screen's right edge (`horzalign "center"`, x 80–320, y 96–343).
+- **Rendering:** a fixed set of HUD elements per player, **created once** on first open: panel, accent edge, title, breadcrumb, 10 rows (label and value), cursor bar, four help lines (the row's help and range, word-wrapped at 40 characters; `test_settings.py` checks that every row's help fits, with the guest's "Only the host can change it."), `<` and `>` around the value on the cursor row when the player may change it, and a two-line footer naming the controls in keyboard or controller words (`scripts\engine\utility::is_player_gamepad_enabled`, set again only when the player switches). Opening, closing, and scrolling only change text, values, alpha, and positions; numbers are shown with `setvalue`, so they never become new strings (L12). The panel is right of the screen's centre and ends at the 4:3 screen's right edge (`horzalign "center"`, x 80–320, y 96–354).
 - **State indication:** on/off settings show ON (green) / OFF (pink); numbers and words show their value, with the range in the help lines; a feature whose requirements are missing shows N/A in grey; values the player may not change are grey.
 - **Controls** (avoid every CP action slot), polled every 0.05 s: the movement keys or left stick with `getnormalizedmovement()` while the player is held in place (below), the buttons with `adsbuttonpressed`, `attackbuttonpressed`, `usebuttonpressed`, `meleebuttonpressed`, `fragbuttonpressed` and `secondaryoffhandbuttonpressed` (all in both compilers) the way a working IW7 zombies menu reads them, and Jump as a `+goStand` command notify, as the stock phone booth listens for it (IW_API_NOTES §8):
 
@@ -250,7 +253,8 @@ Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...`
 
   While it is open, weapons, grenades, melee and Use are off through the stock counters `scripts\engine\utility::allow_weapon`, `allow_offhand_weapons`, `allow_melee` and `allow_usability`, once each way, so closing never undoes what the game itself turned off. It closes on last stand, death, the match's end, and when the `menu` feature is switched off; it cannot open while down, in the afterlife arcade or before `ix_ready`.
 - **Access:** every player can open the menu; settings and host-only actions change only for the host, unless the setting `menu_access` is `everyone`.
-- **Tree (Phase 3):** Characters, Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Player, Movement, Weapons, Zombies, HUD, Quality of Life, Visuals, Utilities and presets.
+- **Tree:** Characters, Player (Phase 4: nine options and a *Position* page with three host-only actions), Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Movement, Weapons, Zombies, HUD, Quality of Life, Visuals, Utilities and presets.
+- **Actions that move the player** (`position.gsc`): the menu's hold is a link, and a linked player cannot be moved, so such an action calls `menu::close_menu_for_move()` first; `menu::is_menu_link(player)` tells it apart from a link the game made (a ride, a trap), which refuses the action.
 
 ## 6. HUD design (`ix\ui\hud`)
 
