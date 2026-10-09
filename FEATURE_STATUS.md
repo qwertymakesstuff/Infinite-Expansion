@@ -213,3 +213,24 @@
 | Performance information | Debug | 10 | INVESTIGATING | Server-side only |
 | 3D debug drawing | Debug | – | BLOCKED | L2 |
 | Aimbot (in AAE's dev menu) | Debug | – | NOT PLANNED | MP cheating tool; excluded by design |
+
+## Fun features (Phases 14–21, not started)
+
+The full scope is in `ROADMAP.md`. Nothing here is started; each feature is verified against the game first, and dropped or marked BLOCKED if the game cannot support it.
+
+| Feature | Category | Phase | Status | Notes |
+|---------|----------|-------|--------|-------|
+| Emote menu (wheel, browse, favorites, random, settings, preview) and categories | Fun | 14 | PLANNED | Study AAE's emotes first; only animations IW7 really has (L13) |
+| Emote preview and radial emote wheel | Fun | 14 | PLANNED | If technically possible; else the closest stable alternative |
+| Emote safety (death, down, revive, weapon change, rounds, teleports, menus, interrupts) | Fun | 14 | PLANNED | Never trap the player in an animation |
+| Fun player and movement effects (super jump, gravity, speed, spin, poses, landings, third person, size) | Fun | 15 | PLANNED | Shares mechanisms with Phases 4–5; global dvars restored (L17, L20) |
+| Fun zombie effects (speed, health, size, freeze, launch, random) | Fun | 15 | PLANNED | Only what the game exposes; each tested alone |
+| Fun weapon effects (rapid or slow fire, infinite ammo, magazine, damage, recoil, one-shot) | Fun | 15 | PLANNED | Separate from the Phase 6 weapon system |
+| Visual effects and miscellaneous toys | Fun | 15 | PLANNED | |
+| Zombies randomizer, with RESET RANDOMIZER | Fun | 16 | PLANNED | Only supported systems |
+| Favorites and presets of fun features | Fun | 17 | PLANNED | Persist only if reliable (L38), else per session; related to Phase 11 |
+| FUN menu section and polish | Fun | 18 | PLANNED | Menu root title to settle ("ALL-SPECTRUM" in the request) |
+| Secret feature manager and easter eggs | Fun | 19 | PLANNED | Hidden from the normal menus; reversible |
+| Co-op social and show-off features | Fun | 20 | PLANNED | No pretend synchronization; local where it cannot sync |
+| Fun feature test checklist | Testing | 21 | PLANNED | Goes into `TESTING.md` with the features |
+

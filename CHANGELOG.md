@@ -4,6 +4,10 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Roadmap: Phases 14–21 added (2026-10-09)
+
+- Eight new phases for the fun features, planned after Phases 4–13 and not started: emotes (14), fun toys (15), a zombies randomizer (16), favorites and presets (17), FUN menu polish (18), secrets and easter eggs (19), co-op social features (20) and their tests (21). Their full scope and ground rules are in the new `ROADMAP.md`; `README.md` and `FEATURE_STATUS.md` list them.
+
 ### 0.3.2: automatic updates from GitHub (2026-10-08)
 
 **Added**
