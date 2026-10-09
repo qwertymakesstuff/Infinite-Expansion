@@ -23,7 +23,7 @@
 | Checker test suite | Tooling | 1 | COMPLETE | `tools/tests/test_check.py` (12 tests; `bad_mod` / `good_mod` fixtures) |
 | Cast data test (character table vs. stock scripts, the menu, and the picture pack's card names) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (7 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
-| Settings test (every setting in the menu and README, valid defaults, help that fits the menu, the init line's count) | Tooling | 4 | COMPLETE | `tools/tests/test_settings.py` (9 tests; checked to fail on a missing row, a wrong count, help that does not fit, a footer line that is too long and a menu over its HUD element budget) |
+| Settings test (every setting in the menu and README, valid defaults, help that fits the menu, the init line's count) | Tooling | 4 | COMPLETE | `tools/tests/test_settings.py` (9 tests, 36 settings; checked to fail on a missing row, a wrong count, help that does not fit, a footer line that is too long and a menu over its HUD element budget) |
 
 ## Installer (Windows)
 
@@ -144,13 +144,14 @@
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Infinite ammo / no reload | Weapons | 6 | PLANNED | `player_sustainAmmo` or per-player refill |
-| Fire-rate modifier | Weapons | 6 | PLANNED | `_meth_85C1(pct)`; range NEEDS TESTING |
-| Recoil / spread modifiers | Weapons | 6 | PLANNED | `player_recoilscaleon`, `setspreadoverride` |
-| Start with max ammo / extra start weapons / random start weapon (AAE) | Weapons | 6 | PLANNED | |
-| Give / take / weapon info / testing tools | Weapons | 6/10 | PLANNED | |
-| Weapon trade between players (AAE) | Weapons | 6 | PLANNED | Use + trace |
-| Weapon roulette / gun game (AAE) | Weapons | 6/7 | PLANNED | |
+| Unlimited ammo (off / reserve / clip) | Weapons | 6 | TESTING | `ix/weapons/ammo.gsc`: *reserve* does what the Max Ammo power-up does (`givemaxammo` on each primary) every half second; *clip* what the Infinite Ammo power-up does (the current primary's clip, both hands, every 0.05 s; Venom-X left alone, as by the power-up). No global `player_sustainAmmo`. L51; R-W1, R-W7 |
+| Unlimited grenades | Weapons | 6 | TESTING | Grenades are powers with charges; one used is topped up with the stock `recharge_power`, as Max Ammo does. The game's own Infinite Grenades flag is left alone. R-W2 |
+| Fire-rate modifier | Weapons | 6 | TESTING | `ix/weapons/handling.gsc`: `fire_rate` 50–300 percent, the time between shots set with `setfiretimescaleon` (`compat::fire_rate_on`) four times a second; the Berserk passive's 65 is kept when it is faster. R-W3 |
+| Recoil / spread modifiers | Weapons | 6 | PARTIAL | *No recoil*: `player_recoilscaleon(0)` four times a second; off hands back to the stock `stancerecoilupdate`. Spread: no zombies script uses `setspreadoverride`, so its values are unknown: INVESTIGATING. R-W4 |
+| Start with max ammo / extra start weapons / random start weapon (AAE) | Weapons | 6 | PARTIAL | *Start with max ammo* (Max Ammo a second after each spawn). Extra or random start weapons need the mystery box's weapon lists (per map, with camos and Pack-a-Punch levels in `interaction_magicwheel.gsc`): DEFERRED. R-W5 |
+| Give / take / weapon info / testing tools | Weapons | 6/10 | PARTIAL | *Refill ammo* (Max Ammo for every standing player, host only) in Phase 6; give / take / info in Phase 10. R-W6 |
+| Weapon trade between players (AAE) | Weapons | – | DEFERRED | Use + trace; not started |
+| Weapon roulette / gun game (AAE) | Weapons | – | DEFERRED | Needs the mystery box's weapon lists, as random start weapons do |
 | Keep kit camo / choose PaP camo (AAE) | Weapons | 6 | INVESTIGATING | `+camoN` suffix; PaP flow |
 | Random weapon kit (AAE) | Weapons | 6 | INVESTIGATING | Attachment validity |
 | Quick weapon switch | Weapons | 6 | INVESTIGATING | `_meth_84AF` |

@@ -4,8 +4,8 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phase 5 (movement) complete — not yet run in-game.**
-> [Movement options](#movement-options): move speed, gravity, wall run, double jump, mantle, slide, bunny hop, unlimited boost and fall damage. [Player options](#player-options): god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points and position tools, all in the in-game menu (ADS + Melee), which shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
+> **Status: Phase 6 (weapons) complete — not yet run in-game.**
+> [Weapon options](#weapon-options): unlimited ammo and grenades, fire rate, no recoil, max ammo at spawn and a refill for everyone. [Movement options](#movement-options): move speed, gravity, wall run, double jump, mantle, slide, bunny hop, unlimited boost and fall damage. [Player options](#player-options): god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points and position tools, all in the in-game menu (ADS + Melee), which shows and changes every setting. Since 0.3.2 the mod [updates itself](#updates) from this project's GitHub releases. It sits on the settings, chat commands, saving and launcher of Phase 2 (confirmed working in a real match) and the character features of Phase 1.5. Everything passes every offline check with both iw7-mod compilers; `TESTING.md` §4 lists the checks a tester can do.
 
 ## Requirements
 
@@ -88,9 +88,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.5.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
+[IX] INFO: init 0.6.0 map=cp_zmb modules=player,weapons,zombies,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 31 (0 changed from the default); features: 4; chat: !ix
+[IX] INFO: settings: 36 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -113,7 +113,7 @@ The bottom of the menu lists these keys in two lines of small text, with the key
 
 While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It closes by itself if you go down.
 
-Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Movement** ([movement options](#movement-options)), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Movement** ([movement options](#movement-options)), **Weapons** ([weapon options](#weapon-options)), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug**. Later phases add theirs. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
 
 ## Player options
 
@@ -150,6 +150,21 @@ The **Movement** page of the menu (also settings for chat and the console). Like
 | **Unlimited sprint**, **Omni-movement**, **Air control** | Options of iw7-mod's newer (develop) builds. On v1.1.0 they read N/A |
 
 Every option goes back to the game's own behaviour when you switch it off or reset it, and the game's own speed, gravity and the rest come back when the match ends. Wall run, double jump and mantle are the game's own multiplayer movement, which zombies switches off at every spawn; the mod switches them back on within a quarter of a second, but not while you are down or in the afterlife arcade. Whether each works on every map is for the first in-game test to show (`KNOWN_LIMITATIONS.md` L50).
+
+## Weapon options
+
+The **Weapons** page of the menu (also settings for chat and the console). Like every setting, they apply to the whole match and belong to the host.
+
+| Option | What it does |
+|--------|--------------|
+| **Unlimited ammo** | *reserve*: your spare ammo stays full, but you still reload. *clip*: the clip stays full, so you never reload (as the Infinite Ammo power-up does; Venom-X keeps its own ammo, as with the power-up) |
+| **Unlimited grenades** | Lethal grenades never run out |
+| **Fire rate** | Percent of how fast every weapon fires (50–300; 100 is the game's own) |
+| **No recoil** | Weapons do not kick when they fire |
+| **Start with max ammo** | Every player gets max ammo a second after spawning |
+| **Refill ammo** | An action (host only): every player gets max ammo and grenades at once, as with a Max Ammo power-up |
+
+Every option goes back to the game's own behaviour when you switch it off or reset it. The ammo options do what the game's own Max Ammo and Infinite Ammo power-ups do; fire rate and recoil leave the game's own changes alone (the Berserk passive's faster firing, recoil-reducing weapons, Deadeye Dewdrops).
 
 ## Settings and chat commands
 
@@ -205,6 +220,11 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `unlimited_sprint` | 0 | 0/1 | Unlimited sprint (iw7-mod develop builds only) |
 | `omni_movement` | 0 | 0/1 | Sprint and slide in any direction (iw7-mod develop builds only) |
 | `air_control` | 0 | 0/1 | Much more steering in the air (iw7-mod develop builds only) |
+| `unlimited_ammo` | off | off, reserve, clip | Spare ammo or the clip stays full |
+| `unlimited_grenades` | 0 | 0/1 | Lethal grenades never run out |
+| `fire_rate` | 100 | 50–300 | Percent of how fast every weapon fires |
+| `no_recoil` | 0 | 0/1 | No recoil |
+| `start_max_ammo` | 0 | 0/1 | Max ammo a second after every spawn |
 
 These dvars are not settings, because they are not the host's to set:
 
@@ -283,8 +303,8 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 3 | In-game menu (ADS + Melee, W / S / A / D), the lobby's character card | **Complete** (in-game test pending) |
 | 4 | Player options: god mode, damage taken, third person, zombies ignoring players, rocket jump, friendly fire, starting points, position tools | **Complete** (in-game test pending) |
 | 5 | Movement: move speed, gravity, wall run, double jump, mantle, slide, bunny hop, unlimited boost, fall damage | **Complete** (in-game test pending) |
-| 6 | Weapons | Next |
-| 7 | Zombies | Planned |
+| 6 | Weapons: unlimited ammo and grenades, fire rate, no recoil, max ammo at spawn, refill | **Complete** (in-game test pending) |
+| 7 | Zombies | Next |
 | 8 | HUD | Planned |
 | 9 | Quality of life | Planned |
 | 10 | Debug / developer mode | Planned |

@@ -52,6 +52,14 @@ build()
     add_setting( "movement", "omni_movement", 1 );
     add_setting( "movement", "air_control", 1 );
 
+    add_page( "weapons", "Weapons", "main" );
+    add_setting( "weapons", "unlimited_ammo", 1 );
+    add_setting( "weapons", "unlimited_grenades", 1 );
+    add_setting( "weapons", "fire_rate", 10 );
+    add_setting( "weapons", "no_recoil", 1 );
+    add_setting( "weapons", "start_max_ammo", 1 );
+    add_action( "weapons", "Refill ammo", "Every player gets max ammo and grenades now, as with a Max Ammo.", custom_scripts\ix\weapons\ammo::refill_everyone, 0, 1 );
+
     add_page( "menu", "Menu", "main" );
     add_setting( "menu", "menu_open", 1 );
     add_setting( "menu", "menu_access", 1 );

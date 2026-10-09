@@ -409,9 +409,9 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| Start with max ammo / extra start weapons / random start weapon | Spawn handlers | `givemaxammo`, `giveweapon` (`iw7_*_zm` names), curated random list | E | RI | PLANNED |
+| Start with max ammo / extra start weapons / random start weapon | Spawn handlers | Max ammo: the stock `loot::give_max_ammo_to_player` after each spawn; weapons: `giveweapon` with names from the mystery box's own lists (`interaction_magicwheel.gsc`: per map, camos, Pack-a-Punch levels) | E | RI | Max ammo TESTING (Phase 6); start weapons DEFERRED |
 | Weapon restore (disconnect/death) + clear after bleed-out | Host saves weapons/perks/points | Per-GUID store (`getguid`) in `level`; file I/O across sessions | M | RI | PLANNED |
-| Weapon roulette / gun game | Random weapon each round / kill progression | On `regular_wave_starting` / kill events: `takeweapon` + `giveweapon` | M | RI | PLANNED |
+| Weapon roulette / gun game | Random weapon each round / kill progression | On `regular_wave_starting` / kill events: `takeweapon` + `giveweapon`, names from the box's lists | M | RI | DEFERRED |
 | Keep kit camo / choose PaP camo | PaP hooks | IW7 PaP is `interaction_weapon_upgrade.gsc`; camo is a weapon-name suffix (`+camoN`) | M | PP | INVESTIGATING |
 | Random weapon kit (attachments/camo) | Random attachment build | Needs valid per-weapon attachment lists (`getweaponattachments`, tables) | H | PP | INVESTIGATING |
 | Box share / weapon limit / multiple wonder weapons | Box hooks | IW7 magic-wheel logic (to be traced) | H | PP | INVESTIGATING |
@@ -472,7 +472,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 
 | BO3 Feature | BO3 Implementation | IW Equivalent | Diff. | Class | Status |
 |---|---|---|---|---|---|
-| God mode / unlimited ammo / refill | Menu toggles | God mode: the damage-callback wrapper drops the damage (no zombies script uses `enableinvulnerability`); ammo: `player_sustainAmmo` or a refill loop | E | RI | God mode TESTING (Phase 4); ammo PLANNED (Phase 6) |
+| God mode / unlimited ammo / refill | Menu toggles | God mode: the damage-callback wrapper drops the damage (no zombies script uses `enableinvulnerability`); ammo: what the Infinite Ammo and Max Ammo power-ups do, as a loop; refill: Max Ammo for everyone | E | RI | God mode TESTING (Phase 4); ammo and refill TESTING (Phase 6) |
 | UFO / noclip | Menu toggle | Link to a script mover, fly with button polling | M | RI | PLANNED (Phase 10) |
 | Teleport menu (save/load, crosshair, sky/ground, nearest zombie, teleport zombies) | Menu actions | `setorigin`, `bullettrace`, `playerphysicstrace`, `getaliveagents` | E | RI | Save / load / crosshair TESTING (Phase 4); the rest PLANNED (Phase 10) |
 | Score / perks / power-ups / weapons / visions | Menu actions | Currency API; `give_zombies_perk`; `drop_loot`; `giveweapon`; `visionsetnakedforplayer` | E | RI | PLANNED |
@@ -505,8 +505,8 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Gravity | `bg_gravity` (1–1000, global) | E | RI | TESTING (Phase 5) |
 | Jump height | No verified dvar; lower gravity jumps higher, double jump adds height | – | PP | PARTIAL (Phase 5, L16) |
 | Unlimited sprint / air control / omni-movement | `bg_sprintUnlimited`, `bg_airControl`, `bg_omnimovement` (develop only) | E | PP | TESTING (Phase 5, feature-detected: N/A on v1.1.0) |
-| Fire-rate / rapid fire | `_meth_85C1(pct)` / `_meth_85C2()` | M | RI / UNK | PLANNED |
-| Recoil / spread | `player_recoilscaleon`, `_meth_822C`; `setspreadoverride`, `_meth_8263` | E | RI | PLANNED |
+| Fire-rate / rapid fire | `_meth_85C1(pct)` / `_meth_85C2()` (stock: the Berserk passive's 65) | M | RI | TESTING (Phase 6) |
+| Recoil / spread | `player_recoilscaleon`, `_meth_822C`; `setspreadoverride`, `_meth_8263` (no stock use) | E | RI / UNK | Recoil TESTING (Phase 6); spread INVESTIGATING |
 | Damage multipliers | Damage-callback wrappers | M | RI | PLANNED |
 | Coordinates / speed / weapon HUD | `self.origin`, `getvelocity`, `getcurrentweapon` | E | RI | PLANNED |
 | FPS display | Not readable from server GSC | – | NCP | BLOCKED — IW LIMITATION |

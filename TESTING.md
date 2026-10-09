@@ -206,6 +206,15 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V114 | `python3 -m unittest discover -s tools/tests` | ✅ 108 tests OK: installer 66, checker 12, character data 7, menu script 14, settings 9 (now 31 settings: every one in the menu and the README, with valid defaults and help that fits) |
 | V115 | The 0.5.0 release on GitHub | ✅ The push of `58c64f5` published `v0.5.0` with `Infinite-Expansion-0.5.0.zip`: 470,145 bytes, SHA-256 `6AD41E20…7C78` as GitHub lists it, byte for byte a local `git archive` of that commit. The setup's own `Get-IXLatestRelease` and `Save-IXUpdate`, run here against the real GitHub, found it, matched size and checksum, and unpacked version 0.5.0, whose 94 files are identical to the commit. Not run: the Windows side of that update (R-U2) |
 
+### Phase 6 (weapons)
+
+| # | Check | Result |
+|---|-------|--------|
+| V116 | `python3 tools/check.py` with `ix/weapons/ammo.gsc` and `handling.gsc` | ✅ PASS, 0 errors, 0 warnings: 48/48 compiled, 24/24 identical between the compilers, 580 built-in calls, 255 far references (23 into stock scripts, all loaded on every zombies map, among them `loot::give_max_ammo_to_player`, `loot::recharge_power` and `cp_weapon::stancerecoilupdate`), 27,930 bytes of custom-script memory |
+| V117 | What the stock zombies scripts do with ammo (`IW_API_NOTES.md` §10) | ✅ The Infinite Ammo power-up (`loot.gsc` `unlimited_ammo`) fills the current primary's clip, `"left"` and `"right"`, every 0.05 s, except the weapons in `level.opweaponsarray` (`zombie.gsc`: the three Venom-X); Max Ammo (`give_max_ammo_to_player`) calls `givemaxammo` on each primary whose name does not start with `alt`, fills the clip of a weapon whose max ammo is its clip, and tops up every power outside the `"secondary"` slot with `recharge_power` (`power_adjustcharges` plus `setweaponammostock`). Grenades are powers with charges (`coop_powers.gsc`); zombies has no power cooldowns (`level.no_power_cooldowns`), and the Infinite Grenades power-up switches `level.infinite_grenades` on and off for everyone, so the mod does not touch it |
+| V118 | What the stock zombies scripts do with fire rate and recoil | ✅ The Berserk passive (`cp_weaponpassives.gsc`) calls `setfiretimescaleon( 65 )` on a kill and `setfiretimescaleoff()` 2 s later or on a weapon change, marking it with `self.berserk`. `cp_weapon.gsc` `stancerecoiladjuster` calls `stancerecoilupdate( stance )` 0.5 s after each stance change, sprint and weapon switch (not with `self.onhelisniper`, which Deadeye Dewdrops sets with `player_recoilscaleon( 0 )`). No zombies script calls `setspreadoverride`, so the mod has no spread option yet. Not run: in game (R-W1–R-W7) |
+| V119 | `python3 -m unittest discover -s tools/tests` | ✅ 108 tests OK: installer 66, checker 12, character data 7, menu script 14, settings 9 (now 36 settings) |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -227,7 +236,7 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.5.0 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 31 (0 changed from the default); features: 4; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.6.0 map=cp_zmb modules=player,weapons,zombies,debug,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 36 (0 changed from the default); features: 4; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
 | R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
 | R-S3 | Menu opens (ADS + Melee) (R-M1) | Menu visible; weapons/offhands disabled while open | not run | not run |
 | R-S4 | Menu closes (Melee at root) (R-M1) | Menu hidden; weapons restored | not run | not run |
@@ -273,6 +282,20 @@ Open the menu (ADS + Melee), then *Movement*. Reset everything afterwards with *
 | R-MV9 | *Unlimited sprint*, *Omni-movement*, *Air control* on v1.1.0; then on a develop build | v1.1.0: each reads N/A (grey) and cannot be switched on. Develop: each works (sprint without a limit; sprint and slide sideways; much more steering in the air) | not run | not run |
 | R-MV10 | Change several movement options, end the match (or `map_restart`), then type `g_speed`, `bg_gravity`, `bg_bounces`, `mantle_legacy` in the console | 190, 800, 0, 0 after the match; the next match applies the saved options again from the start | not run | not run |
 
+### 4.2c Weapons (Phase 6)
+
+Open the menu (ADS + Melee), then *Weapons*. Reset everything afterwards with *Settings* → *Reset every setting*.
+
+| ID | Test | Expected | v1.1.0 | develop |
+|----|------|----------|--------|---------|
+| R-W1 | *Unlimited ammo* clip: fire a whole magazine and keep firing; switch weapons; then reserve: empty a magazine and reload a few times; then off | clip: the magazine never empties and you never reload, with every weapon (also dual-wielded); reserve: you reload, but the spare ammo stays full; off: ammo runs down as usual. Report any weapon that misbehaves (a wonder weapon, a charge weapon) | not run | not run |
+| R-W2 | *Unlimited grenades* ON: throw all your lethal grenades, keep throwing; OFF | A thrown grenade is back within half a second; OFF: they run out as usual | not run | not run |
+| R-W3 | *Fire rate* 200 with an automatic rifle, then 50, then 100; with the Berserk weapon passive if you have one | Twice as fast, then half; then the game's own. With Berserk the faster of the two applies, and nothing stays changed after you set 100 | not run | not run |
+| R-W4 | *No recoil* ON: fire a full magazine while aiming; then OFF and switch weapons | ON: the sights barely move; OFF: the weapon's own recoil again (also with an attachment that reduces recoil) | not run | not run |
+| R-W5 | *Start with max ammo* ON, then die (or bleed out in co-op) and come back; OFF | About a second after each spawn your weapon's ammo is full; OFF: the game's own starting ammo | not run | not run |
+| R-W6 | Use some ammo and grenades, then *Refill ammo* (as the host; in co-op also with a guest down) | "Ammo and grenades refilled for N player(s)." Everyone standing is full; a downed player is left alone. As a guest the row is grey | not run | not run |
+| R-W7 | Pick up the game's own Infinite Ammo and Max Ammo power-ups with *Unlimited ammo* on, then off | Nothing odd: the power-ups work as usual and end as usual | not run | not run |
+
 ### 4.3 Zombies
 
 | ID | Test | Expected | v1.1.0 | develop |
@@ -289,7 +312,7 @@ Chat commands are typed in the match's chat. The replies appear only for the pla
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-C1 | Type `!ix`, then `!ix list`, `!ix list character`, `!ix get character_specials`, `!ix version` | The command list (with `!ix menu`); all 31 settings with values (a few per line); only the four `character` ones; "Special characters: character_specials = 1 (default 1, a whole number from 0 to 2)" and its help line; "Infinite Expansion 0.5.0". A second player sees none of the replies | not run | not run |
+| R-C1 | Type `!ix`, then `!ix list`, `!ix list character`, `!ix get character_specials`, `!ix version` | The command list (with `!ix menu`); all 36 settings with values (a few per line); only the four `character` ones; "Special characters: character_specials = 1 (default 1, a whole number from 0 to 2)" and its help line; "Infinite Expansion 0.6.0". A second player sees none of the replies | not run | not run |
 | R-C2 | Console: `set ix_menu_hint 0` | Within about half a second the console shows `[IX] INFO: setting menu_hint = 0 (console)`; `!ix get menu_hint` says 0 | not run | not run |
 | R-C3 | Invalid values: console `set ix_character_specials abc`; chat `!ix set character_specials 9999`, `!ix set character_specials maybe`, `!ix on character_specials`, `!ix get nothing` | `abc`: a warning, and `ix_character_specials` is back at its value. 9999 becomes 2. "character_specials: 'maybe' is not a whole number from 0 to 2." "character_specials is not an on/off setting …". "No setting 'nothing' …" | not run | not run |
 | R-C4 | Co-op: the guest types `!ix list`, then `!ix set menu_hint 0` | The list works; then "Only the host can change settings." and nothing changes | not run | not run |
@@ -344,7 +367,7 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-I3 | INSTALL, then start a zombies match | Status INSTALLED; `<game>\iw7-mod\custom_scripts\cp\ix_main.gsc` and `iw7-mod\infinite-expansion.json` exist; *Settings → Apps* lists Infinite Expansion; the console shows `[IX] INFO: init` | not run |
 | R-I4 | With the old `mods\infinite_expansion` copy present | The yellow note shows; INSTALL removes that copy's files and says so | not run |
 | R-I5 | UNINSTALL | Status UNINSTALLED; the mod's files and the record are gone; other files in `iw7-mod` stay; the Settings entry is gone | not run |
-| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.5.0` | not run |
+| R-I15 | With an earlier build installed, run the setup from this download | The button reads UPDATE and the mod row says "newer files are ready" (or the new version); after UPDATE, a match's console shows `[IX] INFO: init 0.6.0` | not run |
 | R-I6 | Install, delete the download, then uninstall from *Settings → Apps* | The setup window opens and uninstalls by itself; after closing it, `%LOCALAPPDATA%\InfiniteExpansion` is gone | not run |
 | R-I7 | BROWSE: pick another `.exe`, then `iw7_ship.exe` | First "NOT THE GAME FOLDER", then the rows update | not run |
 | R-I8 | Window details | Drag by the top bar; minimize and close work; buttons glow on hover; no text cut off, also with the yellow note showing; looks right at 125–150 % display scaling | not run |
@@ -359,7 +382,7 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-M1 | Start a match; when round 1 starts, aim and press Melee; press Melee again; then type `!ix menu` | About 3 s into round 1, "ADS + Melee: Infinite Expansion menu" in the middle of the screen, and "Or type !ix menu in chat…" in the corner. The menu opens on the right of the screen (title "Infinite Expansion", rows Characters, Player, Movement, Menu, Settings, Debug, Close, and two lines of small text at the bottom: "W/S: move   A/D: change   Use/Jump: select" and "Melee: back / close    Open: ADS + Melee"), without the cursor jumping; Melee closes it; the chat command opens it too. A screenshot helps | not run | not run |
+| R-M1 | Start a match; when round 1 starts, aim and press Melee; press Melee again; then type `!ix menu` | About 3 s into round 1, "ADS + Melee: Infinite Expansion menu" in the middle of the screen, and "Or type !ix menu in chat…" in the corner. The menu opens on the right of the screen (title "Infinite Expansion", rows Characters, Player, Movement, Weapons, Menu, Settings, Debug, Close, and two lines of small text at the bottom: "W/S: move   A/D: change   Use/Jump: select" and "Melee: back / close    Open: ADS + Melee"), without the cursor jumping; Melee closes it; the chat command opens it too. A screenshot helps | not run | not run |
 | R-M2 | With the menu open: W and S (also held), A and D, Use, Jump, Melee; then ADS, Fire, Tactical, Frag | W/S move the cursor (holding keeps moving) and you stay where you are; A/D change the highlighted value, which has `<` `>` around it; Use and Jump open a page; Melee goes back. ADS/Fire and Tactical/Frag do what W/S and A/D do. You can look around; no walking, shot, aiming, knife, grenade or jump, and Use near a wall buy or door buys nothing. After closing, all of those work again | not run | not run |
 | R-M3 | Characters page: change *Special characters* with A and D; switch *Announce characters* with Use, then with A and D | The value steps through 0, 1, 2 and stops at the ends; the help lines show the range; Use and A / D both switch ON / OFF | not run | not run |
 | R-M4 | Change a setting in the menu, then `!ix get` it in chat; change it in the console with the menu open | Chat shows the menu's value; the open menu shows the console's value within a moment. After a restart the value is still there (saved) | not run | not run |
@@ -372,15 +395,15 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 | R-M11 | ADS + Melee twenty times: quick taps of Melee, slow presses, while walking, right after a jump and a slide; with toggle ADS (if your settings have it); while down; on a ride (Spaceland's rocket coaster, say) | It opens every time (each time close it with Melee); after a jump or a slide, as you land. While down: "The menu cannot open while you are down."; on a ride: "…while the game is moving you." Report any time it did not open, and what you were doing | not run | not run |
 | R-M12 | *Menu* page → *Menu: open with*: crouch_melee, then chat, then ads_melee; try each way to open | Each change prints "The Infinite Expansion menu now opens with …" to everyone, and the second small line at the bottom says the new keys. crouch_melee: crouch, wait a moment, then Melee (ADS + Melee does not); chat: only `!ix menu`. At the next round's start the middle-of-screen line names the new keys | not run | not run |
 | R-M13 | Play three rounds without opening the menu, then open it and play two more; in co-op a friend joins mid-round; then *Menu: hint* OFF | The line shows at the start of each round until you open the menu, then no more; the friend gets it about 6 s after spawning (not again at the next round's start if that is within 30 s). OFF: no line at all | not run | not run |
-| R-M14 | Open the menu and look at every page: the main page, Characters, Player and Movement (scroll down with S past the eighth row), Menu, Settings, Debug; as a guest in co-op too | Every row's name and value, the title, the line under it, the help under the list (up to four lines) and the two small lines of keys are all there. Player shows eight rows at a time and scrolls to Players push apart and Position. A screenshot of the Player page helps. With `debug_log` on, the console says "menu: 28 HUD elements for <name>" on the first opening | not run | not run |
+| R-M14 | Open the menu and look at every page: the main page, Characters, Player and Movement (scroll down with S past the eighth row), Weapons, Menu, Settings, Debug; as a guest in co-op too | Every row's name and value, the title, the line under it, the help under the list (up to four lines) and the two small lines of keys are all there. Player shows eight rows at a time and scrolls to Players push apart and Position. A screenshot of the Player page helps. With `debug_log` on, the console says "menu: 28 HUD elements for <name>" on the first opening | not run | not run |
 
 ### 4.12 Updates (since 0.3.2)
 
-0.3.2 was installed by hand (download, setup, UPDATE); every release since reaches an installed 0.3.2 or newer by itself: double-click the desktop shortcut (R-U2). To try it again later, make the install look older: in `<game>\iw7-mod\custom_scripts\ix\core\bootstrap.gsc`, change the version (for example `"0.5.0"`) to `"0.3.0"`, then use the shortcut.
+0.3.2 was installed by hand (download, setup, UPDATE); every release since reaches an installed 0.3.2 or newer by itself: double-click the desktop shortcut (R-U2). To try it again later, make the install look older: in `<game>\iw7-mod\custom_scripts\ix\core\bootstrap.gsc`, change the version (for example `"0.6.0"`) to `"0.3.0"`, then use the shortcut.
 
 | ID | Test | Expected | Result |
 |----|------|----------|--------|
-| R-U1 | Install the newest version with its setup, then open the setup again | "Installed · v0.5.0" (the version installed) and PLAY; briefly CHECKING FOR UPDATES, then READY TO PLAY; AUTO-UPDATE: ON at the bottom. `%TEMP%\InfiniteExpansionSetup.log` has no "update check failed" line | not run |
+| R-U1 | Install the newest version with its setup, then open the setup again | "Installed · v0.6.0" (the version installed) and PLAY; briefly CHECKING FOR UPDATES, then READY TO PLAY; AUTO-UPDATE: ON at the bottom. `%TEMP%\InfiniteExpansionSetup.log` has no "update check failed" line | not run |
 | R-U2 | With a newer release on GitHub (or the trick above): double-click the desktop shortcut | Within seconds the setup window opens with UPDATING INFINITE EXPANSION; then the new version's window installs it, and the game starts by itself. The game's console shows the new version's init line. Report the time it took and any Windows or antivirus prompt | not run |
 | R-U3 | Same situation, but open the setup instead | The mod row says "v… is out" and the button UPDATE; UPDATE downloads and installs it (ALL SET); PLAY starts the game | not run |
 | R-U4 | Click AUTO-UPDATE: ON, then use the shortcut with a newer release out; click it again | It reads OFF, and the shortcut starts the game without the setup window; then ON again | not run |
@@ -392,7 +415,7 @@ Start from a fresh **Code → Download ZIP** of the repository, extracted, as a 
 
 | ID | Test | Expected | Result |
 |----|------|----------|--------|
-| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.5.0.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
+| R-L1 | INSTALL (or UPDATE / REINSTALL) | The status line says "Added Infinite Expansion.exe to the game folder, and its shortcut to the desktop." `<game>\Infinite Expansion.exe` and the desktop shortcut **Infinite Expansion** have the mod's icon; *Properties → Details* shows Infinite Expansion, version 0.6.0.0. If it says "could not be built", report that line and the `launcher failed:` line of `%TEMP%\InfiniteExpansionSetup.log` | not run |
 | R-L2 | Steam open and signed in: double-click the shortcut | The game starts within a few seconds, on its main menu; no other window appears. Report any Windows or antivirus warning about the launcher | not run |
 | R-L3 | Steam closed: double-click the shortcut; also once while Steam asks for your password | Steam starts; the game starts by itself a few seconds after Steam has signed in (with the password: after you sign in, within five minutes). No "Steam must be running" box | not run |
 | R-L4 | Double-click twice quickly; then once more while the game runs | One game; then "Infinite Warfare is already running." | not run |

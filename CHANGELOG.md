@@ -4,6 +4,22 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.6.0: weapon options (Phase 6) (2026-10-09)
+
+**Added**
+- **Weapons page** in the in-game menu (ADS + Melee, then *Weapons*). Each option is also a setting for chat and the console, applies to the whole match, and belongs to the host:
+  - **Unlimited ammo**: *reserve* keeps your spare ammo full, but you still reload; *clip* keeps the clip full, so you never reload. These are what the game's own Max Ammo and Infinite Ammo power-ups do.
+  - **Unlimited grenades**: a thrown lethal grenade is back within half a second.
+  - **Fire rate**: 50 to 300 percent of how fast every weapon fires.
+  - **No recoil**.
+  - **Start with max ammo**: max ammo a second after every spawn.
+  - **Refill ammo**: an action (host only) that gives every player max ammo and grenades at once.
+- Fire rate and recoil leave the game's own changes alone: the Berserk passive's faster firing, recoil-reducing weapons, and Deadeye Dewdrops.
+
+**Not in this version**
+- Spread: no zombies script uses the game's spread override, so its values are unknown.
+- Extra or random start weapons and weapon roulette need the mystery box's weapon lists; they come later.
+
 ### 0.5.0: movement options (Phase 5) (2026-10-09)
 
 **Added**
