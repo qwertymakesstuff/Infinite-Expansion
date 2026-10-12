@@ -72,6 +72,8 @@ From 0.3.2 on, new versions install themselves; no more downloading zips:
 
 Windows asks before running a file from the internet, and the setup is not code-signed, so it may show "Windows protected your PC". Choose *More info → Run anyway*. The setup is plain PowerShell (`installer\IXSetup.ps1`) that you can read first. If something goes wrong, details go to `%TEMP%\InfiniteExpansionSetup.log` (updates too). For a protected game folder, the setup offers to retry as administrator.
 
+**"Invalid game files!" when the game starts.** That box comes from iw7-mod, not from this mod: at every start iw7-mod compares the SHA-256 of two of the game's own files, `zone\patch_common_mp.ff` and `zone\patch_common.ff`, with the ones it supports (`system_check.cpp`), and warns when either differs or is missing. Neither the setup nor the mod writes those files. Fix it with Steam: *Library → Call of Duty: Infinite Warfare → Properties → Installed Files → Verify integrity of game files*. You can still click OK and play, but iw7-mod warns of crashes, so verify before testing the mod. To check by hand (PowerShell, in the game folder): `Get-FileHash zone\patch_common_mp.ff, zone\patch_common.ff`; iw7-mod expects `E263215A…A247C9` and `A427FDFB…4C6DB3`.
+
 ### By hand
 
 Copy the two folders inside `mods/infinite_expansion` into the `iw7-mod` folder of your game. Every player who wants the CHARACTER menu installs it the same way:
