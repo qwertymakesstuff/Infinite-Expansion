@@ -4,6 +4,13 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.11.0: presets (Phase 11) (2026-10-12)
+
+**Added**
+- **Presets** (new *Presets* page in the menu, host only, Use twice): **Default**, **Classic** (older Call of Duty: old-style mantle, no slide), **Enhanced** (wall run, double jump, mantle, max ammo at spawn, round and zombies on the HUD), **Testing** (host god mode, unlimited ammo and grenades, every perk, 50,000 points) and **Developer** (developer tools, debug log, every HUD number). Each sets every option it covers to its own value or the default, so the result is always the same; the menu's own settings, the HUD's position and the characters are never touched.
+- **Custom**: *Save as Custom* keeps your current options, across games; *Custom* brings them back.
+- *In use* says which preset your settings match now. In chat: `!ix preset`, `!ix preset <name>`, `!ix preset save`.
+
 ### Roadmap: the guided Easter egg mode becomes Phase 13; the fun features move back to 14–21 (2026-10-12)
 
 **Changed**

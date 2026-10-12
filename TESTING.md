@@ -253,6 +253,13 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V141 | `python3 -m unittest discover -s tools/tests` | ✅ 110 tests OK (the new read-outs' help fits) |
 | V142 | The 0.10.2 release on GitHub | ✅ The push of `088361a` published `v0.10.2` with `Infinite-Expansion-0.10.2.zip`: 534,103 bytes, SHA-256 `A5DFABEC…45C1` as GitHub lists it, byte for byte a local `git archive` of that commit. The setup's own `Get-IXLatestRelease` and `Save-IXUpdate`, run here against the real GitHub, found it newer than 0.3.2 and 0.10.1, matched size and checksum, and unpacked version 0.10.2, whose 106 files are identical to the commit. Not run: the Windows side of that update (R-U2) |
 
+### 0.11.0 (presets, Phase 11)
+
+| # | Check | Result |
+|---|-------|--------|
+| V143 | `python3 tools/check.py` with `ix/core/presets.gsc` | ✅ PASS, 0 errors, 0 warnings: 68/68 compiled, 34/34 identical between the compilers, `fields` 11 known cases, 0 new |
+| V144 | `python3 -m unittest discover -s tools/tests` | ✅ 111 tests OK; new `test_presets`: the six presets in order (Default, Classic, Enhanced, Testing, Developer, Custom); every built-in value names a real setting that a preset governs, is valid for it, is written as `to_text` writes it (so *In use* can match it) and is not its default; Default names none; the kept settings exist and include the menu's own and the characters; every preset row's help fits the menu. Not run: in game (R-C10) |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.

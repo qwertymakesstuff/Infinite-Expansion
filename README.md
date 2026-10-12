@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: 0.10.2 — Phases 7–10 played; the Zombies page works except *Zombie health*, done a new way in 0.10.2 (not yet re-tested); give yourself any weapon of the map.**
+> **Status: 0.11.0 — new: [presets](#presets) (Phase 11): Default, Classic, Enhanced, Testing, Developer and your own Custom. *Zombie health* done a new way in 0.10.2 (not yet re-tested); Phase 12 (polish) next.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -92,7 +92,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.10.2 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui
+[IX] INFO: init 0.11.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: settings: 52 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
@@ -401,8 +401,8 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 8 | HUD: round, zombies left and alive, health, speed | **Complete** (in-game test pending) |
 | 9 | Quality of life: *Reset this page*, game speed, zombie outlines, restart, chat shortcuts | **Complete** (in-game test pending) |
 | 10 | Developer tools (locked): spawning, kill all, end the round, points, power-ups, read-outs, the log | **Complete** (in-game test pending) |
-| 11 | Configuration presets | Next |
-| 12 | Polish | Planned |
+| 11 | Configuration presets: Default, Classic, Enhanced, Testing, Developer, Custom | **Complete** (in-game test pending) |
+| 12 | Polish | Next |
 | 13 | Guided Easter egg mode: an optional in-game guide to each map's main Easter egg quest | Planned, not started (`ROADMAP.md`) |
 | 14 | Emotes: menu, wheel, preview, favorites | Planned, not started (`ROADMAP.md`) |
 | 15 | Fun toys: player, movement, zombie, weapon and visual effects | Planned, not started |
