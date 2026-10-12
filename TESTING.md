@@ -244,6 +244,14 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V137 | `python3 -m unittest discover -s tools/tests` | ✅ 110 tests OK: installer 66, checker 13 (`fields`), character data 7, menu script 14, settings 10 (the weapon rows' help fits) |
 | V138 | The 0.10.1 release on GitHub | ✅ The push of `d25be2d` published `v0.10.1` with `Infinite-Expansion-0.10.1.zip`: 529,667 bytes, SHA-256 `0350309E…9E68` as GitHub lists it, byte for byte a local `git archive` of that commit. The setup's own `Get-IXLatestRelease` and `Save-IXUpdate`, run here against the real GitHub, found it newer than 0.3.2 and 0.10.0, matched size and checksum, and unpacked version 0.10.1, whose 106 files are identical to the commit. Not run: the Windows side of that update (R-U2) |
 
+### 0.10.2 (Zombie health fixed)
+
+| # | Check | Result |
+|---|-------|--------|
+| V139 | In-game report (2026-10-12): every option of the Zombies page works except *Zombie health* | ✅ Investigated against the stock dump. 0.10.1 set `level._id_8CB3[type]`, which `zombies_spawning.gsc` `calculatezombiehealth` multiplies in at every wave spawn (`_id_13F53`), and both compilers write `_id_8CB3` as token `0x8CB3` through `assemble_field`, below IW7's `max_string_id` (`0x13FCC`), the same token the stock scripts use; nothing in the stock scripts resets a zombie's health after the spawn or ties a bullet's damage to the zombie's health. So the scripts do not show why it did nothing. Found instead: hits that kill whatever the health (Insta-Kill, the overclock attachment, frozen zombies, slides, four Fate & Fortune cards, weapons scaled to the zombie's own health, `onzombiedamaged` and `fateandfortuneweaponscale`; L58). 0.10.2 no longer writes `_id_8CB3`: it sets the health on every regular zombie the stock spawners announce with `level notify( "agent_spawned", agent )` (after `_id_13F53` set it; all spawn paths of `zombies_spawning.gsc` and the DLC maps' own spawners), keeps a respawned zombie's saved health, scales the zombies out when the option changes (keeping how hurt they are), says how many changed, and shows one zombie's full health next to the game's (*In effect now*, `!ix zombies`). The menu steps it 50 at a time. Not run: in game (R-Z2, R-Z9) |
+| V140 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 66/66 compiled, 33/33 identical between the compilers, `fields` 11 known cases, 0 new |
+| V141 | `python3 -m unittest discover -s tools/tests` | ✅ 110 tests OK (the new read-outs' help fits) |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -333,14 +341,14 @@ Open the menu (ADS + Melee), then *Zombies*. Turn on *HUD: zombies* (HUD page) t
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
 | R-Z1 | *Zombie speed* sprint in an early round; then walk; then default | sprint: every regular zombie and cop on the map sprints at once (also on Spaceland, where 0.10.0 did nothing: V133); walk: they walk; default: zombies already out keep their speed, new ones move as the game picks. Clowns and skeletons keep their own. Report a zombie that freezes, slides or moves oddly | not run | not run |
-| R-Z2 | *Zombie health* 1000, then 10, then 100 | 1000: the zombies already out and every new one take about ten times the bullets (*In effect now*: 1000); 10: they drop at once; 100: the game's own again | not run | not run |
+| R-Z2 | *Zombie health* 1000, then 10, then 100, with an ordinary gun (no Insta-Kill, no overclock attachment, L58) | 1000: a line says how many zombies out changed; those and every new one take about ten times the bullets; *In effect now*: *A zombie's health* ten times *Game's own for it*; 10: they drop at once; 100: the game's own again, both read-outs equal | not run | not run |
 | R-Z3 | *Max zombies alive* 4, then 64, then 24 (round 5 or later) | 4: at most about 4 alive (brutes and bosses come on top); 64: more pile up at once; report if the game slows down or stops spawning. 24: the game's own | not run | not run |
 | R-Z4 | *Points multiplier* 200, then 0, then 100; pick up a Double Money while at 200 | 200: kills and hits pay twice (Double Money: four times); 0: nothing; 100: the game's own, also after Double Money ends | not run | not run |
 | R-Z5 | *Power-ups per round* 0 for two rounds, then 20 | 0: no power-ups from kills (an event round's last zombie may still drop a Max Ammo, as the game does); 20: more than five can drop in a round | not run | not run |
 | R-Z6 | *Starting round* 20, then *Game* → *Restart the match*; then back to 1 | The restarted match starts at round 20 (the game's round counter shows 20, zombies are tough and fast) and the console shows `[IX] INFO: zombies: the match starts at round 20`; no special round comes at once. Report anything odd about the rounds after it | not run | not run |
 | R-Z7 | *Start with perks* ON mid-match; then die (or bleed out in co-op) and come back; in solo and in co-op | Every perk within a second or two of switching it on, and again about a second after each spawn (in solo without Up N' Atoms); OFF: none at the next spawn | not run | not run |
 | R-Z8 | Play three rounds with several Zombies options on; go down and get revived; in co-op bleed out and come back | Rounds start and end as usual; the HUD's counts match; no `script runtime error` in the console | not run | not run |
-| R-Z9 | *Zombies* → *In effect now* a few seconds into a match; change each Zombies option and look again; type `!ix zombies` | *Set up* yes, *Speed hook* on; each value follows its option (health, most alive during a round, points, power-ups a round); the chat line says the same; the console has `[IX] INFO: zombies: options applied; …` once per match | not run | not run |
+| R-Z9 | *Zombies* → *In effect now* a few seconds into a match; change each Zombies option and look again; type `!ix zombies` | *Set up* yes, *Speed hook* on; each value follows its option (health percentage and a zombie's health against the game's, most alive during a round, points, power-ups a round); the chat line says the same; the console has `[IX] INFO: zombies: options applied; …` once per match | not run | not run |
 
 ### 4.3b Info HUD (Phase 8)
 

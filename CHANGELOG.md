@@ -4,6 +4,17 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.10.2: Zombie health fixed (2026-10-12)
+
+**Fixed**
+- **Zombie health** did nothing in game. The mod now sets the health itself on every regular zombie as the game spawns it, and on the zombies already out when the option changes, keeping how hurt they are. A / D change it 50 at a time, and a line says how many zombies out it changed.
+
+**Added**
+- *In effect now* shows the full health of one zombie out now next to what the game gave it (*A zombie's health*, *Game's own for it*), so you can see the option at work; `!ix zombies` says the same.
+
+**Known**
+- Some hits kill a zombie whatever its health: Insta-Kill, the overclock attachment, a few Fate & Fortune cards and weapons that scale to the zombie's health (`KNOWN_LIMITATIONS.md` L58). Test the option with an ordinary gun.
+
 ### 0.10.1: the Zombies page fixed; give yourself any weapon (2026-10-12)
 
 **Fixed**

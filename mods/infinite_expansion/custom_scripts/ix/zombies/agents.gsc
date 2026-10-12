@@ -17,11 +17,13 @@
 //     default, they keep their speed and new ones move as the game picks.
 //     The hook is checked every second and put back if the game made the
 //     table anew.
-//   - health: the stock calculatezombiehealth() multiplies a zombie's health
-//     by level._id_8CB3[type] when it is set; nothing in the game sets it, and
-//     the spawner's setup empties it. The mod sets it for the regular zombie
-//     types, so zombies that spawn afterwards get it, and scales the health
-//     of the regular zombies already out when the option changes.
+//   - health: the stock spawners give each zombie its health
+//     (calculatezombiehealth: by round, cops and skeletons a few rounds
+//     ahead) and then notify "agent_spawned". The mod sets the option's share
+//     of that health on every regular zombie it is told about, and on the
+//     regular zombies already out when the option changes. (Up to 0.10.1 the
+//     mod set the stock multiplier table level._id_8CB3 instead; that did
+//     not change the zombies in game, KNOWN_LIMITATIONS.md L58.)
 //   - most alive: level.max_static_spawned_enemies, which the wave loop sets
 //     to 24 when a round starts and to 0 when it ends (quests set their own
 //     for a while). While a round runs and the option is not 24, the mod sets
@@ -42,6 +44,7 @@ register()
     level.ix.zombies.stock_movemode = [];
     custom_scripts\ix\zombies\zombies::on_ready( ::apply );
     level thread keep_speed_hook();
+    level thread watch_spawns();
     level thread keep_max_zombies();
 }
 
@@ -49,7 +52,6 @@ register()
 apply()
 {
     hook_speed();
-    apply_health();
 }
 
 // Regular zombies alive now (the types both options change).
@@ -166,46 +168,119 @@ health_types()
     return [ "generic_zombie", "zombie_cop", "cop_dlc2", "skeleton", "zombie_clown", "skater" ];
 }
 
-on_health_changed( value, old_value, id )
+// Every new zombie, as the game spawns it. The stock spawners give a zombie
+// its health (calculatezombiehealth) before they notify "agent_spawned"
+// (zombies_spawning.gsc and each DLC map's own spawning script).
+watch_spawns()
 {
-    if ( !custom_scripts\ix\zombies\zombies::is_ready() )
+    level endon( "game_ended" );
+
+    for (;;)
+    {
+        level waittill( "agent_spawned", agent );
+
+        if ( isdefined( agent ) && isalive( agent ) && isdefined( agent.agent_type ) && custom_scripts\ix\core\util::array_contains( health_types(), agent.agent_type ) )
+            scale_new_zombie( agent );
+    }
+}
+
+// Remembers the game's health and sets the option's share of it. A zombie the
+// game took off the map and brings back (level.respawn_data) starts with the
+// health it had, already scaled: only a fresh one, whose health is still the
+// game's full value, is set to the new full value.
+scale_new_zombie( zombie )
+{
+    stock = zombie.maxhealth;
+    percent = custom_scripts\ix\core\config::get( "zombie_health" );
+    zombie.ix_stock_health = stock;
+    zombie.ix_health_percent = percent;
+
+    if ( percent == 100 )
         return;
 
-    apply_health();
+    wanted = scaled_health( stock, percent );
 
-    // The zombies out now: scaled from the old percentage to the new one.
-    ratio = value / ( old_value * 1.0 );
+    if ( zombie.health == stock )
+        zombie.health = wanted;
+    else
+        zombie.health = int( max( 1, min( zombie.health, wanted ) ) );
+
+    zombie.maxhealth = wanted;
+
+    if ( !isdefined( level.ix.zombies.health_logged ) )
+    {
+        level.ix.zombies.health_logged = 1;
+        custom_scripts\ix\core\log::info( "zombies: health " + wanted + " for a " + zombie.agent_type + " (the game's " + stock + ")" );
+    }
+}
+
+scaled_health( stock, percent )
+{
+    return int( max( 1, stock * percent / 100.0 ) );
+}
+
+// The game's own full health of a zombie out now: remembered at its spawn, or
+// worked out from its health when it came another way.
+stock_health( zombie, percent )
+{
+    if ( isdefined( zombie.ix_stock_health ) && isdefined( zombie.ix_health_percent ) && zombie.ix_health_percent == percent )
+    {
+        if ( percent == 100 && zombie.maxhealth == zombie.ix_stock_health )
+            return zombie.ix_stock_health;
+
+        if ( percent != 100 && zombie.maxhealth == scaled_health( zombie.ix_stock_health, percent ) )
+            return zombie.ix_stock_health;
+    }
+
+    return int( max( 1, zombie.maxhealth * 100.0 / percent ) );
+}
+
+// The zombies out now get the new share at once, keeping how hurt they are.
+on_health_changed( value, old_value, id )
+{
+    count = 0;
 
     foreach ( zombie in regular_zombies( health_types() ) )
     {
-        zombie.maxhealth = int( max( 1, zombie.maxhealth * ratio ) );
-        zombie.health = int( max( 1, zombie.health * ratio ) );
+        stock = stock_health( zombie, old_value );
+        wanted = scaled_health( stock, value );
+        zombie.health = int( max( 1, zombie.health * wanted / ( max( 1, zombie.maxhealth ) * 1.0 ) ) );
+        zombie.maxhealth = wanted;
+        zombie.ix_stock_health = stock;
+        zombie.ix_health_percent = value;
+        count++;
     }
+
+    level.ix.zombies.health_logged = undefined;
+    level thread say_health_changed( value, count );
 }
 
-apply_health()
+// One line once the value stops changing (A / D held down steps it fast).
+say_health_changed( value, count )
 {
-    if ( !isdefined( level._id_8CB3 ) )
-        level._id_8CB3 = [];
+    level notify( "ix_zombie_health_said" );
+    level endon( "ix_zombie_health_said" );
+    level endon( "game_ended" );
+    wait 1;
 
-    percent = custom_scripts\ix\core\config::get( "zombie_health" );
+    custom_scripts\ix\core\log::info( "zombies: health " + value + " percent; " + count + " zombies out changed" );
 
-    foreach ( type in health_types() )
+    foreach ( player in level.players )
     {
-        if ( percent == 100 )
-            level._id_8CB3[type] = undefined;
-        else
-            level._id_8CB3[type] = percent / 100.0;
+        if ( custom_scripts\ix\core\util::is_valid_player( player ) )
+            player iprintln( "Zombie health " + value + " percent: " + count + " zombies out now and every new one." );
     }
 }
 
-// The health percentage new zombies get (the Debug page's read-out).
-health_scale()
+// A regular zombie out now (the In effect now read-outs), or undefined.
+sample_zombie()
 {
-    if ( !isdefined( level._id_8CB3 ) || !isdefined( level._id_8CB3["generic_zombie"] ) )
-        return 100;
+    zombies = regular_zombies( health_types() );
 
-    return int( level._id_8CB3["generic_zombie"] * 100 + 0.5 );
+    if ( zombies.size == 0 )
+        return undefined;
+
+    return zombies[0];
 }
 
 // ---------------------------------------------------------------------------

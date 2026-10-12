@@ -164,7 +164,7 @@
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
 | Zombie speed (default / walk / run / sprint) | Zombies | 7 | TESTING | `ix/zombies/agents.gsc`: the mod's hook in front of the stock `level.movemodefunc` of regular zombies and cops (clowns and skeletons keep their own). The game has no faster mode than sprint, so AAE's "super sprint" has no equivalent. L54; R-Z1 |
-| Weaker / tougher zombies (AAE: weaker zombies, health cap round) | Zombies | 7 | TESTING | *Zombie health* 10–1000 percent through the stock health multiplier `level._id_8CB3[type]`, for zombies that spawn afterwards (bosses and brutes keep theirs). A cap round: not built. L54; R-Z2 |
+| Weaker / tougher zombies (AAE: weaker zombies, health cap round) | Zombies | 7 | TESTING | *Zombie health* 10–1000 percent, set on each regular zombie when the game announces its spawn (`"agent_spawned"`) and on those out when it changes; bosses and brutes keep theirs. 0.10.0–0.10.1 used the stock multiplier `level._id_8CB3`, which did nothing in game (L58). *In effect now* shows one zombie's health next to the game's. A cap round: not built. L54, L58; R-Z2 |
 | Starting round (AAE) | Zombies | 7 | TESTING | `ix/zombies/rounds.gsc`: `level.wave_num` and `last_event_wave` before the first round, as the stock boss-fight-only modes do; from the next match; it counts toward the highest round (L53); R-Z6 |
 | Points multiplier | Zombies | 7 | TESTING | `ix/zombies/points.gsc`: `level.cash_scalar` (kills, hits, the Nuke, windows) times the option; Double Money still doubles. R-Z4 |
 | Power-ups per round | Zombies | 7 | TESTING | `level.powerup_drop_max_per_round` (the game's 5; 0: none from kills). R-Z5 |

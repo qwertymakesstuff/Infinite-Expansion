@@ -82,7 +82,7 @@ build()
 
     add_page( "zombies", "Zombies", "main" );
     add_setting( "zombies", "zombie_speed", 1 );
-    add_setting( "zombies", "zombie_health", 10 );
+    add_setting( "zombies", "zombie_health", 50 );
     add_setting( "zombies", "max_zombies", 4 );
     add_setting( "zombies", "points_multiplier", 50 );
     add_setting( "zombies", "powerup_limit", 1 );
@@ -92,7 +92,9 @@ build()
     add_page( "zombies_now", "In effect now", "zombies" );
     add_info( "zombies_now", "Set up", "yes once the game's spawner is ready; the options apply from then.", custom_scripts\ix\zombies\zombies::set_up_info );
     add_info( "zombies_now", "Speed hook", "on: Zombie speed reaches the zombies.", custom_scripts\ix\zombies\zombies::speed_hook_info );
-    add_info( "zombies_now", "New zombies' health", "Percent of the game's health that new regular zombies get.", custom_scripts\ix\zombies\zombies::health_info );
+    add_info( "zombies_now", "Zombie health", "Percent of the game's health that regular zombies get.", custom_scripts\ix\zombies\zombies::health_info );
+    add_info( "zombies_now", "A zombie's health", "The full health of one zombie out now (0: none out).", custom_scripts\ix\zombies\zombies::health_now_info );
+    add_info( "zombies_now", "Game's own for it", "What the game gave that zombie. With Zombie health 200, twice as much above.", custom_scripts\ix\zombies\zombies::health_stock_info );
     add_info( "zombies_now", "Most alive now", "The game's limit this round (0 between rounds).", custom_scripts\ix\zombies\zombies::max_alive_info );
     add_info( "zombies_now", "Points", "Percent the game pays for kills and hits now (Double Money included).", custom_scripts\ix\zombies\zombies::points_info );
     add_info( "zombies_now", "Power-ups a round", "Most power-ups kills can drop this round.", custom_scripts\ix\zombies\zombies::powerups_info );

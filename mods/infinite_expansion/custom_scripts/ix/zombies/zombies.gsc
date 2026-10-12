@@ -138,7 +138,29 @@ speed_hook_info()
 
 health_info()
 {
-    return custom_scripts\ix\zombies\agents::health_scale();
+    return custom_scripts\ix\core\config::get( "zombie_health" );
+}
+
+// The health of a regular zombie out now, and the game's own for it (0 when
+// none is out): the proof that the option reaches the zombies.
+health_now_info()
+{
+    zombie = custom_scripts\ix\zombies\agents::sample_zombie();
+
+    if ( !isdefined( zombie ) )
+        return 0;
+
+    return zombie.maxhealth;
+}
+
+health_stock_info()
+{
+    zombie = custom_scripts\ix\zombies\agents::sample_zombie();
+
+    if ( !isdefined( zombie ) )
+        return 0;
+
+    return custom_scripts\ix\zombies\agents::stock_health( zombie, custom_scripts\ix\core\config::get( "zombie_health" ) );
 }
 
 max_alive_info()
@@ -168,7 +190,7 @@ powerups_info()
 status_text()
 {
     // No "%": chat lines may go through a printf on the way.
-    return "set up " + set_up_info() + ", speed hook " + speed_hook_info() + ", new zombies' health " + health_info() + " percent, most alive " + max_alive_info() + ", points " + points_info() + " percent, power-ups a round " + powerups_info() + ", round " + round_number();
+    return "set up " + set_up_info() + ", speed hook " + speed_hook_info() + ", zombie health " + health_info() + " percent (a zombie out now: " + health_now_info() + " of the game's " + health_stock_info() + "), most alive " + max_alive_info() + ", points " + points_info() + " percent, power-ups a round " + powerups_info() + ", round " + round_number();
 }
 
 // "!ix zombies" (chat.gsc runs it on the player who typed it).
