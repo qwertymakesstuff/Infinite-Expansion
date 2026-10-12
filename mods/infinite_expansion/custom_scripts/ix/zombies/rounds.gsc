@@ -20,8 +20,21 @@
 
 register()
 {
-    custom_scripts\ix\core\config::add_int( "start_round", 1, 1, 100, "Starting round", "The round the next match starts at. It counts toward your highest round.", undefined );
+    custom_scripts\ix\core\config::add_int( "start_round", 1, 1, 100, "Starting round", "The round the next match starts at. It counts toward your highest round.", ::on_start_round_changed );
     custom_scripts\ix\zombies\zombies::on_ready( ::apply );
+}
+
+// It only applies when a match starts: say so, once a change is made.
+on_start_round_changed( value, old_value, id )
+{
+    if ( !isdefined( level.players ) )
+        return;
+
+    foreach ( player in level.players )
+    {
+        if ( custom_scripts\ix\core\util::is_valid_player( player ) )
+            player iprintln( "Starting round " + value + ": from the next match (Game: Restart the match)." );
+    }
 }
 
 // At the spawner's setup, and at every round start (when it does nothing).
@@ -37,7 +50,9 @@ apply()
         return;
 
     // Already under way (a round has started), or the boss-fight-only mode.
-    if ( !isdefined( level.wave_num ) || level.wave_num != 0 || ( isdefined( level.direct_to_boss_fight ) && level.direct_to_boss_fight ) )
+    // The boss-fight-only mode: asked through the stock function, which reads
+    // a field the v1.1.0 compiler has no name for (KNOWN_LIMITATIONS.md C10).
+    if ( !isdefined( level.wave_num ) || level.wave_num != 0 || scripts\cp\zombies\direct_boss_fight::should_directly_go_to_boss_fight() )
     {
         custom_scripts\ix\core\log::info( "zombies: start_round " + start + " not applied: the match is already under way or has its own round" );
         return;

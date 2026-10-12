@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: Phases 7–10 (zombies, HUD, quality of life, developer tools) complete — not yet run in-game.**
+> **Status: 0.10.1 — Phases 7–10 played (the Zombies page fixed in 0.10.1, not yet re-tested); new: give yourself any weapon of the map.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -88,7 +88,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.10.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui
+[IX] INFO: init 0.10.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: settings: 52 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
@@ -163,6 +163,7 @@ The **Weapons** page of the menu (also settings for chat and the console). Like 
 | **No recoil** | Weapons do not kick when they fire |
 | **Start with max ammo** | Every player gets max ammo a second after spawning |
 | **Refill ammo** | An action (host only): every player gets max ammo and grenades at once, as with a Max Ammo power-up |
+| **Give a weapon** | Pages by class (assault rifles, SMGs, shotguns, LMGs, snipers, pistols, other) and this map's **wonder weapons**: Use on one, the menu closes and it is in your hands with full ammo. With every slot full, the weapon in your hands goes, as with the box. Only weapons this map has (its own weapon table) are listed, so other maps' wonder weapons are not; the rows show the game's own names for them (AR57, KBS, …). Host only, unless *Menu: who changes settings* is *everyone*. No points are taken |
 
 Every option goes back to the game's own behaviour when you switch it off or reset it. The ammo options do what the game's own Max Ammo and Infinite Ammo power-ups do; fire rate and recoil leave the game's own changes alone (the Berserk passive's faster firing, recoil-reducing weapons, Deadeye Dewdrops).
 
@@ -172,15 +173,16 @@ The **Zombies** page of the menu (also settings for chat and the console). Like 
 
 | Option | What it does |
 |--------|--------------|
-| **Zombie speed** | *default*: the game's mix, faster each round. *walk*, *run* or *sprint*: every regular zombie and cop moves that way (clowns and skeletons keep their own). Back to *default*, zombies already out keep their speed; new ones move as the game picks |
-| **Zombie health** | Percent of the game's zombie health (10–1000), for zombies that spawn from then on. Bosses and brutes keep theirs |
+| **Zombie speed** | *default*: the game's mix, faster each round. *walk*, *run* or *sprint*: every regular zombie and cop moves that way at once (clowns and skeletons keep their own). Back to *default*, zombies already out keep their speed; new ones move as the game picks |
+| **Zombie health** | Percent of the game's zombie health (10–1000), for the zombies out now and every new one. Bosses and brutes keep theirs |
 | **Max zombies alive** | Most zombies out at once (1–64; the game's 24). Many more can slow the game down |
 | **Points multiplier** | Percent of the points kills and hits give (0–1000); Double Money still doubles them |
 | **Power-ups per round** | Most power-ups zombies drop in a round (0–20; the game's 5). Power-ups the game hands out otherwise (an event round's last zombie, Fate & Fortune cards, quests) still come |
 | **Starting round** | The round the **next** match starts at (1–100). It counts toward your highest round in your stats; pair it with *Starting points* on the Player page |
-| **Start with perks** | Every player gets every perk of the map a second after spawning (without Up N' Atoms in solo), as the game's own permanent-perks reward does. Perks lost when you go down stay lost |
+| **Start with perks** | Every player gets every perk of the map at once, and again a second after each spawn (without Up N' Atoms in solo), as the game's own permanent-perks reward does. Perks lost when you go down stay lost |
+| **In effect now** | A page of read-outs: what the game is using right now (the speed hook, new zombies' health, the most alive this round, the points percentage, power-ups a round, the round). `!ix zombies` in chat says the same |
 
-Every option goes back to the game's own behaviour when you switch it off or reset it.
+Every option goes back to the game's own behaviour when you switch it off or reset it. If one seems to do nothing, look at *In effect now* (or type `!ix zombies`) and send what it says.
 
 ## The info HUD
 
@@ -237,6 +239,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `!ix menu` | Opens the in-game menu |
 | `!ix refill` / `!ix save` / `!ix load` / `!ix tp` | The menu's *Refill ammo*, *Save position*, *Go to saved position* and *Teleport to crosshair* (host, or everyone with *Menu: who changes settings* *everyone*) |
 | `!ix log [n]` | The mod's last n log lines (8, at most 32) |
+| `!ix zombies` | What the Zombies options do right now (the values the game is using) |
 
 | Setting | Default | Range | Effect |
 |---------|---------|-------|--------|

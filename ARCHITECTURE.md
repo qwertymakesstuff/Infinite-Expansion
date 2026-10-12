@@ -56,7 +56,8 @@ Infinite-Expansion/                          (repository)
 │               ├── weapons/                 ≙ /scripts/weapons/
 │               │   ├── weapons.gsc          the module: registers the files below          (Phase 1)
 │               │   ├── ammo.gsc             unlimited ammo / grenades, max ammo, refill   (Phase 6)
-│               │   └── handling.gsc         fire rate, no recoil                         (Phase 6)
+│               │   ├── handling.gsc         fire rate, no recoil                         (Phase 6)
+│               │   └── give.gsc             give a weapon of this map (menu pages)       (0.10.1)
 │               ├── zombies/                 ≙ /scripts/zombies/
 │               │   ├── zombies.gsc          the module; round and zombie counts           (Phase 7)
 │               │   ├── agents.gsc           zombie speed, zombie health, max alive         (Phase 7)

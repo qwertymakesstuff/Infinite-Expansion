@@ -86,6 +86,9 @@ class BadMod(unittest.TestCase):
         self.assert_reported("[source]", "include_user.gsc:6", "dev blocks")
         self.assert_reported("[source]", "swallow.gsc:4", "ends in a backslash")
 
+    def test_fields(self):
+        self.assert_reported("[fields]", "z.gsc:4", ".direct_to_boss_fight is a stock field without a token")
+
     def test_lua(self):
         self.assert_reported("[lua]", "ui_scripts/Invented/__init__.lua:11", "Engine.SetPlayerData")
         self.assert_reported("[lua]", "ui_scripts/Invented/__init__.lua:12", ":SetMagicColor()")
@@ -105,7 +108,7 @@ class BadMod(unittest.TestCase):
         for name in ("_meth_80A1", "va", "logprint", "tell", "fileexists", "waittill_any", "isreallyalive", "swallow.gsc:6"):
             for line in self.errors:
                 self.assertIsNone(re.search(rf"\b{re.escape(name)}\b", line), line)
-        self.assertEqual(len(self.errors), 30 if HAVE_LUAC else 29, "\n".join(self.errors))
+        self.assertEqual(len(self.errors), 31 if HAVE_LUAC else 30, "\n".join(self.errors))
 
 
 @unittest.skipUnless(HAVE_TOOLCHAIN, "run tools/setup_compilers.sh first")

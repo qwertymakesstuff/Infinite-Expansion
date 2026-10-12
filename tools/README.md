@@ -26,7 +26,7 @@ python3 tools/check.py                                   # the mod in mods/infin
 python3 -m unittest discover -s tools/tests -v           # tests: check.py, the setup, the launcher, the menu script, the settings
 ```
 
-`check.py` exits 0 when there are no errors. Warnings do not fail the check. It runs these checks:
+`check.py` exits 0 when there are no errors. Its `fields` rule rejects a stock field (one the stock scripts use) whose name is not in the v1.1.0 compiler's token table: such a name compiles to a string, which is probably not the game's field (`KNOWN_LIMITATIONS.md` C10); the mod's own struct fields and the known cases are listed in `OWN_FIELDS` and `ACCEPTED_FIELDS`. Warnings do not fail the check. It runs these checks:
 
 | Check | What it verifies |
 |-------|------------------|

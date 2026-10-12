@@ -5,16 +5,30 @@
 // it starts, one a frame, skipping perks the player has: the map's own list
 // when it has one (level.all_perk_list), else the ten perks of the first map,
 // and without Up N' Atoms in solo (its self-revives come from the machine).
-// The mod calls it at each spawn while start_perks is on. Perks lost when a
-// player goes down stay lost, as in the game.
+// The mod calls it at each spawn while start_perks is on, and for everyone
+// playing when it is switched on. Perks lost when a player goes down stay
+// lost, as in the game.
 //
 // Settings:
 //   start_perks  0  1: every perk at each spawn
 
 register()
 {
-    custom_scripts\ix\core\config::add_bool( "start_perks", 0, "Start with perks", "Every player gets every perk of the map a second after spawning.", undefined );
+    custom_scripts\ix\core\config::add_bool( "start_perks", 0, "Start with perks", "Every player gets every perk of the map now and a second after each spawn.", ::on_perks_changed );
     custom_scripts\ix\core\events::subscribe( "player_spawn", ::on_spawn );
+}
+
+// Switched on: everyone playing gets them now, not only at the next spawn.
+on_perks_changed( value, old_value, id )
+{
+    if ( !value || !isdefined( level.players ) )
+        return;
+
+    foreach ( player in level.players )
+    {
+        if ( custom_scripts\ix\core\util::is_valid_player( player ) && isalive( player ) && !( isdefined( player.inlaststand ) && player.inlaststand ) )
+            player thread give_perks();
+    }
 }
 
 on_spawn( player, arg )

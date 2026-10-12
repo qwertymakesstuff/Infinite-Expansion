@@ -150,7 +150,7 @@
 | Fire-rate modifier | Weapons | 6 | TESTING | `ix/weapons/handling.gsc`: `fire_rate` 50–300 percent, the time between shots set with `setfiretimescaleon` (`compat::fire_rate_on`) four times a second; the Berserk passive's 65 is kept when it is faster. R-W3 |
 | Recoil / spread modifiers | Weapons | 6 | PARTIAL | *No recoil*: `player_recoilscaleon(0)` four times a second; off hands back to the stock `stancerecoilupdate`. Spread: no zombies script uses `setspreadoverride`, so its values are unknown: INVESTIGATING. R-W4 |
 | Start with max ammo / extra start weapons / random start weapon (AAE) | Weapons | 6 | PARTIAL | *Start with max ammo* (Max Ammo a second after each spawn). Extra or random start weapons need the mystery box's weapon lists (per map, with camos and Pack-a-Punch levels in `interaction_magicwheel.gsc`): DEFERRED. R-W5 |
-| Give / take / weapon info / testing tools | Weapons | 6/10 | PARTIAL | *Refill ammo* (Max Ammo for every standing player, host only) in Phase 6; give / take / info in Phase 10. R-W6 |
+| Give / take / weapon info / testing tools | Weapons | 6/10 | PARTIAL | *Refill ammo* (Phase 6); *Give a weapon* (0.10.1): every box and wall weapon of the map's own weapon table, by class, and the map's wonder weapons, given as the box gives them (`ix/weapons/give.gsc`; L57; R-W8). Take / weapon info: not built |
 | Weapon trade between players (AAE) | Weapons | – | DEFERRED | Use + trace; not started |
 | Weapon roulette / gun game (AAE) | Weapons | – | DEFERRED | Needs the mystery box's weapon lists, as random start weapons do |
 | Keep kit camo / choose PaP camo (AAE) | Weapons | 6 | INVESTIGATING | `+camoN` suffix; PaP flow |

@@ -20,6 +20,7 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = REPO / "mods" / "infinite_expansion" / "custom_scripts"
 MENU = SCRIPTS / "ix" / "ui" / "menu.gsc"
 MENU_TREE = SCRIPTS / "ix" / "ui" / "menu_tree.gsc"
+GIVE = SCRIPTS / "ix" / "weapons" / "give.gsc"
 INFO_HUD = SCRIPTS / "ix" / "ui" / "hud.gsc"
 README = REPO / "README.md"
 TESTING = REPO / "TESTING.md"
@@ -182,6 +183,10 @@ class Settings(unittest.TestCase):
         self.assertIn('" Locked: " + custom_scripts\\ix\\core\\config::find( item.needs ).label + " is OFF."', MENU.read_text())
         for _page, label, help_text in MENU_DEV_ACTION.findall(tree):
             texts[label] = help_text + GUEST_NOTE + locked_note
+        # Every weapon row of "Give a weapon" shows give.gsc entry_help(), host only.
+        self.assertIn("give::entry_help(), custom_scripts\\ix\\weapons\\give::give_entry, 0, 1, entry", tree)
+        give_help = re.search(r'^entry_help\(\)\s*\{\s*return "([^"]*)";', GIVE.read_text(), re.M).group(1)
+        texts["a weapon row"] = give_help + GUEST_NOTE
         for _page, label, help_text in MENU_INFO.findall(tree):
             texts[label] = help_text
         self.assertGreater(len(texts), 20)

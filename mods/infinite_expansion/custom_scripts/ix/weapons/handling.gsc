@@ -5,11 +5,12 @@
 //   - fire rate: setfiretimescaleon( percent ) sets the time between shots as
 //     a percentage of the weapon's own, setfiretimescaleoff() ends it. The
 //     stock Berserk weapon passive (scripts\cp\cp_weaponpassives.gsc) sets 65
-//     on a kill and ends it 2 s later or on a weapon change. The mod sets its
-//     own time four times a second while fire_rate is not 100, the faster of
-//     the two while Berserk is on, and ends it once when fire_rate goes back
-//     to 100 (unless Berserk is on, which ends itself). Through compat.gsc:
-//     v1.1.0's compiler does not know these names.
+//     on a kill and ends it 2 s later or on a weapon change (the mod follows
+//     it by its notifies: track_berserk). The mod sets its own time four
+//     times a second while fire_rate is not 100, the faster of the two while
+//     Berserk is on, and ends it once when fire_rate goes back to 100 (unless
+//     Berserk is on, which ends itself). Through compat.gsc: v1.1.0's
+//     compiler does not know these names.
 //   - recoil: player_recoilscaleon( percent ) / player_recoilscaleoff(). The
 //     stock cp_weapon.gsc sets each weapon's recoil after stance changes,
 //     sprints and weapon switches (stancerecoilupdate), and the Deadeye perk
@@ -33,7 +34,30 @@ register()
 on_connect( player, arg )
 {
     if ( custom_scripts\ix\core\util::is_valid_player( player ) )
+    {
+        player thread track_berserk();
         player thread keep_handling();
+    }
+}
+
+// The stock Berserk passive (cp_weaponpassives.gsc) is on from its
+// "stop_berserk_timer" notify (each kill) to its "end_berserk" notify (2 s
+// later, on a weapon change or death). Its own field self.berserk is not one
+// of the names the v1.1.0 compiler knows, so a script reading it may not read
+// the game's field (KNOWN_LIMITATIONS.md C10); notify names are plain strings
+// and always match.
+track_berserk()
+{
+    self endon( "disconnect" );
+    self.ix.berserk = 0;
+
+    for (;;)
+    {
+        self waittill( "stop_berserk_timer" );
+        self.ix.berserk = 1;
+        self waittill( "end_berserk" );
+        self.ix.berserk = 0;
+    }
 }
 
 keep_handling()
@@ -53,7 +77,7 @@ keep_handling()
         if ( isdefined( self.inlaststand ) && self.inlaststand )
             continue;
 
-        berserk = isdefined( self.berserk ) && self.berserk;
+        berserk = isdefined( self.ix.berserk ) && self.ix.berserk;
         rate = custom_scripts\ix\core\config::get( "fire_rate" );
 
         if ( rate != 100 )

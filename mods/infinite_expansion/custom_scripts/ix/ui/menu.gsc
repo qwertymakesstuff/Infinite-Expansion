@@ -107,13 +107,15 @@ add_setting( page, id, step )
     return item;
 }
 
-// An action row: fn runs on the player; confirm: Use twice.
-add_action( page, label, help, fn, confirm, host_only )
+// An action row: fn runs on the player; confirm: Use twice. With arg, fn
+// gets it: self [[ fn ]]( arg ) (one row per weapon, say).
+add_action( page, label, help, fn, confirm, host_only, arg )
 {
     item = new_item( "action", label, help );
     item.fn = fn;
     item.confirm = confirm;
     item.host_only = host_only;
+    item.arg = arg;
     add_item( page, item );
     return item;
 }
@@ -927,7 +929,11 @@ run_action( item )
     }
 
     state.confirm = undefined;
-    self [[ item.fn ]]();
+
+    if ( isdefined( item.arg ) )
+        self [[ item.fn ]]( item.arg );
+    else
+        self [[ item.fn ]]();
 
     if ( state.open )
         draw();

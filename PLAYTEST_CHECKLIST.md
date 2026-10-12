@@ -1,4 +1,4 @@
-# Play-test checklist (0.10.0)
+# Play-test checklist (0.10.1)
 
 What to try in a real match, and what should happen. Each item names its row in `TESTING.md` §4 (in brackets), where the details are. Tick what works; for anything that does not, see *If something is wrong* below.
 
@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.10.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui`, then `settings: 52 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.10.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui`, then `settings: 52 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*
@@ -47,18 +47,20 @@ What to try in a real match, and what should happen. Each item names its row in 
 - [ ] **W3** *Fire rate* 200: twice as fast; 100: normal again. *(R-W3)*
 - [ ] **W4** *No recoil*: the sights barely move. *(R-W4)*
 - [ ] **W5** *Refill ammo*: ammo and grenades full for everyone standing. *(R-W6)*
+- [ ] **W6** *Give a weapon* (new in 0.10.1): pick a weapon on each class page and a wonder weapon; the menu closes and it is in your hands with full ammo; with every slot full, the one in your hands goes. Only this map's weapons are listed. Report one that arrives without attachments, empty, or not at all. *(R-W8)*
 
-## 5. Zombies (Phase 7, new)
+## 5. Zombies (Phase 7; fixed in 0.10.1)
 
-Turn on *HUD: zombies* (HUD page) first, to see the counts.
+Turn on *HUD: zombies* (HUD page) first, to see the counts. *Zombies* → *In effect now* shows what the game is using right now; `!ix zombies` in chat says the same. If an option seems to do nothing, send a screenshot of either.
 
-- [ ] **Z1** *Zombie speed* sprint in round 1–3: every regular zombie sprints within a second; walk: they walk; default: new zombies move as the game picks. No zombie freezes or slides oddly. *(R-Z1)*
-- [ ] **Z2** *Zombie health* 1000 (round 5 or later): new zombies take about ten times the bullets; 10: they drop at once; 100: normal. *(R-Z2)*
-- [ ] **Z3** *Max zombies alive* 4: at most about 4 alive (brutes come on top); 64: many more at once, and the game does not slow down badly or stop spawning; 24: normal. *(R-Z3)*
-- [ ] **Z4** *Points multiplier* 200: kills pay twice (with Double Money, four times); 0: nothing; 100: normal, also after Double Money ends. *(R-Z4)*
-- [ ] **Z5** *Power-ups per round* 0: no power-ups from kills for two rounds; 20: more than five in a round. *(R-Z5)*
-- [ ] **Z6** *Starting round* 20, then *Game* → *Restart the match*: the new match starts at round 20, with no special round at once. Set it back to 1 afterwards. *(R-Z6)*
-- [ ] **Z7** *Start with perks* on: about a second after each spawn you have every perk (in solo without Up N' Atoms); also after dying and coming back. *(R-Z7)*
+- [ ] **Z0** *In effect now*, a few seconds into the match: *Set up* yes, *Speed hook* on, *New zombies' health* 100, *Points* 100, *Power-ups a round* 5. *(R-Z9)*
+- [ ] **Z1** *Zombie speed* sprint in round 1–3: every regular zombie on the map starts sprinting at once; walk: they walk; default: new zombies move as the game picks. No zombie freezes or slides oddly. *(R-Z1)*
+- [ ] **Z2** *Zombie health* 1000: the zombies already out and every new one take about ten times the bullets (*In effect now* says 1000); 10: they drop at once; 100: normal. *(R-Z2)*
+- [ ] **Z3** *Max zombies alive* 4 (round 5 or later, when many zombies come): at most about 4 alive (brutes come on top), and *Most alive now* says 4 during the round; 24: normal. *(R-Z3)*
+- [ ] **Z4** *Points multiplier* 200: kills pay twice (*Points* says 200; with Double Money, 400); 0: nothing; 100: normal. *(R-Z4)*
+- [ ] **Z5** *Power-ups per round* 0: no power-ups from kills for two rounds (*Power-ups a round* says 0); 20: more than five in a round. *(R-Z5)*
+- [ ] **Z6** *Starting round* 20 (a line says it applies from the next match), then *Game* → *Restart the match*: the new match starts at round 20, with no special round at once. Set it back to 1 afterwards. *(R-Z6)*
+- [ ] **Z7** *Start with perks* on: every perk within a second or two, right away, and again after dying and coming back (in solo without Up N' Atoms). *(R-Z7)*
 - [ ] **Z8** Play three rounds with several Zombies options on, go down and get revived: rounds start and end as usual, and the console has no `script runtime error`. *(R-Z8)*
 
 ## 6. Info HUD (Phase 8, new)

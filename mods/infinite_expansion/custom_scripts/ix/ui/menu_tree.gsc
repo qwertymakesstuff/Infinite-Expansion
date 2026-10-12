@@ -7,7 +7,7 @@
 //
 //   add_page( id, title, parent )                    a page, linked from its parent
 //   add_setting( page, setting, step )               step: A / D change numbers by it
-//   add_action( page, label, help, fn, confirm, host_only )
+//   add_action( page, label, help, fn, confirm, host_only [, arg] )   arg: fn gets it
 //   add_info( page, label, help, fn )                fn returns a number or a short word
 //   add_reset( page )                                "Reset this page", for a page of settings
 //   add_dev_action( page, label, help, fn )          an action locked until dev_tools is ON
@@ -62,6 +62,22 @@ build()
     add_setting( "weapons", "no_recoil", 1 );
     add_setting( "weapons", "start_max_ammo", 1 );
     add_action( "weapons", "Refill ammo", "Every player gets max ammo and grenades now, as with a Max Ammo.", custom_scripts\ix\weapons\ammo::refill_everyone, 0, 1 );
+
+    // Give a weapon: one page per class of this map's weapons (give.gsc).
+    add_page( "give", "Give a weapon", "weapons" );
+    groups = custom_scripts\ix\weapons\give::groups();
+
+    if ( groups.size == 0 )
+        add_info( "give", "No weapons found", "This map's weapon table listed none. Send the console's [IX] give line.", custom_scripts\ix\weapons\give::table_name );
+
+    foreach ( group in groups )
+    {
+        add_page( "give_" + group.id, group.title, "give" );
+
+        foreach ( entry in group.entries )
+            add_action( "give_" + group.id, entry.label, custom_scripts\ix\weapons\give::entry_help(), custom_scripts\ix\weapons\give::give_entry, 0, 1, entry );
+    }
+
     add_reset( "weapons" );
 
     add_page( "zombies", "Zombies", "main" );
@@ -72,6 +88,15 @@ build()
     add_setting( "zombies", "powerup_limit", 1 );
     add_setting( "zombies", "start_round", 1 );
     add_setting( "zombies", "start_perks", 1 );
+
+    add_page( "zombies_now", "In effect now", "zombies" );
+    add_info( "zombies_now", "Set up", "yes once the game's spawner is ready; the options apply from then.", custom_scripts\ix\zombies\zombies::set_up_info );
+    add_info( "zombies_now", "Speed hook", "on: Zombie speed reaches the zombies.", custom_scripts\ix\zombies\zombies::speed_hook_info );
+    add_info( "zombies_now", "New zombies' health", "Percent of the game's health that new regular zombies get.", custom_scripts\ix\zombies\zombies::health_info );
+    add_info( "zombies_now", "Most alive now", "The game's limit this round (0 between rounds).", custom_scripts\ix\zombies\zombies::max_alive_info );
+    add_info( "zombies_now", "Points", "Percent the game pays for kills and hits now (Double Money included).", custom_scripts\ix\zombies\zombies::points_info );
+    add_info( "zombies_now", "Power-ups a round", "Most power-ups kills can drop this round.", custom_scripts\ix\zombies\zombies::powerups_info );
+    add_info( "zombies_now", "Round", "The round being played.", custom_scripts\ix\zombies\zombies::round_number );
     add_reset( "zombies" );
 
     add_page( "hud", "HUD", "main" );
@@ -144,9 +169,9 @@ add_setting( page, setting, step )
     custom_scripts\ix\ui\menu::add_setting( page, setting, step );
 }
 
-add_action( page, label, help, fn, confirm, host_only )
+add_action( page, label, help, fn, confirm, host_only, arg )
 {
-    return custom_scripts\ix\ui\menu::add_action( page, label, help, fn, confirm, host_only );
+    return custom_scripts\ix\ui\menu::add_action( page, label, help, fn, confirm, host_only, arg );
 }
 
 // A developer tool: host only, Use twice, and locked while dev_tools is OFF.

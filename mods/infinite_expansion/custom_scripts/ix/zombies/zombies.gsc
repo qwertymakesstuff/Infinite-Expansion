@@ -28,6 +28,7 @@ register()
     custom_scripts\ix\zombies\perks::register();
 
     custom_scripts\ix\core\events::subscribe( "round_start", ::on_round_start );
+    custom_scripts\ix\core\chat::add_command( "zombies", ::status_command, "what the zombies options do right now" );
     level thread wait_for_spawner();
 }
 
@@ -51,8 +52,8 @@ wait_for_spawner()
         wait 0.25;
 
     level.ix.zombies.ready = 1;
-    custom_scripts\ix\core\log::debug( "zombies: the stock spawner is set up" );
     apply_all();
+    custom_scripts\ix\core\log::info( "zombies: options applied; " + status_text() );
 }
 
 spawner_ready()
@@ -112,4 +113,66 @@ zombies_alive()
     }
 
     return count;
+}
+
+// ---------------------------------------------------------------------------
+// What the options do right now: the values the game itself reads (the Debug
+// page's "Zombies options" and "!ix zombies"), so a test can tell an option
+// that is not applied from one the game ignores.
+
+set_up_info()
+{
+    if ( is_ready() )
+        return "yes";
+
+    return "not yet";
+}
+
+speed_hook_info()
+{
+    if ( custom_scripts\ix\zombies\agents::speed_hooked() )
+        return "on";
+
+    return "off";
+}
+
+health_info()
+{
+    return custom_scripts\ix\zombies\agents::health_scale();
+}
+
+max_alive_info()
+{
+    if ( !isdefined( level.max_static_spawned_enemies ) )
+        return 0;
+
+    return level.max_static_spawned_enemies;
+}
+
+points_info()
+{
+    if ( !isdefined( level.cash_scalar ) )
+        return 100;
+
+    return int( level.cash_scalar * 100 + 0.5 );
+}
+
+powerups_info()
+{
+    if ( !isdefined( level.powerup_drop_max_per_round ) )
+        return 0;
+
+    return level.powerup_drop_max_per_round;
+}
+
+status_text()
+{
+    // No "%": chat lines may go through a printf on the way.
+    return "set up " + set_up_info() + ", speed hook " + speed_hook_info() + ", new zombies' health " + health_info() + " percent, most alive " + max_alive_info() + ", points " + points_info() + " percent, power-ups a round " + powerups_info() + ", round " + round_number();
+}
+
+// "!ix zombies" (chat.gsc runs it on the player who typed it).
+status_command( words )
+{
+    self tell( "Zombies options now: " + status_text() );
 }

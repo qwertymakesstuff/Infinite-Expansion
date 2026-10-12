@@ -21,6 +21,11 @@ without it, using the compilers iw7-mod embeds (tools/setup_compilers.sh):
            blocks (iw7-mod compiles those only with developer_script 1, so the
            checked code would differ from what runs), and no // comment ending in
            a backslash (both compilers then drop the next line without an error)
+  fields   a field the stock scripts use (level.wave_num, self.inlaststand) must
+           have a token in the v1.1.0 compiler's table: without one it compiles
+           to a name, which is probably not the field the game's own scripts
+           read and write (KNOWN_LIMITATIONS.md C10). The mod's own struct
+           fields (OWN_FIELDS) and known cases (ACCEPTED_FIELDS) are listed
   lua      Lua UI scripts (ui_scripts/<Folder>/__init__.lua): luac5.1 syntax, and
            every Engine./LUI./MenuBuilder./... path, method and bare function call
            must appear in iw7-mod's own ui_scripts (pinned in setup_compilers.sh) or
@@ -76,6 +81,20 @@ ZOMBIES_MAPS = ("cp_zmb", "cp_rave", "cp_disco", "cp_town", "cp_final")
 ZOMBIES_ROOTS = ("scripts/cp/gametypes/zombie",)
 RAW_ID_FILES = {"custom_scripts/ix/core/compat.gsc"}
 
+# Field names (after a ".") in code with comments and strings blanked.
+FIELD = re.compile(r"(?<![0-9])\.([A-Za-z_]\w*)\b")
+TOKEN = re.compile(r'^\s*\{\s*0x[0-9A-Fa-f]+,\s*"([^"]+)"\s*\}', re.MULTILINE)
+# Names the mod uses only on its own structs (level.ix..., menu state, its
+# setting records), where a name instead of a token is harmless. .size is the
+# built-in length.
+OWN_FIELDS = {"size", "hud", "num", "order", "special", "zombies", "berserk"}
+# Stock fields used knowing they may not be the game's (KNOWN_LIMITATIONS.md
+# C10): the experimental cross-map characters (L26), and the character number,
+# which reaches the game as the return value of the function the mod replaces
+# (character.gsc character_num_for_spawn), not through the field.
+ACCEPTED_FIELDS = {"player_character_info", "intro_gesture", "intro_music", "melee_weapon", "pap_gesture",
+                   "pap_gesture_anim", "photo", "revive_gesture", "starting_weapon", "vo_suffix",
+                   "player_character_num"}
 RAW_ID = re.compile(r"\b_(meth|func)_([0-9A-Fa-f]+)\b")
 PLACEHOLDER = re.compile(r"^_(func|meth)_([0-9A-Fa-f]+)$")
 INCLUDE = re.compile(r"^\s*#include\b", re.MULTILINE)
@@ -554,6 +573,9 @@ def main():
                     report.error("source", f"{rel}:{line}", message)
         print(f"[source]   {source_issues} #include / dev-block / comment issues")
 
+        # fields
+        check_fields(toolchain, stock_root if stock else None, mod_root, scripts, report)
+
         # lua
         check_lua(mod_root, ui_root, report)
 
@@ -576,6 +598,34 @@ def main():
     verdict = "FAIL" if report.errors else "PASS"
     print(f"RESULT: {verdict} ({plural(len(report.errors), 'error')}, {plural(len(report.warnings), 'warning')})")
     return 1 if report.errors else 0
+
+
+def check_fields(toolchain, stock_root, mod_root, scripts, report):
+    """Stock field names the v1.1.0 compiler has no token for."""
+    table = toolchain / "src" / "gsc-tool-release" / "src" / "gsc" / "engine" / "iw7_token.cpp"
+    if stock_root is None or not table.is_file():
+        report.warn("fields", display(mod_root), "stock dump or the v1.1.0 token table not found; field names not checked")
+        return
+    tokens = set(TOKEN.findall(table.read_text(encoding="utf-8", errors="replace")))
+    stock_fields = set()
+    for path in stock_root.rglob("*.gsc"):
+        stock_fields.update(FIELD.findall(strip_code(path.read_text(encoding="utf-8", errors="replace"))))
+    checked = set()
+    accepted = set()
+    for rel in scripts:
+        code = strip_code((mod_root / rel).read_text(encoding="utf-8"))
+        for match in FIELD.finditer(code):
+            name = match.group(1)
+            # _id_XXXX names compile to that token itself (context::token_id).
+            if name not in stock_fields or name in tokens or name in OWN_FIELDS or re.fullmatch(r"_id_[0-9A-Fa-f]+", name):
+                continue
+            if name in ACCEPTED_FIELDS:
+                accepted.add(name)
+                continue
+            checked.add(name)
+            line = code.count("\n", 0, match.start()) + 1
+            report.error("fields", f"{rel}:{line}", f".{name} is a stock field without a token in the v1.1.0 compiler's table: it compiles to a name the game's own scripts do not use (KNOWN_LIMITATIONS.md C10); use a stock function that reads it, or a field of the mod's own")
+    print(f"[fields]   stock field names checked against the v1.1.0 token table: {len(accepted)} known cases (C10), {len(checked)} new")
 
 
 def check_lua(mod_root, ui_root, report):

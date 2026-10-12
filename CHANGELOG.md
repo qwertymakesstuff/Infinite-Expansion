@@ -4,6 +4,19 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.10.1: the Zombies page fixed; give yourself any weapon (2026-10-12)
+
+**Fixed**
+- **Zombie speed** did nothing on Spaceland: the mod now puts its speed hook in place for regular zombies even where the map has none, and the zombies already out change at once.
+- **Zombie health** now changes the zombies already out too, not only new ones.
+- **Start with perks** gives the perks as soon as it is switched on.
+- The fire-rate option now notices the Berserk passive by the game's own signals, and the starting round asks the game whether the boss-fight-only mode is on, instead of reading two fields the game's compiler cannot name (`KNOWN_LIMITATIONS.md` C10).
+
+**Added**
+- **Give a weapon** (*Weapons* page): every weapon of the map's box and walls, by class, and the map's own wonder weapons; the menu closes and it is in your hands with full ammo, as the box gives it. Host only, unless everyone may change settings.
+- **In effect now** (*Zombies* page) and `!ix zombies`: what the game is using right now (speed hook, new zombies' health, most alive, points, power-ups a round), to tell an option that is not applied from one the game ignores.
+- `check.py` rejects stock fields the v1.1.0 compiler has no name for (`fields`).
+
 ### 0.10.0: zombies options, info HUD, quality of life and developer tools (Phases 7–10) (2026-10-09)
 
 **Added**
