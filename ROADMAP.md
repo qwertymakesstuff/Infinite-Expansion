@@ -5,15 +5,15 @@ The phase plan. `README.md` lists every phase with its status; this file holds t
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0–10 | Forensics, foundation, characters, core systems, in-game menu, player options, movement, weapons, zombies options, info HUD, quality of life, developer tools | Built (in-game tests pending; `README.md`, `PLAYTEST_CHECKLIST.md`, `TESTING.md`) |
-| 11–13 | Configuration presets, polish, testing | Planned, 11 next (`FEATURE_STATUS.md`) |
-| 14 | **Guided Easter egg mode**: an optional in-game guide to each map's main Easter egg quest | Planned, **not started** (below) |
-| 15–22 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Planned, **not started** (below) |
+| 11–12 | Configuration presets, polish | In progress (`FEATURE_STATUS.md`) |
+| 13 | **Guided Easter egg mode**: an optional in-game guide to each map's main Easter egg quest | Planned, **not started** (below) |
+| 14–21 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Planned, **not started** (below) |
 
-The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. None of them is started; nothing below exists in the mod yet.
+The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. On 2026-10-12 the owner removed Phase 13 (a testing phase: start-up, player, zombies, configuration and compatibility checks) and put the guided Easter egg mode in its place, so the fun features are Phases 14–21 again. Testing goes on with each phase as before (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). None of Phases 13–21 is started; nothing below exists in the mod yet.
 
-## Phase 14 — Guided Easter egg mode
+## Phase 13 — Guided Easter egg mode
 
-An optional Guided Mode for Infinite Warfare zombies (the request calls the mod "All-Spectrum"; it is Infinite Expansion): an in-game companion that helps players follow each map's main Easter egg quest with contextual hints, objectives and directions. It makes the quests easier to follow; it never completes a step for the player. Added on 2026-10-09 by the project owner; not started.
+An optional Guided Mode for Infinite Warfare zombies (the request calls the mod "All-Spectrum"; it is Infinite Expansion): an in-game companion that helps players follow each map's main Easter egg quest with contextual hints, objectives and directions. It makes the quests easier to follow; it never completes a step for the player. Added on 2026-10-09 by the project owner as Phase 14; made Phase 13 on 2026-10-12, in place of the testing phase, with the same scope; not started.
 
 **1. Guided Mode toggle.** A *Guided Easter Egg Mode* option set before loading into a zombies map, for example:
 
@@ -118,7 +118,7 @@ never another map's guide. A step that cannot be detected is navigated by hand, 
 
 **Design philosophy.** An optional in-game Easter egg companion, not a cheat that completes the quest. Players who want to find the Easter eggs themselves leave it off and never see it; players who want help get accurate instructions without leaving the game for a walkthrough. Accuracy, contextual guidance, a clean HUD and normal zombies gameplay come first.
 
-## Rules for Phases 15–22
+## Rules for Phases 14–21
 
 These come with the request and apply to every fun feature:
 
@@ -128,7 +128,7 @@ These come with the request and apply to every fun feature:
 - **Honest co-op.** Do not assume network synchronization. A feature that cannot synchronize reliably is done locally, and a local-only effect is never presented as synchronized.
 - **Fun first.** The goal is not competitive balance but the polished extras that make players open the mod and think "What does this thing do?": polished UI, fun animations, funny effects, discoverability, smooth controls, good feedback, reversibility, co-op where possible, easy customization and easter eggs. The result should feel like a serious Infinite Warfare zombies enhancement mod with a ridiculous amount of fun stuff hidden inside it.
 
-## Phase 15 — Zombies emote system
+## Phase 14 — Zombies emote system
 
 A polished, standalone Emotes system made for Infinite Warfare zombies: a real feature of the mod, not a single animation command.
 
@@ -152,7 +152,7 @@ A polished, standalone Emotes system made for Infinite Warfare zombies: a real f
 - **Emote wheel:** if technically possible, a radial wheel (for example Dance at the top; Wave, Laugh, Point, Taunt, Salute and Pose around it; Back at the bottom) with the selected emote clearly highlighted, usable during a match without getting in the way of the game's HUD.
 - **Safety:** emotes handle death, respawn, going down, reviving and being revived, weapon changes, round transitions, teleports and loading sections, pausing or opening a menu, and being interrupted. An emote never traps the player in an animation and never interferes with normal zombies gameplay.
 
-## Phase 16 — Zombies fun toys
+## Phase 15 — Zombies fun toys
 
 A `FUN` category of optional, entertaining, fully reversible gameplay toys:
 
@@ -171,7 +171,7 @@ FUN
 - **Weapon effects**, separate from the core weapon system of Phase 6: rapid fire, very slow fire, infinite ammo, a huge magazine, damage up or down, experimental recoil, random weapon behaviour, one-shot mode where supported.
 - **Known so far** (for when this starts): several of these use the same game mechanisms as Phases 4–7 (gravity and speed dvars, `setmovespeedscale`, the fire-rate methods, `player_sustainAmmo`, damage callbacks; `IW_API_NOTES.md` §9–10). The global dvars affect every player and outlive the match (L17, L20), so their toys must put the old value back.
 
-## Phase 17 — Zombies randomizer
+## Phase 16 — Zombies randomizer
 
 A randomizer of fun gameplay modifiers:
 
@@ -189,7 +189,7 @@ Random Everything
 
 A run shows what it rolled, for example: movement speed 1.35x, jump height 1.75x, gravity 0.80x, weapon modifier Rapid Fire, zombie speed 1.25x, zombie health 0.75x, emote Dance, HUD Minimal. Only supported systems are randomized. `RESET RANDOMIZER` restores every modified setting to its original or default state.
 
-## Phase 18 — Favorites and presets
+## Phase 17 — Favorites and presets
 
 Save favorites and presets of the fun features: favorite emotes, fun effects, zombies modifiers, randomizer setups and combinations of effects:
 
@@ -205,7 +205,7 @@ Custom
 
 A preset switches on several compatible features at once (for example CHAOS: Super Jump, Low Gravity, Fast Zombies, Random Weapon and Random Emote on). Presets persist across sessions only if the mod environment allows it reliably, otherwise they last for the session. The settings already persist as archived dvars (`KNOWN_LIMITATIONS.md` L38), which is the first thing to try; Phase 11 (configuration presets) is related.
 
-## Phase 19 — Fun menu polish
+## Phase 18 — Fun menu polish
 
 A dedicated section of the zombies menu:
 
@@ -232,7 +232,7 @@ ALL-SPECTRUM
 
 `FUN` should look polished and intentional, something a player wants to explore, not a debug or developer menu. The request names the menu's root "ALL-SPECTRUM"; today it is titled "Infinite Expansion" (`ix/ui/menu_tree.gsc`), so settle the title when this phase starts.
 
-## Phase 20 — Secret and easter egg system
+## Phase 19 — Secret and easter egg system
 
 A small system for hidden, zombies-specific features, not all shown in the normal menus: secret emotes, rare animations, hidden player effects, funny zombie modifiers, secret menu themes, rare randomizer outcomes, hidden menu interactions, references to the zombies easter eggs, developer jokes. Built so that new easter eggs can be added later without rewriting the menu:
 
@@ -247,11 +247,11 @@ SecretFeatureManager
 
 Every secret effect stays reversible and never permanently damages or changes the game.
 
-## Phase 21 — Zombies social and show-off features
+## Phase 20 — Zombies social and show-off features
 
 Co-op zombies only, where technically possible: emotes other players can see, synchronized emotes, group poses and group emote effects, fun player introductions, victory and end-of-round poses, team-wide randomizer challenges, shared fun modifiers, emotes shown to spectators. Nothing is assumed to synchronize: what cannot synchronize reliably is done locally and never presented as synchronized. Features handle players joining and leaving, death, going down, reviving, spectating and round transitions.
 
-## Phase 22 — Fun feature testing
+## Phase 21 — Fun feature testing
 
 A dedicated zombies checklist in `TESTING.md`, written as the features are built:
 

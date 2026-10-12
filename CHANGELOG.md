@@ -4,6 +4,11 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### Roadmap: the guided Easter egg mode becomes Phase 13; the fun features move back to 14–21 (2026-10-12)
+
+**Changed**
+- The project owner removed Phase 13 (testing) and put the guided Easter egg mode, with the same scope, in its place. Testing goes on with each phase (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). The fun features are Phases 14–21 again, unchanged. Phases 11 (configuration presets) and 12 (polish) come first.
+
 ### 0.10.2: Zombie health fixed (2026-10-12)
 
 **Fixed**
