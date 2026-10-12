@@ -22,6 +22,7 @@ MENU = SCRIPTS / "ix" / "ui" / "menu.gsc"
 MENU_TREE = SCRIPTS / "ix" / "ui" / "menu_tree.gsc"
 GIVE = SCRIPTS / "ix" / "weapons" / "give.gsc"
 INFO_HUD = SCRIPTS / "ix" / "ui" / "hud.gsc"
+PRESETS = SCRIPTS / "ix" / "core" / "presets.gsc"
 README = REPO / "README.md"
 TESTING = REPO / "TESTING.md"
 PLAYTEST = REPO / "PLAYTEST_CHECKLIST.md"
@@ -43,6 +44,10 @@ MENU_ACTION = re.compile(r'add_action\(\s*(?:"([a-z0-9_]+)"|page),\s*"([^"]*)",\
 MENU_DEV_ACTION = re.compile(r'add_dev_action\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)",')
 DEV_GATE = "dev_tools"
 MENU_INFO = re.compile(r'add_info\(\s*"([a-z0-9_]+)",\s*"([^"]*)",\s*"([^"]*)"')
+# presets.gsc add(): id, title, help, and "id=value" words or undefined (Custom).
+PRESET = re.compile(r'^\s*add\(\s*"([a-z]+)",\s*"([^"]*)",\s*"([^"]*)",\s*(?:"([^"]*)"|(undefined))\s*\);', re.M)
+# The presets the project asked for (Phase 11), in the menu's order.
+PRESET_NAMES = ["default", "classic", "enhanced", "testing", "developer", "custom"]
 GUEST_NOTE = " Only the host can change it."  # menu.gsc item_help(), for a player who may not change it
 # The keys at the bottom of the menu: small text (fontscale 0.7, about 5 of
 # the 640-wide screen's units a character) in the panel's 224 usable units.
@@ -187,6 +192,10 @@ class Settings(unittest.TestCase):
         self.assertIn("give::entry_help(), custom_scripts\\ix\\weapons\\give::give_entry, 0, 1, entry", tree)
         give_help = re.search(r'^entry_help\(\)\s*\{\s*return "([^"]*)";', GIVE.read_text(), re.M).group(1)
         texts["a weapon row"] = give_help + GUEST_NOTE
+        # Every preset's row shows its own help, host only.
+        self.assertIn("add_action( \"presets\", preset.title, preset.help, custom_scripts\\ix\\core\\presets::apply_action, 1, 1, id );", tree)
+        for _id, title, help_text, _values, _custom in PRESET.findall(PRESETS.read_text()):
+            texts["preset " + title] = help_text + GUEST_NOTE
         for _page, label, help_text in MENU_INFO.findall(tree):
             texts[label] = help_text
         self.assertGreater(len(texts), 20)
@@ -237,6 +246,43 @@ class Settings(unittest.TestCase):
         rows = re.search(r"^wanted_rows\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
         self.assertLessEqual(len(re.findall(r'rows\[rows\.size\] = "', rows)), INFO_HUD_ROWS)
         self.assertEqual(len(re.findall(r"= hud_text\(", text)), 2, "a label and a number per row")
+
+    def test_presets(self):
+        text = PRESETS.read_text()
+        found = PRESET.findall(text)
+        self.assertEqual([preset_id for preset_id, *_rest in found], PRESET_NAMES)
+        kept_body = re.search(r"^kept_settings\(\)\s*\{\s*return \[([^\]]*)\];", text, re.M).group(1)
+        kept = re.findall(r'"([a-z0-9_]+)"', kept_body)
+        for setting in kept:
+            self.assertIn(setting, self.settings, "kept_settings")
+        # The menu itself and the characters are never a preset's business.
+        for setting in ("menu", "menu_open", "menu_access", "character_select"):
+            self.assertIn(setting, kept)
+        for preset_id, _title, _help, values, custom in found:
+            if preset_id == "custom":
+                self.assertEqual(custom, "undefined")
+                continue
+            self.assertEqual(custom, "", preset_id)
+            seen = set()
+            for word in values.split():
+                setting, value = word.split("=")
+                self.assertNotIn(setting, seen, f"{preset_id}: {setting} twice")
+                seen.add(setting)
+                self.assertIn(setting, self.settings, f"{preset_id}: {setting}")
+                self.assertNotIn(setting, kept, f"{preset_id}: {setting} is kept")
+                kind, default, extra, _where = self.settings[setting]
+                self.assertNotEqual(value, default, f"{preset_id}: {setting} is its default anyway")
+                # Written as config.gsc to_text() writes it, so "In use" can match it.
+                if kind == "bool":
+                    self.assertIn(value, ("0", "1"), f"{preset_id}: {setting}")
+                elif kind == "enum":
+                    self.assertIn(value, extra, f"{preset_id}: {setting}")
+                else:
+                    self.assertEqual(kind, "int", f"{preset_id}: {setting}")
+                    self.assertEqual(value, str(int(value)), f"{preset_id}: {setting}")
+                    low, high = (int(number) for number in extra)
+                    self.assertTrue(low <= int(value) <= high, f"{preset_id}: {setting}")
+        self.assertEqual(found[0][3], "", "Default changes nothing from the defaults")
 
     def test_init_line_counts_them(self):
         for path in (README, TESTING, PLAYTEST):

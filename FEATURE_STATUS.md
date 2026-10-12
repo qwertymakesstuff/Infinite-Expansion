@@ -96,7 +96,7 @@
 | How to open it, at the start of each round | UI | 0.4.1 | TESTING | `iprintlnbold` 3 s after `round_start`, until the player has opened the menu; late joiners 6 s after spawning; `menu_hint`. R-M13 |
 | The menu's keys in small text at its bottom | UI | 0.4.1 | TESTING | Two lines at fontscale 0.7, keyboard or controller words, with the keys that open it; their width is tested. Not visible in 0.4.0 (too many HUD elements, L49); fixed in 0.4.2. R-M1, R-M14 |
 | Menu pages (data) | UI | 3 | TESTING | `ix/ui/menu_tree.gsc`: Characters, Player (with Position), Movement, Weapons, Zombies, HUD, Game, Menu, Settings, Debug (with Information and Drop a power-up); the first page scrolls |
-| Reset / defaults from menu | UI | 3/9 | TESTING | *Reset every setting* (confirm with a second Use, host only); *Reset this page* at the end of every page of options (Phase 9); presets come in Phase 11; R-M6, R-Q1 |
+| Reset / defaults from menu | UI | 3/9 | TESTING | *Reset every setting* (confirm with a second Use, host only); *Reset this page* at the end of every page of options (Phase 9); presets: the Presets page (Phase 11); R-M6, R-Q1, R-C10 |
 | Host-only changes | UI | 3 | TESTING | Everyone can look; only the host changes, unless `menu_access` is `everyone`; R-M5 |
 | Per-player access list | UI | – | NOT PLANNED | `menu_access` covers host-only versus everyone |
 | Lobby card of the chosen character | UI | 3 | TESTING | The CHARACTER pick's card, big, in the stock lobby's bottom right under the player list (the lower middle with three or four players): the pack's card (Pam Grier's 2:1), else a special's stock picture, else the team card or initials; the stock special pictures stay hidden; follows a new pick, SELECT SHOW and players joining or leaving (L42, L43); R-UI7 |
@@ -200,7 +200,7 @@
 | Chat commands (save, tp, ammo, help) | QoL | 9 | TESTING | `ix/qol/qol.gsc`: `!ix refill`, `!ix save`, `!ix load`, `!ix tp` (the menu's actions, same rules); `!ix` lists everything, a few lines a frame. Bank and share: not built. R-Q5 |
 | Restart | QoL | 9 | TESTING | Game → *Restart the match* (host, Use twice): iw7-mod's console `map_restart`. L55; R-Q4 |
 | Timescale | Utilities | 9 | TESTING | Game → *Game speed* 25–200 percent with iw7-mod's `setslowmotion( s, s, 0 )`; the game's speed back at 100 and at the match's end. L55; R-Q2 |
-| Presets (Default/Classic/Enhanced/Testing/Developer/Custom) | Config | 11 | PLANNED | Data maps applied through `config::set`; R-C10 |
+| Presets (Default/Classic/Enhanced/Testing/Developer/Custom) | Config | 11 | TESTING | `ix/core/presets.gsc`: built-in presets as data (`id=value` words), applied through `config::set` to every governed setting (the menu's own settings, the HUD's position and the characters are kept); *Custom* saved as archived dvars (L38, L59); *In use* read-out; Presets page and `!ix preset`. R-C10 |
 | Feature reset (all / per category) | Config | 9 | TESTING | *Reset every setting* and *Reset this page* (every page of options). R-Q1 |
 | Vision presets | Visuals | – | DEFERRED | `visionsetnakedforplayer` works, but the stock scripts set their own vision at many moments (last stand, afterlife arcade, revives, Rave mode, Dischord glasses, the final boss), and only three names exist on all five maps |
 | Night vision | Visuals | 9 | INVESTIGATING | `_meth_821A` |

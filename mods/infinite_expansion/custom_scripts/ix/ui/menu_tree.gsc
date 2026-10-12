@@ -122,6 +122,17 @@ build()
     add_setting( "menu", "menu_hint", 1 );
     add_setting( "menu", "menu", 1 );
 
+    add_page( "presets", "Presets", "main" );
+    add_info( "presets", "In use", "The preset your settings match now; Your own when none does.", custom_scripts\ix\core\presets::matching );
+
+    foreach ( id in level.ix.presets.order )
+    {
+        preset = level.ix.presets.list[id];
+        add_action( "presets", preset.title, preset.help, custom_scripts\ix\core\presets::apply_action, 1, 1, id );
+    }
+
+    add_action( "presets", "Save as Custom", "Your settings now become Custom, kept across games. Menu, HUD layout and characters are not in it.", custom_scripts\ix\core\presets::save_custom_action, 1, 1 );
+
     add_page( "settings", "Settings", "main" );
     add_info( "settings", "Changed from the default", "How many settings differ from their default.", custom_scripts\ix\ui\menu::changed_count_info );
     add_action( "settings", "Reset every setting", "Every setting back to its default. Saved settings are reset too.", custom_scripts\ix\ui\menu::reset_all_action, 1, 1 );

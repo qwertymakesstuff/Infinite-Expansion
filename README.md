@@ -117,7 +117,7 @@ The bottom of the menu lists these keys in two lines of small text, with the key
 
 While the menu is open you stand still: the movement keys steer the menu instead of you, and your weapon, grenades, melee and Use are off. You can still look around, and zombies can still hit you. Closing the menu gives everything back at once. It closes by itself if you go down.
 
-Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Movement** ([movement options](#movement-options)), **Weapons** ([weapon options](#weapon-options)), **Zombies** ([zombies options](#zombies-options)), **HUD** ([the info HUD](#the-info-hud)), **Game** ([game options](#game-options)), **Menu** (its own settings), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug** ([developer tools](#developer-tools)). The first page scrolls past its eighth row. Every page of options ends with **Reset this page** (Use twice), which puts only that page's options back to their defaults. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
+Its pages: **Characters**, **Player** ([player options](#player-options), with **Position** inside), **Movement** ([movement options](#movement-options)), **Weapons** ([weapon options](#weapon-options)), **Zombies** ([zombies options](#zombies-options)), **HUD** ([the info HUD](#the-info-hud)), **Game** ([game options](#game-options)), **Menu** (its own settings), **Presets** ([presets](#presets)), **Settings** (how many differ from the default, *Reset every setting*, the version) and **Debug** ([developer tools](#developer-tools)). The first page scrolls past its eighth row. Every page of options ends with **Reset this page** (Use twice), which puts only that page's options back to their defaults. Each row shows a setting's current value, and the lines under the list say what it does and which values it takes. Everyone can open the menu; only the host can change settings (they apply to the whole match), unless the host sets *Menu: who changes settings* to *everyone*.
 
 ## Player options
 
@@ -221,6 +221,21 @@ The **Debug** page of the menu, for testing. Its tools are **locked** until the 
 
 `!ix log` in chat shows anyone the mod's last 8 log lines (`!ix log 20`: the last 20, at most 32). Flying (UFO, noclip) is not possible from the mod's scripts (`KNOWN_LIMITATIONS.md` L56).
 
+## Presets
+
+The **Presets** page of the menu sets many options at once (host only, Use twice). A preset gives every option it covers either its own value or the default, so the result is the same whatever you had set before. No preset touches the menu's own settings (how it opens, who may change settings, the hint), where the HUD sits (*HUD: side*, *HUD: height*) or the characters. *In use* at the top says which preset your settings match now, or *Your own*.
+
+| Preset | What it sets (everything else: the default) |
+|--------|---------------------------------------------|
+| **Default** | Nothing: every option the game's own, as on a fresh install |
+| **Classic** | Older Call of Duty: *Mantle* on, *Mantle: older style* on, *Slide* off, *HUD: round* on |
+| **Enhanced** | *Wall run*, *Double jump*, *Mantle*, *Start with max ammo*, *HUD: round* and *HUD: zombies* on |
+| **Testing** | *God mode* host, *Unlimited ammo* clip, *Unlimited grenades*, *Start with perks*, *Starting points* 50,000, *HUD: round*, *HUD: zombies*, *Zombie outlines* |
+| **Developer** | *Developer tools* and *Debug log* on, all four HUD numbers, *Zombie outlines*, *God mode* host |
+| **Custom** | Your own: **Save as Custom** (last row) stores the value of every option a preset covers, and it is kept across games. Until you save one, *Custom* says there is nothing to apply |
+
+Options that take effect later still do: *Starting round* from the next match, *Starting points* for new players. In chat: `!ix preset` lists the presets and says which is in use, `!ix preset enhanced` applies one, `!ix preset save` saves yours as Custom (host).
+
 ## Settings and chat commands
 
 Every option of the mod is a **setting** with a type, a default and a valid range. Change one in any of three ways:
@@ -228,6 +243,8 @@ Every option of the mod is a **setting** with a type, a default and a valid rang
 - **The in-game menu** (above).
 - **Chat** (press the chat key in a match): `!ix set character_announce 1`. Only the host can change settings; everyone can look.
 - **Console** (`~`): `set ix_character_announce 1`. It applies within half a second.
+
+Many at once: a [preset](#presets). No setting needs the mod's files edited: each one is a console variable named `ix_` plus the setting (`ix_move_speed`, `ix_unlimited_ammo`, `ix_hud_round` …, all in the table below), so they can also go on the launcher's command line (`+set ix_move_speed 150`, see [The launcher](#the-launcher)).
 
 Changes are **saved** by themselves: the mod stores them in your game config (as `seta ix_<setting> <value>`, the way the CHARACTER menu saves your pick), so the next game starts with them. This works in the normal install, which friends can join; nothing is written anywhere else. Settings belong to the host: in someone else's match, theirs apply. A value outside a setting's range is refused (`!ix` says what is valid), and numbers are kept within their range.
 
@@ -244,6 +261,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `!ix refill` / `!ix save` / `!ix load` / `!ix tp` | The menu's *Refill ammo*, *Save position*, *Go to saved position* and *Teleport to crosshair* (host, or everyone with *Menu: who changes settings* *everyone*) |
 | `!ix log [n]` | The mod's last n log lines (8, at most 32) |
 | `!ix zombies` | What the Zombies options do right now (the values the game is using) |
+| `!ix preset` / `!ix preset <name>` / `!ix preset save` | The presets and which is in use / host: apply one / host: save yours as Custom |
 
 | Setting | Default | Range | Effect |
 |---------|---------|-------|--------|

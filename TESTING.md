@@ -398,7 +398,7 @@ Chat commands are typed in the match's chat. The replies appear only for the pla
 | R-C7 | Open the menu with `!ix menu`, then type `!ix off menu`; ADS + Melee; `!ix on menu`; die or bleed out and respawn, then ADS + Melee | The menu closes at once and does not open while off (`!ix menu` says it cannot open now); after `!ix on menu`, and after the respawn, it opens | not run | not run |
 | R-C8 | Odd chat: `!ix set character_specials 1;quit`, `!ix get "x`, `!IX LIST` | The first is refused (not a whole number) and the game keeps running; the second answers "No setting that …"; upper case works like lower case | not run | not run |
 | R-C9 | `set ix_debug_log 1`, then a new match; `!ix off debug_log` | `[IX] DEBUG:` lines (player connected / spawned), then none | not run | not run |
-| R-C10 | Presets *(Phase 11)* | All values match the preset table | not run | not run |
+| R-C10 | Presets *(Phase 11)*: *Presets* → each built-in preset (Use twice); `!ix list` after each; then *Testing*, *Save as Custom*, *Default*, *Custom*; quit, start again, `!ix preset` | A line says how many settings changed; the values match the table in `README.md` (*Presets*), every other governed setting is at its default, and the menu's own settings, the HUD's position and the characters are unchanged; *In use* names the preset just applied (*Your own* after any change); *Custom* first says nothing is saved; after saving, *Default* then *Custom* brings the Testing values back; after the restart `!ix preset` still lists Custom and *Custom* applies it | not run | not run |
 
 ### 4.5 Characters (Phase 1.5)
 

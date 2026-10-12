@@ -40,7 +40,8 @@ Infinite-Expansion/                          (repository)
 │               │   ├── config.gsc           settings: types, ranges, get/set/reset, console (Phase 2)
 │               │   ├── persist.gsc          saving settings (seta) + layout version        (Phase 2)
 │               │   ├── features.gsc         on/off features, requirements, hooks           (Phase 2)
-│               │   └── chat.gsc             !ix chat commands                              (Phase 2)
+│               │   ├── chat.gsc             !ix chat commands                              (Phase 2)
+│               │   └── presets.gsc          configuration presets, Custom                  (Phase 11)
 │               ├── ui/                      ≙ /scripts/ui/
 │               │   ├── menu.gsc             menu engine (pages, items, rendering, input)   (Phase 3)
 │               │   ├── menu_tree.gsc        menu pages (data only)                       (Phase 3)
@@ -177,7 +178,7 @@ config::find(id) / exists(id) / changed_count() / to_text(setting, value) / desc
 - **Change notification.** Each change logs `setting <id> = <value> (<source>)`, notifies `level "ix_setting_changed", id`, and runs `level thread [[on_change]](value, old_value, id)`. The value found at registration does not count as a change.
 - **Persistence (`ix\core\persist`).** Every change is saved as an archived dvar: `executecommand("seta ix_<id> <value>")`, the way the CHARACTER menu saves `ix_character`. iw7-mod keeps archived dvars in the host's config, so the next game starts with them, and registration reads them back. This needs neither `fs_game` nor file access, so it works in the install friends can join (L9, L30). Only values made of letters, digits, `_`, `.` and `-` (at most 64) are ever written, so no value can add a console command.
 - **Layout version.** `ix_settings_version` (now 1) records which layout of settings was saved; `persist::migrate(from)` converts old values once when a later version renames or changes a setting. An invalid saved value is replaced by the default at registration, and saved again.
-- **Presets** *(later)*: Default, Classic, Enhanced, Testing, Developer and Custom as data (`id → value` maps), applied with `set`.
+- **Presets (`ix\core\presets`, Phase 11).** Default, Classic, Enhanced, Testing and Developer are data: `add( id, title, help, "id=value …" )`, the settings each changes from their defaults, written as `to_text` writes them. `apply( id, source )` gives every *governed* setting (all but `kept_settings()`: the menu's own settings, the HUD's position and the characters) the preset's value or its default, through `config::set`, so each module hears of its change as usual, and returns how many changed. Custom is the host's own: `save_custom` stores every governed setting as the archived dvar `ix_custom_<id>` (and `ix_custom_saved 1`); a setting a later version adds gets its default. `matching()` names the preset the settings match now (the menu's *In use*). Menu: the Presets page; chat: `!ix preset [name | save]`. `test_settings.py` checks that every preset value names a real, governed setting with a valid value that is not its default.
 
 ### 4.3 Event bus (`ix\core\events`)
 

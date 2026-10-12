@@ -86,11 +86,17 @@ Turn on *HUD: zombies* (HUD page) first, to see the counts. *Zombies* → *In ef
 - [ ] **D6** *Information*: map, players, round, zombies and position look right. *What am I looking at?* at a zombie and a wall names them. *(R-D7)*
 - [ ] **D7** Chat `!ix log`: the mod's last 8 log lines. *(R-D8)*
 
-## 9. Co-op (when a friend can join)
+## 9. Presets (Phase 11, new)
+
+- [ ] **PR1** *Presets* → *Enhanced* (Use twice): a line says how many settings changed; wall run, double jump and mantle work, the round and zombies are on the HUD; *In use* says Enhanced. Then *Testing*: god mode, unlimited ammo, every perk; *In use* says Testing. *(R-C10)*
+- [ ] **PR2** Change any option by hand: *In use* says *Your own*. *Default*: everything back to the game's own, but your *Menu: open with*, the HUD's side and height and your character settings stay. *(R-C10)*
+- [ ] **PR3** *Custom* before saving: it says nothing is saved. Set a few options, *Save as Custom*, *Default*, then *Custom*: your options are back. Quit the game, start it again: `!ix preset` still knows Custom. *(R-C10)*
+
+## 10. Co-op (when a friend can join)
 
 - [ ] **C1** The friend joins (both with the mod installed by the setup); the host's settings apply to both; the friend's menu rows are grey ("Only the host can change it."). *(R-S2, R-C4)*
 - [ ] **C2** *Zombie outlines* and the HUD work for the friend too; *Restart the match* restarts it for both. *(R-Q3, R-Q4)*
 
-## 10. Clean-up
+## 11. Clean-up
 
 - [ ] **E1** *Settings* → *Reset every setting*, then start a new match: the console says `0 changed from the default`, and the game plays as without the mod. *(R-C6)*

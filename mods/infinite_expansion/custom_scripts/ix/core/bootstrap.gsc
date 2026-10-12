@@ -41,7 +41,8 @@ start( modules )
     setdvar( "ix_version", level.ix.version );
 
     // Core, in dependency order: settings need the event bus (features listen
-    // for spawns) and saving; the chat commands need settings.
+    // for spawns) and saving; the chat commands need settings; the presets,
+    // chat (their settings are read only when one is applied).
     custom_scripts\ix\core\log::setup();
     custom_scripts\ix\core\compat::setup();
     custom_scripts\ix\core\events::setup();
@@ -49,6 +50,7 @@ start( modules )
     custom_scripts\ix\core\persist::setup();
     custom_scripts\ix\core\features::setup();
     custom_scripts\ix\core\chat::setup();
+    custom_scripts\ix\core\presets::setup();
     custom_scripts\ix\core\config::add_bool( "debug_log", 0, "Debug log", "Extra [IX] DEBUG lines in the console and iw7-mod/logs/console.log.", undefined );
 
     foreach ( module_register in modules )
