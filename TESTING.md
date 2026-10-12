@@ -259,6 +259,7 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 |---|-------|--------|
 | V143 | `python3 tools/check.py` with `ix/core/presets.gsc` | ✅ PASS, 0 errors, 0 warnings: 68/68 compiled, 34/34 identical between the compilers, `fields` 11 known cases, 0 new |
 | V144 | `python3 -m unittest discover -s tools/tests` | ✅ 111 tests OK; new `test_presets`: the six presets in order (Default, Classic, Enhanced, Testing, Developer, Custom); every built-in value names a real setting that a preset governs, is valid for it, is written as `to_text` writes it (so *In use* can match it) and is not its default; Default names none; the kept settings exist and include the menu's own and the characters; every preset row's help fits the menu. Not run: in game (R-C10) |
+| V145 | The 0.11.0 release on GitHub | ✅ The push of `dd162fb` published `v0.11.0` with `Infinite-Expansion-0.11.0.zip`: 540,873 bytes, SHA-256 `0AB6CF7E…3A92` as GitHub lists it, byte for byte a local `git archive` of that commit. The setup's own `Get-IXLatestRelease` and `Save-IXUpdate`, run here against the real GitHub, found it newer than 0.3.2 and 0.10.2, matched size and checksum, and unpacked version 0.11.0, whose 107 files are identical to the commit. Not run: the Windows side of that update (R-U2) |
 
 ## 3. Runtime test environment (for testers)
 
