@@ -133,8 +133,9 @@ new_guide( map, map_name, quest, prerequisites )
 // "count:<name>*<n>" (after n of that notify, shown as (2/3)), "check"
 // (the step's own check function, step.check) or "manual" (players mark it).
 // marker: "struct:<targetname>", "ent:<targetname>", "structs:<targetname>" /
-// "ents:<targetname>" (the nearest of them), "locate" (the step's own
-// function, step.locate) or "none". Only places the game's own quest scripts
+// "ents:<targetname>" (the nearest of them), "sn_struct:<script_noteworthy>",
+// "sn_structs:<script_noteworthy>", "locate" (the step's own function,
+// step.locate) or "none". Only places the game's own quest scripts
 // look up themselves.
 add_step( guide, id, objective, location, minimal, standard, detailed, detect, marker )
 {
@@ -151,6 +152,66 @@ add_step( guide, id, objective, location, minimal, standard, detailed, detect, m
     step.marked = 0;
     guide.steps[guide.steps.size] = step;
     return step;
+}
+
+// Helpers the guides share (by name, through fields every compiler knows).
+
+// The nearest live agent of this type (agent_type, as the stock scripts set
+// it) to the player this runs on, or undefined.
+nearest_agent( type )
+{
+    if ( !isdefined( level.agentarray ) )
+        return undefined;
+
+    best = undefined;
+    best_distance = 0;
+
+    foreach ( agent in level.agentarray )
+    {
+        if ( !isdefined( agent ) || !isalive( agent ) || !isdefined( agent.agent_type ) || agent.agent_type != type )
+            continue;
+
+        gap = distancesquared( self.origin, agent.origin );
+
+        if ( !isdefined( best ) || gap < best_distance )
+        {
+            best = agent;
+            best_distance = gap;
+        }
+    }
+
+    return best;
+}
+
+// A script model in the world with this model, or undefined.
+find_model( model )
+{
+    foreach ( thing in getentarray( "script_model", "classname" ) )
+    {
+        if ( isdefined( thing.model ) && thing.model == model )
+            return thing;
+    }
+
+    return undefined;
+}
+
+// A pickup the game sends no signal for (a Soul Key): done once the model has
+// appeared after the flag and is gone again.
+taken_after( flag, model )
+{
+    if ( !custom_scripts\ix\guided\tracker::flag_set_by_game( flag ) )
+        return 0;
+
+    if ( !isdefined( level.ix.guided.seen_models ) )
+        level.ix.guided.seen_models = [];
+
+    if ( isdefined( find_model( model ) ) )
+    {
+        level.ix.guided.seen_models[model] = 1;
+        return 0;
+    }
+
+    return isdefined( level.ix.guided.seen_models[model] );
 }
 
 // ---------------------------------------------------------------------------

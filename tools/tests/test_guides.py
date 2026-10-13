@@ -26,8 +26,8 @@ STRING = r'"((?:[^"\\]|\\.)*)"'
 NEW_GUIDE = re.compile(r'new_guide\(\s*' + r',\s*'.join([STRING] * 4) + r'\s*\)')
 ADD_STEP = re.compile(r'add_step\(\s*guide,\s*' + r',\s*'.join([STRING] * 8) + r'\s*\)')
 LIMITS = {"objective": 32, "location": 40, "minimal": 70, "standard": 150, "detailed": 300}
-DETECT = re.compile(r'^(flag|flags|notify|count):([a-z0-9_+]+)(?:\*([1-9][0-9]*))?$|^(check|manual)$')
-MARKER = re.compile(r'^(struct|ent|structs|ents):([a-z0-9_]+)$|^(locate|none)$')
+DETECT = re.compile(r'^(flag|flags|notify|count):([a-z0-9_+ ]+)(?:\*([1-9][0-9]*))?$|^(check|manual)$')
+MARKER = re.compile(r'^(struct|ent|structs|ents|sn_struct|sn_structs):([a-z0-9_]+)$|^(locate|none)$')
 
 
 def stock_text(map_name):
@@ -36,6 +36,31 @@ def stock_text(map_name):
     paths += list((DUMP / "cp" / "zombies").glob("*.gsc"))
     paths += list((DUMP / "cp").glob("*.gsc"))
     return "\n".join(path.read_text(errors="replace") for path in paths)
+
+
+def looked_up(stock, name, function, key):
+    """The stock scripts look this name up: getstruct( "name", "targetname" ),
+    or pass "name" to a function that looks up its argument the same way
+    (disco_mpq.gsc rk_symbol_handler( "rk_symbol_punk_streets", ... ) does
+    getstruct( var_0, "targetname" ))."""
+    literal = re.search(function + r'(?:array)?\(\s*"' + re.escape(name) + r'",\s*"' + key + '"', stock)
+    if literal:
+        return True
+    passed = re.search(r'\w+\(\s*"' + re.escape(name) + r'"\s*[,)]', stock)
+    by_variable = re.search(function + r'(?:array)?\(\s*var_\d+,\s*"' + key + '"', stock)
+    return bool(passed and by_variable)
+
+
+def sets_flag(stock, name):
+    """The stock scripts set this flag: flag_set( "name" ), or flag_init it
+    and pass "name" to a function that does flag_set( var_N ) (disco_mpq.gsc
+    rk_symbol_handler( "rk_symbol_punk_streets", "skq_p2t1_4" ))."""
+    if re.search(r'flag_set\(\s*"' + re.escape(name) + '"', stock):
+        return True
+    initialised = re.search(r'flag_init\(\s*"' + re.escape(name) + '"', stock)
+    passed = re.search(r'\w+\([^;\n]*"' + re.escape(name) + r'"\s*\)', stock)
+    by_variable = re.search(r'flag_set\(\s*var_\d+\s*\)', stock)
+    return bool(initialised and passed and by_variable)
 
 
 def after_step(text, step_id):
@@ -110,11 +135,27 @@ class Guides(unittest.TestCase):
                 self.assertEqual(kind == "count", match.group(3) is not None, f"{map_name} {step['id']}: detect {step['detect']}")
                 if kind in ("flag", "flags"):
                     for name in names.split("+"):
-                        self.assertRegex(stock, r'flag_set\(\s*"' + re.escape(name) + '"', f"{map_name} {step['id']}: the game never sets flag {name}")
+                        self.assertTrue(sets_flag(stock, name), f"{map_name} {step['id']}: the game never sets flag {name}")
                 elif kind in ("notify", "count"):
-                    self.assertRegex(stock, r'level notify\(\s*"' + re.escape(names) + '"', f"{map_name} {step['id']}: the game never notifies {names}")
+                    self.assertTrue(re.search(r'level notify\(\s*"' + re.escape(names) + '"', stock), f"{map_name} {step['id']}: the game never notifies {names}")
                 elif match.group(4) == "check":
                     self.assertIn("step.check = ::", after_step(text, step["id"]), f"{map_name} {step['id']}: no check function")
+
+    def test_resets_are_the_games_own(self):
+        # step.reset names a notify the game sends when it undoes a step.
+        for map_name, (_header, steps, text) in self.guides.items():
+            stock = stock_text(map_name)
+            for step in steps:
+                for name in re.findall(r'step\.reset = "([a-z0-9_]+)";', after_step(text, step["id"])):
+                    self.assertTrue(re.search(r'level notify\(\s*"' + re.escape(name) + '"', stock), f"{map_name} {step['id']}: the game never notifies {name}")
+
+    def test_resets_are_the_games_own(self):
+        # step.reset names a notify the game sends when it undoes a step.
+        for map_name, (_header, steps, text) in self.guides.items():
+            stock = stock_text(map_name)
+            for step in steps:
+                for name in re.findall(r'step\.reset = "([a-z0-9_]+)";', after_step(text, step["id"])):
+                    self.assertTrue(re.search(r'level notify\(\s*"' + re.escape(name) + '"', stock), f"{map_name} {step['id']}: the game never notifies {name}")
 
     def test_markers_are_places_the_game_looks_up(self):
         for map_name, (_header, steps, text) in self.guides.items():
@@ -123,10 +164,11 @@ class Guides(unittest.TestCase):
                 match = MARKER.match(step["marker"])
                 self.assertTrue(match, f"{map_name} {step['id']}: marker {step['marker']}")
                 kind, name = match.group(1), match.group(2)
-                if kind in ("struct", "structs"):
-                    self.assertRegex(stock, r'getstruct(?:array)?\(\s*"' + re.escape(name) + r'",\s*"targetname"', f"{map_name} {step['id']}: no stock getstruct of {name}")
-                elif kind in ("ent", "ents"):
-                    self.assertRegex(stock, r'getent(?:array)?\(\s*"' + re.escape(name) + r'",\s*"targetname"', f"{map_name} {step['id']}: no stock getent of {name}")
+                lookups = {"struct": ("getstruct", "targetname"), "structs": ("getstruct", "targetname"),
+                           "ent": ("getent", "targetname"), "ents": ("getent", "targetname"),
+                           "sn_struct": ("getstruct", "script_noteworthy"), "sn_structs": ("getstruct", "script_noteworthy")}
+                if kind in lookups:
+                    self.assertTrue(looked_up(stock, name, *lookups[kind]), f"{map_name} {step['id']}: the stock scripts never look up {kind} {name}")
                 elif match.group(3) == "locate":
                     self.assertIn("step.locate = ::", after_step(text, step["id"]), f"{map_name} {step['id']}: no locate function")
 

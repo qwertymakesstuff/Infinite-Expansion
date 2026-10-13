@@ -4,7 +4,9 @@
 // quest scripts set, a notify they send, or the guide's own check), or when
 // players mark it done by hand. Evidence counts backwards: once the game
 // reports a later step, every step before it is done too (the quest cannot
-// get there otherwise). Nothing is assumed: a step without a signal stays
+// get there otherwise). A step can name the notify the game sends when it
+// undoes it (step.reset, a puzzle that fails and starts over): the guide then
+// goes back to that step. Nothing is assumed: a step without a signal stays
 // open until someone marks it.
 //
 // The quest is the game's, so what the game reports is the same for every
@@ -25,6 +27,11 @@ start( guide )
         if ( custom_scripts\ix\core\util::starts_with( step.detect, "notify:" ) )
             level thread watch_notify( step, getsubstr( step.detect, 7, step.detect.size ) );
 
+        // step.reset: a notify the game sends when it undoes this step (a
+        // failed puzzle that starts over): the guide goes back to it.
+        if ( isdefined( step.reset ) )
+            level thread watch_reset( guide, step );
+
         // "count:<notify>*<n>": done after n of them, as a stock script
         // counts them itself (the five power switches, three defenses).
         if ( custom_scripts\ix\core\util::starts_with( step.detect, "count:" ) )
@@ -44,6 +51,27 @@ watch_notify( step, name )
     level endon( "game_ended" );
     level waittill( name );
     step.seen = 1;
+}
+
+watch_reset( guide, step )
+{
+    level endon( "game_ended" );
+
+    for (;;)
+    {
+        level waittill( step.reset );
+
+        for ( i = step.index; i < guide.steps.size; i++ )
+        {
+            guide.steps[i].auto = 0;
+            guide.steps[i].seen = 0;
+        }
+
+        if ( level.ix.guided.reached >= step.index )
+            level.ix.guided.reached = step.index - 1;
+
+        custom_scripts\ix\core\log::info( "guided: the game started step " + ( step.index + 1 ) + " (" + step.id + ") over" );
+    }
 }
 
 watch_count( step, name )

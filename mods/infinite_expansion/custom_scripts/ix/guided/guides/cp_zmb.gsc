@@ -253,16 +253,7 @@ sign_panels_charged()
 // no signal for it.
 soul_key_taken()
 {
-    if ( !custom_scripts\ix\guided\tracker::flag_set_by_game( "ufo_quest_finished" ) )
-        return 0;
-
-    if ( isdefined( soul_key() ) )
-    {
-        level.ix.guided.soul_key_seen = 1;
-        return 0;
-    }
-
-    return isdefined( level.ix.guided.soul_key_seen );
+    return custom_scripts\ix\guided\guided::taken_after( "ufo_quest_finished", "zmb_soul_key_base" );
 }
 
 // ---------------------------------------------------------------------------
@@ -400,11 +391,5 @@ next_sign_panel()
 
 soul_key()
 {
-    foreach ( thing in getentarray( "script_model", "classname" ) )
-    {
-        if ( isdefined( thing.model ) && thing.model == "zmb_soul_key_base" )
-            return thing;
-    }
-
-    return undefined;
+    return custom_scripts\ix\guided\guided::find_model( "zmb_soul_key_base" );
 }

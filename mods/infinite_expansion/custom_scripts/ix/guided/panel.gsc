@@ -468,6 +468,15 @@ marker_target( step )
             return nearest_origin( scripts\engine\utility::getstructarray( parts[1], "targetname" ) );
         case "ents":
             return nearest_origin( getentarray( parts[1], "targetname" ) );
+        case "sn_struct":
+            found = scripts\engine\utility::getstruct( parts[1], "script_noteworthy" );
+
+            if ( isdefined( found ) )
+                return found.origin;
+
+            return undefined;
+        case "sn_structs":
+            return nearest_origin( scripts\engine\utility::getstructarray( parts[1], "script_noteworthy" ) );
     }
 
     return undefined;
