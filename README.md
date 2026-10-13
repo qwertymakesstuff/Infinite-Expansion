@@ -92,9 +92,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.12.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui
+[IX] INFO: init 0.12.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 52 (0 changed from the default); features: 4; chat: !ix
+[IX] INFO: settings: 61 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -314,6 +314,15 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `hud_speed` | 0 | 0/1 | Your speed on screen |
 | `hud_side` | left | left, right | Which side of the screen the HUD's numbers are on |
 | `hud_height` | 0 | -150–150 | Moves the HUD's numbers up (more) or down (less) |
+| `guided_mode` | 0 | 0/1 | [Guided Mode](#guided-mode): the main quest's objective tracker (also the lobby's GUIDED MODE) |
+| `guided_hints` | standard | minimal, standard, detailed, full | How much the guide says; full: every step and solution, ahead too |
+| `guided_panel` | full | full, compact, hidden | The tracker: objective and hint / the objective only / none |
+| `guided_marker` | 1 | 0/1 | The marker on the objective and how far it is |
+| `guided_side` | right | right, left | Which side of the screen the tracker is on |
+| `guided_height` | 0 | -150–150 | Moves the tracker down (more) or up (less) |
+| `guided_text` | normal | small, normal, large | The tracker's text size |
+| `guided_opacity` | 100 | 30–100 | Percent: how solid the tracker is |
+| `guided_coop` | shared | shared, personal | Whom a step marked done by hand is done for |
 | `game_speed` | 100 | 25–200 | Percent of the speed of the whole match |
 | `zombie_outlines` | 0 | 0/1 | Zombies outlined through walls, for everyone |
 | `dev_tools` | 0 | 0/1 | Unlocks the Debug page's developer tools |

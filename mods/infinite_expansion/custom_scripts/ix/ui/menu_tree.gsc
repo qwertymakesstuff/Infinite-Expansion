@@ -101,6 +101,42 @@ build()
     add_info( "zombies_now", "Round", "The round being played.", custom_scripts\ix\zombies\zombies::round_number );
     add_reset( "zombies" );
 
+    add_page( "guided", "Guided Mode", "main" );
+    add_setting( "guided", "guided_mode", 1 );
+    add_info( "guided", "Guide for this map", "Ready, or None yet: no verified guide for this map yet.", custom_scripts\ix\guided\guided::guide_info );
+    add_info( "guided", "Steps done", "Steps of the quest done: those the game reports and those marked by hand.", custom_scripts\ix\guided\guided::progress_info );
+    add_info( "guided", "Steps in all", "The steps of this map's main quest in the guide.", custom_scripts\ix\guided\guided::steps_info );
+    add_action( "guided", "Previous step", "The step before, on the tracker. Next step comes back to the current one.", custom_scripts\ix\guided\guided::previous_action, 0, 0 );
+    add_action( "guided", "Next step", "The next step, on the tracker. Past the current one only with Guided: hints full.", custom_scripts\ix\guided\guided::next_action, 0, 0 );
+    add_action( "guided", "Reveal more", "More of this step's hint on the tracker, up to the full solution.", custom_scripts\ix\guided\guided::more_action, 0, 0 );
+    add_action( "guided", "Mark step complete", "For a step the game cannot report: done by hand. Use twice.", custom_scripts\ix\guided\guided::mark_action, 1, 0 );
+    add_action( "guided", "Clear marks", "Steps marked done by hand are open again. Use twice.", custom_scripts\ix\guided\guided::clear_marks_action, 1, 0 );
+    add_page( "guided_steps", "Full guide", "guided" );
+
+    // One row a step, when this map has a guide (else the page is left out).
+    if ( custom_scripts\ix\guided\guided::has_guide() )
+    {
+        steps = custom_scripts\ix\guided\guided::guide().steps;
+
+        for ( i = 0; i < steps.size; i++ )
+        {
+            row = custom_scripts\ix\ui\menu::add_info( "guided_steps", "Step " + ( i + 1 ), "", custom_scripts\ix\guided\guided::step_state_info );
+            row.arg = i;
+            row.help_fn = custom_scripts\ix\guided\guided::step_help;
+        }
+    }
+
+    add_page( "guided_options", "Guide options", "guided" );
+    add_setting( "guided_options", "guided_hints", 1 );
+    add_setting( "guided_options", "guided_panel", 1 );
+    add_setting( "guided_options", "guided_marker", 1 );
+    add_setting( "guided_options", "guided_side", 1 );
+    add_setting( "guided_options", "guided_height", 10 );
+    add_setting( "guided_options", "guided_text", 1 );
+    add_setting( "guided_options", "guided_opacity", 10 );
+    add_setting( "guided_options", "guided_coop", 1 );
+    add_reset( "guided_options" );
+
     add_page( "hud", "HUD", "main" );
     add_setting( "hud", "hud_round", 1 );
     add_setting( "hud", "hud_zombies", 1 );

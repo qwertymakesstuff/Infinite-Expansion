@@ -509,6 +509,12 @@ is_held()
 }
 
 // For other modules: whether this player's link is only the menu holding them.
+// The menu is open on this player's screen (the HUDs hide under it).
+is_open_for( player )
+{
+    return isdefined( player ) && isdefined( player.ix ) && isdefined( player.ix.menu ) && player.ix.menu.open;
+}
+
 is_menu_link( player )
 {
     return isdefined( player.ix ) && isdefined( player.ix.menu ) && player is_held();
@@ -1334,7 +1340,11 @@ draw_row( label, value, item )
 
             return;
         case "info":
-            show_value( value, self [[ item.fn ]]() );
+            if ( isdefined( item.arg ) )
+                show_value( value, self [[ item.fn ]]( item.arg ) );
+            else
+                show_value( value, self [[ item.fn ]]() );
+
             return;
     }
 
@@ -1514,6 +1524,10 @@ item_help( item )
         return "Press Use again to confirm. Anything else cancels.";
 
     text = item.help;
+
+    // A row whose help depends on the match (the guide's steps).
+    if ( isdefined( item.help_fn ) )
+        text = self [[ item.help_fn ]]( item.arg );
 
     if ( item.kind == "setting" )
     {

@@ -7,8 +7,8 @@
 // governs to the preset's value or, when the preset does not name it, to its
 // default, so a preset gives the same result whatever was set before. Some
 // settings are personal or about the menu itself, and no preset touches them
-// (kept_settings): who opens the menu and how, where the HUD sits, and the
-// characters.
+// (kept_settings): who opens the menu and how, where the HUD sits, the
+// characters, and Guided Mode (a way to play, chosen in the lobby).
 //
 // Custom is the host's own preset. "Save as Custom" stores the value of every
 // governed setting as an archived dvar ix_custom_<id> (persist.gsc), so it
@@ -77,7 +77,7 @@ find( id )
 // No preset changes these.
 kept_settings()
 {
-    return [ "menu", "menu_open", "menu_access", "menu_hint", "hud_side", "hud_height", "character_select", "character_specials", "character_crossmap", "character_announce" ];
+    return [ "menu", "menu_open", "menu_access", "menu_hint", "hud_side", "hud_height", "character_select", "character_specials", "character_crossmap", "character_announce", "guided_mode", "guided_hints", "guided_panel", "guided_marker", "guided_side", "guided_height", "guided_text", "guided_opacity", "guided_coop" ];
 }
 
 // Every setting a preset governs, in the settings' own order.

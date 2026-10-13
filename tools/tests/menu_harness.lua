@@ -258,7 +258,9 @@ Engine = {
     end,
     SetDvarString = function(name, value)
         dvars[name] = value
-        nameSets = nameSets + 1
+        if name == "name" then
+            nameSets = nameSets + 1
+        end
     end,
     Exec = function(command)
         execs[#execs + 1] = command
@@ -489,6 +491,17 @@ if scenario == "lobby" then
         list.IXCharacterButton:fire("button_action", { controller = 0 })
     end
     print("requests " .. table.concat(requests, ","))
+
+    -- GUIDED MODE: its label, then two presses (on, then off again).
+    local guided = list.IXGuidedButton
+    if guided then
+        print("guided " .. tostring(guided.Text.text))
+        for _ = 1, 2 do
+            execs = {}
+            guided:fire("button_action", { controller = 0 })
+            print("guided " .. tostring(guided.Text.text) .. " exec=" .. table.concat(execs, ";"))
+        end
+    end
 
     -- Opening the lobby again: still one button.
     stats.characterSelect = 0

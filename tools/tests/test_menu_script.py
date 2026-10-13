@@ -21,17 +21,17 @@ MENU_LUA = REPO / "mods" / "infinite_expansion" / "ui_scripts" / "InfiniteExpans
 HARNESS = Path(__file__).resolve().parent / "menu_harness.lua"
 LUA = shutil.which("lua5.1")
 
-# The stock list with CHARACTER under SELECT SHOW (ChooseMap) and everything
-# below it one 40-pixel step lower: (top, bottom) per element.
+# The stock list with CHARACTER and GUIDED MODE under SELECT SHOW (ChooseMap)
+# and everything below them two 40-pixel steps lower: (top, bottom) per element.
 LOBBY_BOSS_OFF = {
     "StartMatch": (0, 30), "Loadout": (40, 70), "Barracks": (80, 110), "ChooseMap": (120, 150),
-    "IXCharacterButton": (160, 190), "Tips": (200, 230), "Armory": (240, 270), "ForSpacing": (280, 285),
-    "ButtonDescription": (350, 415), "ContractsButton": (280, 340),
+    "IXCharacterButton": (160, 190), "IXGuidedButton": (200, 230), "Tips": (240, 270), "Armory": (280, 310),
+    "ForSpacing": (320, 325), "ButtonDescription": (390, 455), "ContractsButton": (320, 380),
 }
 LOBBY_BOSS_ON = {
     "StartMatch": (0, 30), "Loadout": (40, 70), "Barracks": (80, 110), "ChooseMap": (120, 150),
-    "IXCharacterButton": (160, 190), "BossBattle": (200, 230), "Tips": (240, 270), "Armory": (280, 310),
-    "ForSpacing": (280, 285), "ButtonDescription": (390, 455), "ContractsButton": (320, 380),
+    "IXCharacterButton": (160, 190), "IXGuidedButton": (200, 230), "BossBattle": (240, 270), "Tips": (280, 310),
+    "Armory": (320, 350), "ForSpacing": (320, 325), "ButtonDescription": (430, 495), "ContractsButton": (360, 420),
 }
 
 
@@ -44,10 +44,12 @@ class MenuScript(unittest.TestCase):
 
     def lobby(self, *options):
         """{prefix: {"buttons": n, "order": [...], "rect": {id: (top, bottom)}}, "field": [...], "requests": str}"""
-        report = {"field": []}
+        report = {"field": [], "guided": []}
         for line in self.run_harness("lobby", *options):
             words = line.split(" ")
-            if words[0] == "field":
+            if words[0] == "guided":
+                report["guided"].append(" ".join(words[1:]))
+            elif words[0] == "field":
                 report["field"].append(int(words[1]))
             elif words[0] == "requests":
                 report["requests"] = " ".join(words[1:])
@@ -75,7 +77,14 @@ class MenuScript(unittest.TestCase):
                     self.assertEqual(section["rect"], {key: (float(a), float(b)) for key, (a, b) in expected.items()}, prefix)
                     order_ = section["order"]
                     self.assertEqual(order_[order_.index("ChooseMap") + 1], "IXCharacterButton", prefix)
+                    self.assertEqual(order_[order_.index("ChooseMap") + 2], "IXGuidedButton", prefix)
                 self.assertEqual(report["requests"], "open IXCharacterMenu")
+                # GUIDED MODE: off until switched on, and saved for the next match.
+                self.assertEqual(report["guided"], [
+                    "GUIDED MODE: OFF",
+                    "GUIDED MODE: ON exec=seta ix_guided_mode 1",
+                    "GUIDED MODE: OFF exec=seta ix_guided_mode 0",
+                ])
 
     def test_lobby_puts_back_an_available_special_after_the_stock_reset(self):
         cases = [

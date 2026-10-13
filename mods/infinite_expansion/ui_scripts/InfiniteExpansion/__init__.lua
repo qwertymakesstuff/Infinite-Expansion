@@ -665,10 +665,10 @@ end)
 -- START GAME 0-30, LOADOUT 40-70, BARRACKS 80-110, SELECT SHOW (ChooseMap)
 -- 120-150, then BOSS BATTLE (only when boss battles are on), TUTORIAL (Tips),
 -- SURVIVAL DEPOT (Armory), a spacer, the CONTRACTS widget and the description
--- line. CHARACTER goes under SELECT SHOW and everything below it moves down one
--- step. The stock list places those elements again when it switches between
--- its "boss battle on/off" layouts, so each of them keeps the offset for every
--- later placement too.
+-- line. CHARACTER and GUIDED MODE go under SELECT SHOW and everything below
+-- them moves down two steps. The stock list places those elements again when
+-- it switches between its "boss battle on/off" layouts, so each of them keeps
+-- the offset for every later placement too.
 local lobbyStep = 40
 local lobbyElementsBelow = { "BossBattle", "Tips", "Armory", "ForSpacing", "ContractsButton", "ButtonDescription" }
 
@@ -689,6 +689,51 @@ local function moveDown(element, offset)
     element:SetBottom(bottom + offset, 0)
 end
 
+-- GUIDED MODE (Phase 13): the objective tracker for the map's main Easter egg
+-- quest, as Black Ops 6's lobby offers Directed Mode. It writes the archived
+-- dvar ix_guided_mode, the mod's setting guided_mode, which the next match
+-- reads (custom_scripts/ix/guided). Off until a player switches it on; the
+-- host's choice applies to the match.
+local guidedDvar = "ix_guided_mode"
+
+local function guidedOn()
+    local ok, value = pcall(Engine.GetDvarString, guidedDvar)
+    return ok and value == "1"
+end
+
+local function guidedLabel(on)
+    if on then
+        return ToUpperCase("Guided Mode: On")
+    end
+    return ToUpperCase("Guided Mode: Off")
+end
+
+local function addLobbyGuidedButton(navigator, controllerIndex, top, bottom, nextButton)
+    local button = MenuBuilder.BuildRegisteredType("MenuButton", { controllerIndex = controllerIndex })
+    button.id = "IXGuidedButton"
+    button.buttonDescription = "Off: the map as it was made. On: an objective tracker leads you through the main Easter egg quest. The host's choice applies."
+    button.Text:setText(guidedLabel(guidedOn()), 0)
+    navigator.IXGuidedButton = button
+    button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, top, bottom)
+    if nextButton then
+        LUI.UIElement.addElementBefore(button, nextButton)
+    else
+        navigator:addElement(button)
+    end
+    button:addEventHandler("button_action", function(element, eventArgs)
+        -- The command runs on a later frame, so the label follows the new
+        -- value rather than reading the dvar back.
+        local on = not guidedOn()
+        local value = "0"
+        if on then
+            value = "1"
+        end
+        Engine.Exec("seta " .. guidedDvar .. " " .. value)
+        pcall(Engine.SetDvarString, guidedDvar, value)
+        element.Text:setText(guidedLabel(on), 0)
+    end)
+end
+
 local function addLobbyCharacterButton(navigator, controller)
     if not navigator or navigator.IXCharacterButton or not navigator.ChooseMap then
         return
@@ -707,7 +752,7 @@ local function addLobbyCharacterButton(navigator, controller)
 
     local _, _, _, showBottom = navigator.ChooseMap:getLocalRect()
     for _, id in ipairs(lobbyElementsBelow) do
-        moveDown(navigator[id], lobbyStep * _1080p)
+        moveDown(navigator[id], 2 * lobbyStep * _1080p)
     end
     button:SetAnchorsAndPosition(0, 1, 0, 1, 0, _1080p * 340, showBottom + 10 * _1080p, showBottom + lobbyStep * _1080p)
 
@@ -722,6 +767,8 @@ local function addLobbyCharacterButton(navigator, controller)
     button:addEventHandler("button_action", function(element, eventArgs)
         LUI.FlowManager.RequestAddMenu("IXCharacterMenu", true, eventArgs.controller, false)
     end)
+
+    pcall(addLobbyGuidedButton, navigator, controllerIndex, showBottom + (lobbyStep + 10) * _1080p, showBottom + 2 * lobbyStep * _1080p, nextButton)
 end
 
 -- The stock lobby sets characterSelect to 0 every time it opens
