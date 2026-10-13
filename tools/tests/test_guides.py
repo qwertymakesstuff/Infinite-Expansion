@@ -163,12 +163,30 @@ class Guides(unittest.TestCase):
                         self.assertTrue(sends_notify(stock, name), f"{map_name} {step['id']}: the game never notifies {name}")
 
     def test_parallel_steps_are_closed_by_a_later_step(self):
-        # A step done in any order (step.parallel = 1) is closed by the next
-        # step that needs them all: a guide never ends on one.
+        # A step done in any order (step.parallel = 1) closes only by its own
+        # signal or with a later step that needs it (step.needs, directly or
+        # through another step): every one is needed by a step after it.
         for map_name, (_header, steps, text) in self.guides.items():
-            parallel = [step["id"] for step in steps if "step.parallel = 1;" in after_step(text, step["id"])]
-            if parallel:
-                self.assertNotEqual(parallel[-1], steps[-1]["id"], f"{map_name}: the last step is parallel")
+            needs = {}
+            for step in steps:
+                found = re.findall(r'step\.needs = "([a-z0-9_ ]+)";', after_step(text, step["id"]))
+                needs[step["id"]] = found[0].split() if found else []
+            needed = set()
+            for names in needs.values():
+                needed.update(names)
+            for step in steps:
+                if "step.parallel = 1;" in after_step(text, step["id"]):
+                    self.assertIn(step["id"], needed, f"{map_name} {step['id']}: a parallel step no later step needs")
+
+    def test_needs_name_earlier_steps(self):
+        # step.needs lists the ids of earlier steps a step cannot be done
+        # without; the tracker closes them with it.
+        for map_name, (_header, steps, text) in self.guides.items():
+            ids = [step["id"] for step in steps]
+            for index, step in enumerate(steps):
+                for names in re.findall(r'step\.needs = "([a-z0-9_ ]+)";', after_step(text, step["id"])):
+                    for name in names.split():
+                        self.assertIn(name, ids[:index], f"{map_name} {step['id']}: needs {name}, not an earlier step")
 
     def test_markers_are_places_the_game_looks_up(self):
         for map_name, (_header, steps, text) in self.guides.items():

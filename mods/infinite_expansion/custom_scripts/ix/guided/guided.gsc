@@ -125,6 +125,7 @@ new_guide( map, map_name, quest, prerequisites )
     guide.quest = quest;
     guide.prerequisites = prerequisites;
     guide.steps = [];
+    guide.by_id = [];
     return guide;
 }
 
@@ -138,8 +139,9 @@ new_guide( map, map_name, quest, prerequisites )
 // game's interactions of that name: what players press Use on), "locate"
 // (the step's own function, step.locate) or "none". Only places the game's
 // own quest scripts look up themselves.
-// After add_step a guide may set step.parallel = 1: a step the quest lets
-// players do in any order with the steps around it (tracker.gsc).
+// After add_step a guide may set step.parallel = 1 (a step the quest lets
+// players do in any order with the steps around it) and step.needs (the
+// ids of earlier steps it cannot be done without), tracker.gsc.
 add_step( guide, id, objective, location, minimal, standard, detailed, detect, marker )
 {
     step = spawnstruct();
@@ -155,6 +157,7 @@ add_step( guide, id, objective, location, minimal, standard, detailed, detect, m
     step.marked = 0;
     step.parallel = 0;
     guide.steps[guide.steps.size] = step;
+    guide.by_id[id] = step;
     return step;
 }
 
@@ -196,6 +199,24 @@ interactions( name )
     foreach ( spot in scripts\engine\utility::getstructarray( "interaction", "targetname" ) )
     {
         if ( isdefined( spot.script_noteworthy ) && spot.script_noteworthy == name )
+            found[found.size] = spot;
+    }
+
+    return found;
+}
+
+// Those of them players can use right now (cp_interaction.gsc keeps them in
+// level.current_interaction_structs: a pickup leaves it once taken).
+active_interactions( name )
+{
+    found = [];
+
+    if ( !isdefined( level.current_interaction_structs ) )
+        return found;
+
+    foreach ( spot in interactions( name ) )
+    {
+        if ( scripts\engine\utility::array_contains( level.current_interaction_structs, spot ) )
             found[found.size] = spot;
     }
 

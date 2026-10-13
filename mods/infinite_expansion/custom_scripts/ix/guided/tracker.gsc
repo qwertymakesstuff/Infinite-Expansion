@@ -5,13 +5,14 @@
 // players mark it done by hand. Evidence counts backwards: once the game
 // reports a later step, every step before it is done too (the quest cannot
 // get there otherwise). Steps the quest lets players do in any order
-// (step.parallel: the parts of a body, three mirrors) are the exception:
-// one of them done says nothing about the steps before it, so it is done on
-// its own, and the next step that needs them all closes them. A step can
-// name the notify the game sends when it undoes it (step.reset, a puzzle
-// that fails and starts over): the guide then goes back to that step.
-// Nothing is assumed: a step without a signal stays open until someone
-// marks it.
+// (step.parallel: the parts of a body, three mirrors, a bridge to build
+// before it is needed) are the exception: one of them done says nothing
+// about the steps around it, so it is done by its own signal, or with a
+// later step that names it among the steps it cannot be done without
+// (step.needs: placing the mirrors needs both mirrors taken). A step can name
+// the notify the game sends when it undoes it (step.reset, a puzzle that
+// fails and starts over): the guide then goes back to that step. Nothing is
+// assumed: a step without a signal stays open until someone marks it.
 //
 // The quest is the game's, so what the game reports is the same for every
 // player (all scripts run on the host). Steps marked by hand are for everyone
@@ -25,8 +26,9 @@
 start( guide )
 {
     // reached: the furthest step the game reports that closes every step
-    // before it. done_ahead: the steps done in any order past it, as the
-    // game reported them (the panels announce each once).
+    // before it (all but those done in any order). done_ahead: the steps
+    // done in any order, as the game reported them (the panels announce
+    // each once).
     level.ix.guided.reached = -1;
     level.ix.guided.done_ahead = [];
 
@@ -78,22 +80,38 @@ watch_reset( guide, step, name )
     {
         level waittill( name );
 
-        // A notify the game also sends once the quest is won never undoes it.
+        // A notify the game also sends after it has moved past the step for
+        // good (the quest won, the head in place) never undoes it.
         waittillframeend;
 
-        if ( detected( guide.steps[guide.steps.size - 1] ) )
+        if ( reported_after( guide, step ) )
             continue;
+
+        // The chain from this step on; steps done in any order stay done.
+        undone = 0;
 
         for ( i = step.index; i < guide.steps.size; i++ )
         {
-            guide.steps[i].auto = 0;
-            guide.steps[i].seen = 0;
+            later = guide.steps[i];
+
+            if ( later.parallel && i > step.index )
+                continue;
+
+            if ( later.auto || later.seen )
+                undone = 1;
+
+            later.auto = 0;
+            later.seen = 0;
         }
 
         if ( level.ix.guided.reached >= step.index )
+        {
             level.ix.guided.reached = step.index - 1;
+            undone = 1;
+        }
 
-        custom_scripts\ix\core\log::info( "guided: the game started step " + ( step.index + 1 ) + " (" + step.id + ") over" );
+        if ( undone )
+            custom_scripts\ix\core\log::info( "guided: the game started step " + ( step.index + 1 ) + " (" + step.id + ") over" );
     }
 }
 
@@ -138,9 +156,13 @@ track( guide )
             continue;
         }
 
-        for ( i = guide.steps.size - 1; i > level.ix.guided.reached; i-- )
+        for ( i = guide.steps.size - 1; i >= 0; i-- )
         {
             step = guide.steps[i];
+
+            // Closed by a later step already.
+            if ( i <= level.ix.guided.reached && !step.parallel )
+                continue;
 
             if ( !step.auto )
             {
@@ -152,18 +174,58 @@ track( guide )
 
                 if ( step.parallel )
                     level.ix.guided.done_ahead[level.ix.guided.done_ahead.size] = i;
+
+                close_needs( guide, step );
             }
 
-            // A step done in any order closes only itself.
-            if ( !step.parallel )
-            {
+            // A step done in any order closes only itself (and its needs).
+            if ( !step.parallel && i > level.ix.guided.reached )
                 level.ix.guided.reached = i;
-                break;
-            }
         }
 
         wait 0.5;
     }
+}
+
+// The steps this one cannot be done without (step.needs, ids between
+// spaces), and theirs: done with it.
+close_needs( guide, step )
+{
+    if ( !isdefined( step.needs ) )
+        return;
+
+    foreach ( id in strtok( step.needs, " " ) )
+    {
+        needed = guide.by_id[id];
+
+        if ( !isdefined( needed ) || needed.auto )
+            continue;
+
+        needed.auto = 1;
+
+        if ( needed.parallel )
+            level.ix.guided.done_ahead[level.ix.guided.done_ahead.size] = needed.index;
+
+        close_needs( guide, needed );
+    }
+}
+
+// Lasting evidence (a flag, a check) the game reports for a step after this
+// one that closes the steps before it.
+reported_after( guide, step )
+{
+    for ( i = step.index + 1; i < guide.steps.size; i++ )
+    {
+        later = guide.steps[i];
+
+        if ( later.parallel || custom_scripts\ix\core\util::starts_with( later.detect, "notify:" ) || custom_scripts\ix\core\util::starts_with( later.detect, "count:" ) )
+            continue;
+
+        if ( detected( later ) )
+            return 1;
+    }
+
+    return 0;
 }
 
 detected( step )
@@ -206,12 +268,9 @@ flag_set_by_game( name )
 
 is_done( index, player )
 {
-    if ( index <= level.ix.guided.reached )
-        return 1;
-
     step = level.ix.guided.guide.steps[index];
 
-    if ( step.auto || step.marked )
+    if ( step.auto || step.marked || ( index <= level.ix.guided.reached && !step.parallel ) )
         return 1;
 
     return isdefined( player ) && isdefined( player.ix ) && isdefined( player.ix.guided ) && isdefined( player.ix.guided.marked[step.id] );
@@ -222,7 +281,7 @@ current_index( player )
 {
     steps = level.ix.guided.guide.steps;
 
-    for ( i = level.ix.guided.reached + 1; i < steps.size; i++ )
+    for ( i = 0; i < steps.size; i++ )
     {
         if ( !is_done( i, player ) )
             return i;

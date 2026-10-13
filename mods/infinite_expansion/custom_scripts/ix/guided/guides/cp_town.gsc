@@ -11,8 +11,9 @@
 // steps read what the game does to the world instead: a part's glow gone
 // when it is taken, a mirror model on its stand, the card in its slot, the
 // Death Ray signs, the garage door going up. Much of the quest can be done
-// in any order (step.parallel): those steps close only themselves, and the
-// Life Ray, the Chem Mix and the charged nuke close everything they need.
+// in any order (step.parallel): those steps close by their own signal, or
+// with the step that needs them (step.needs: the Life Ray, the chemistry
+// set, the charged nuke).
 // A failed sonic beam or code entry makes the game play the end of the
 // fight again: the guide goes back too. Nothing here changes the quest.
 
@@ -58,6 +59,7 @@ guide()
         "Kill enemies with the Cleaver until the vial meter is full. Crog kills fill it fastest.",
         "Equip the Cleaver. Each Crog killed with it adds 10 percent, each zombie killed adds 5 percent, each Cleaver hit on a zombie adds 1 percent. When the meter is full the vial is filled.",
         "flag:vial_filled", "none" );
+    step.needs = "get_cleaver";
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "summon_elvira", "Give Elvira the full vial", "TV Studio",
         "Return the filled vial to Elvira.",
@@ -101,6 +103,7 @@ guide()
         "Bring the part to the Deep Freeze trap's sparking control panel and fit it.",
         "Use the sparking control panel while carrying the part. The panel is replaced and the trap's buttons work again; using the trap costs 750.",
         "flag:freeze_trap_part_added", "sn_struct:fix_freeze_trap" );
+    step.needs = "freeze_trap_part";
     step.parallel = 1;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "freeze_meat", "Freeze and smash the pig", "Where the Deep Freeze trap fires",
@@ -108,6 +111,7 @@ guide()
         "Use the Deep Freeze trap (750), then hit the frozen pig in front of the torso with the Crowbar.",
         "Use the repaired trap. Once it has fired, the pig can be broken: melee it with the Crowbar (nothing else works). It shatters and the torso behind it can be taken.",
         "flag:frozen_meat_gone", "ent:frozen_meat" );
+    step.needs = "fix_freeze_trap get_crowbar";
     step.parallel = 1;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "body_torso", "Collect the zombie torso", "Behind the frozen pig",
@@ -115,6 +119,7 @@ guide()
         "Pick up the zombie torso that was behind the frozen pig.",
         "After the pig shatters, interact with the glowing torso to collect it (it cannot be taken before the meat is gone).",
         "check", "ent:mpq_zom_torso_part" );
+    step.needs = "freeze_meat";
     step.check = ::torso_taken;
     step.parallel = 1;
 
@@ -139,6 +144,7 @@ guide()
         "Pick up the arm that the quakes pushed out of the sand.",
         "Once the arm has fully risen, interact with it to collect it (needs both the lever taken and the quake done).",
         "check", "ent:mpq_zom_l_arm_part" );
+    step.needs = "quake_beach_arm";
     step.check = ::beach_arm_taken;
     step.parallel = 1;
 
@@ -155,6 +161,7 @@ guide()
         "Kill one of the glowing soldier zombies with the Cleaver as the final blow; a leg appears where it died.",
         "Equip the Cleaver. Glowing (radioactive) soldier zombies sprint; finish one with a Cleaver melee. A glowing leg appears at its death spot; interact with it to collect it.",
         "check", "locate" );
+    step.needs = "get_cleaver";
     step.check = ::cleaver_leg_taken;
     step.locate = ::cleaver_leg;
     step.parallel = 1;
@@ -164,6 +171,7 @@ guide()
         "Bring the collected parts to the zombie body slab in the spawn area and interact to lay them out.",
         "Interact with the body slab in the spawn area; every part you have picked up so far is placed (glowing). You can place in batches. All 6 must be placed before the Life Ray can build the body.",
         "check", "interaction:mpq_zom_body" );
+    step.needs = "body_head body_torso body_arm_firepit body_arm_beach leg_from_tree leg_from_glowing_zombie";
     step.check = ::body_laid;
     step.total = 6;
     step.progress = ::parts_on_slab;
@@ -174,6 +182,7 @@ guide()
         "Melee the bathroom mirror at the RV Park with the Crowbar and take the glass shard.",
         "Equip the Crowbar, go to the RV Park bathroom and melee the intact mirror. It shatters; interact with the glass shard to collect it.",
         "check", "ent:bathroom_mirror_piece" );
+    step.needs = "get_crowbar";
     step.check = ::bathroom_shard_taken;
     step.parallel = 1;
 
@@ -182,6 +191,7 @@ guide()
         "Melee the passenger mirror of the white car in front of the gas station with the Crowbar, then pick it up.",
         "Equip the Crowbar and melee the passenger-side mirror of the white car parked in front of the gas station. It falls to the ground; interact to collect it.",
         "check", "ent:car_mirror_ground" );
+    step.needs = "get_crowbar";
     step.check = ::car_mirror_taken;
     step.parallel = 1;
 
@@ -190,6 +200,7 @@ guide()
         "Place each mirror on its own stand along the ray path so the beam bounces to the body slab.",
         "Interact with each mirror stand while holding that mirror (bathroom shard, Elvira's mirror, car mirror). The beam goes machine to shard to Elvira mirror to car mirror to slab.",
         "check", "locate" );
+    step.needs = "mirror_bathroom mirror_car";
     step.check = ::all_mirrors_placed;
     step.locate = ::next_mirror_stand;
     step.total = 3;
@@ -210,6 +221,7 @@ guide()
         "Digits 3,4,5,6,8 in a random order, read from film reels 1-5. Stop the cycling counter on each digit; 3 wrong ones kick you out. The beam then needs all 6 parts on the slab and all 3 mirrors placed, or it stops early.",
         "check", "interaction:ray_gun_start" );
     step.check = ::body_made;
+    step.needs = "place_body place_mirrors scantron";
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "reverse_code", "Enter the code backwards", "Spawn area (ray machine)",
         "Reverse the polarity.",
@@ -241,6 +253,7 @@ guide()
         "Add the three parts to the chemistry station in the gas station garage.",
         "Interact with the chemistry station in the garage; each part you hold is added. When all 3 are in, the computer screen lights up and the beakers appear.",
         "flag:chemistry_step1", "interaction:crafting_station_chem" );
+    step.needs = "chem_set_parts";
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "brew_chem_mix", "Brew the Chem Mix", "Radios, then the garage lab",
         "Dr. Bright's tapes name the chemical that kills the beast.",
@@ -259,6 +272,7 @@ guide()
         "Read the four numbers under the desk in the back of the Beachside Market, then hit each pressure gauge with the Crowbar to stop it on one.",
         "Gauges: behind the gas station, right side of the Snack Shack, behind the shack at the Power Station, in the Crowbar motel room. A Crowbar hit stops the swinging needle; hit again to free it. Any gauge can show any of the numbers.",
         "flag:launchcode_step1", "ents:mpq_gauge_trig" );
+    step.needs = "get_crowbar";
     step.parallel = 1;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "take_launch_codes", "Take the launch codes", "Beachside Market safe",
@@ -266,6 +280,7 @@ guide()
         "Take the nuclear launch codes from the open safe in the Beachside Market. Write the code down.",
         "Interact with the open safe in the back of the Beachside Market to take the codes. You cannot check them during code entry later, so note the 5-digit code.",
         "flag:launchcode_step2", "sn_struct:take_launchcodes" );
+    step.needs = "set_gauges";
     step.parallel = 1;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "nuke_parts", "Find the 3 nuke parts", "Red car, stream end, one more",
@@ -284,6 +299,7 @@ guide()
         "Place all three teleporter parts on the nuke stand.",
         "Interact with the nuke stand to place every part you hold; when the third goes in the teleporter is built.",
         "flag:launchcode_step3", "sn_struct:place_bomb_parts" );
+    step.needs = "nuke_parts";
     step.parallel = 1;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "charge_nuke", "Charge the bomb teleporter", "The nuke",
@@ -291,6 +307,7 @@ guide()
         "All players stand at the nuke and hold Use together to start charging; defend it for 20 seconds.",
         "Requires codes taken, bomb built, Chem Mix added. Every player within 96 units holds Use. It charges for 20 s; then it stays charged only 30 s, so be ready to teleport.",
         "flag:teleporter_charged", "sn_struct:place_bomb_parts" );
+    step.needs = "take_launch_codes build_nuke";
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "teleport_nuke", "Teleport the bomb", "The nuke",
         "Send the bomb (and yourselves) to the beast.",
