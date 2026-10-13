@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: 0.12.0 — Phases 11 and 12 done: [presets](#presets) (Default, Classic, Enhanced, Testing, Developer, your own Custom) and a polish pass (options that are off cost nothing while you play). *Zombie health* done a new way in 0.10.2 (not yet re-tested). Next: Phase 13, the guided Easter egg mode.**
+> **Status: 0.13.0 — Phase 13 done: [Guided Mode](#guided-mode), an optional tracker for each map's main Easter egg quest (objective, hints, a marker, steps that complete themselves), with a guide for all five maps. Off by default: the lobby's GUIDED MODE button switches it on. Not yet played through in a real match. Before that: [presets](#presets) and a polish pass (Phases 11–12). Next: Phase 14, emotes.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -92,7 +92,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.12.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui
+[IX] INFO: init 0.13.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: settings: 61 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
@@ -235,6 +235,46 @@ The **Presets** page of the menu sets many options at once (host only, Use twice
 | **Custom** | Your own: **Save as Custom** (last row) stores the value of every option a preset covers, and it is kept across games. Until you save one, *Custom* says there is nothing to apply |
 
 Options that take effect later still do: *Starting round* from the next match, *Starting points* for new players. In chat: `!ix preset` lists the presets and says which is in use, `!ix preset enhanced` applies one, `!ix preset save` saves yours as Custom (host).
+
+## Guided Mode
+
+An optional companion for each map's main Easter egg quest, in the spirit of Black Ops 6's guided mode. It is **off by default**. Switch it on with the **GUIDED MODE** button in the zombies lobby (under CHARACTER), or on the menu's **Guided Mode** page. Like every setting, the host's choice applies to the match.
+
+While it is on, every player sees:
+
+- **The tracker** on the right of the screen: *MAIN QUEST 3/17*, the current objective, where it is, and a hint. A count follows the objective where the game keeps one, *(2/3)*. A long hint turns its pages every six seconds.
+- **A gold marker** on the objective, with the distance in meters, wherever the game itself knows the place. Elsewhere the hint says where to go.
+- ***Objective complete*** and ***New objective*** messages, with the game's own challenge sounds.
+
+The guide **follows the game by itself**. Each step reads what the game's quest scripts do: a flag, a notify, or a change in the world (a part's glow going out when it is taken, a mirror on its stand, a door going up). Steps the quest allows in any order are tracked one by one, so a part found early is announced as done. When the game undoes a step, the guide goes back too: a failed puzzle, a boss phase played again, N31L turning evil again. Nothing in a guide is invented: every signal and marker is one the game's own scripts use (`tools/guided/research/`, checked by `tools/tests/test_guides.py`). The guide never changes the quest.
+
+| Map | Quest | Steps |
+|-----|-------|-------|
+| Zombies in Spaceland | The UFO and the Soul Key | 17 |
+| Rave in the Redwoods | The Super Slasher | 18 |
+| Shaolin Shuffle | The Rat King's relics | 34 |
+| Attack of the Radioactive Thing | Nuke the Radioactive Thing | 44 |
+| The Beast from Beyond | N31L and the Cryptids | 22 |
+
+**The Guided Mode page** of the menu:
+
+- *Previous step* / *Next step* look around the guide.
+- *Reveal more* shows more of the current hint.
+- *Mark step complete* (Use twice) closes a step the game could not report, for example one done before Guided Mode was on.
+- *Clear marks* opens the hand-marked steps again.
+- *Full guide* lists every step, done, current or ahead.
+- *Guide options* sets the hint level, the tracker's side, height, text size and opacity, a compact or hidden panel, the marker, and co-op.
+
+| Hint level | Says |
+|------------|------|
+| **minimal** | A nudge in the right direction |
+| **standard** | What to do and where |
+| **detailed** | Every detail of the step |
+| **full** | The detailed hint, plus the next step; *Next step* shows every step and its solution |
+
+In co-op the game's own progress counts for everyone. *Guided: co-op* sets whom a step marked by hand is done for: *shared* (everyone; only players who may change settings mark, the host by default) or *personal* (only you). In chat: `!ix guide` gives the current objective and hint; `!ix guide next`, `prev`, `more`, `done` do as the menu does.
+
+The guides are not yet played through in a real match (`KNOWN_LIMITATIONS.md` L60–L62). If a step does not close by itself, mark it and report the map and the step.
 
 ## Settings and chat commands
 
@@ -387,11 +427,11 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | `KNOWN_LIMITATIONS.md` | Engine, client, compiler, and environment limits, with workarounds |
 | `ARCHITECTURE.md` | Module layout, init flow, the core systems (settings, events, features, chat commands), and how to add a feature |
 | `FEATURE_STATUS.md` | Every planned feature and its status |
-| `ROADMAP.md` | The phase plan, with the full scope of the phases not started yet (13: the guided Easter egg mode; 14–21: the fun features) |
+| `ROADMAP.md` | The phase plan, with the full scope of the phases not started yet (14–21: the fun features) |
 | `PLAYTEST_CHECKLIST.md` | What to try in a real match, short, with what should happen |
 | `TESTING.md` | Verification levels, verification log, runtime test checklist |
 | `CHANGELOG.md` | History |
-| `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests |
+| `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests, the Guided Mode guide generator (`tools/guided/`) |
 | `installer/` | The Windows setup: `IXSetup.ps1` (window), `IXSetup.Core.ps1` (install logic), `IXSetup.xaml` (layout and artwork); the launcher's source, `IXLauncher.cs`; the picture pack: `IXPictures.ps1` and `IXPictures.Core.ps1` |
 
 ## Roadmap
@@ -412,8 +452,8 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | 10 | Developer tools (locked): spawning, kill all, end the round, points, power-ups, read-outs, the log | **Complete** (in-game test pending) |
 | 11 | Configuration presets: Default, Classic, Enhanced, Testing, Developer, Custom | **Complete** (in-game test pending) |
 | 12 | Polish: a review of every script; idle options no longer poll, the HUD moves instead of rebuilding, shared helpers | **Complete** (in-game test pending) |
-| 13 | Guided Easter egg mode: an optional in-game guide to each map's main Easter egg quest | Next, not started (`ROADMAP.md`) |
-| 14 | Emotes: menu, wheel, preview, favorites | Planned, not started (`ROADMAP.md`) |
+| 13 | Guided Mode: an optional tracker for each map's main Easter egg quest, with a guide for all five maps | **Complete** (in-game test pending) |
+| 14 | Emotes: menu, wheel, preview, favorites | Next, not started (`ROADMAP.md`) |
 | 15 | Fun toys: player, movement, zombie, weapon and visual effects | Planned, not started |
 | 16 | Zombies randomizer | Planned, not started |
 | 17 | Favorites and presets of the fun features | Planned, not started |

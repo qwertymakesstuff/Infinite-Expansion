@@ -270,6 +270,15 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V148 | `python3 -m unittest discover -s tools/tests` | ✅ 111 tests OK |
 | V149 | The 0.12.0 release on GitHub | ✅ The push of `642ad5f` published `v0.12.0` with `Infinite-Expansion-0.12.0.zip`: 544,058 bytes, SHA-256 `C022B49B…1D72` as GitHub lists it, byte for byte a local `git archive` of that commit. The setup's own `Get-IXLatestRelease` and `Save-IXUpdate`, run here against the real GitHub, found it newer than 0.3.2 and 0.11.0, matched size and checksum, and unpacked version 0.12.0, whose 107 files are identical to the commit. Not run: the Windows side of that update (R-U2) |
 
+### 0.13.0 (Guided Mode, Phase 13)
+
+| # | Check | Result |
+|---|-------|--------|
+| V150 | Research of each map's main quest for the guides (`tools/guided/research/<map>.md`) | ✅ Each quest was read step by step from the decompiled stock scripts. Every step's signal and marker has a file and line: the quest lines (`zombie_quest.gsc` `register_quest_step`), their flags, level notifies, structs, entities and interactions. Walkthroughs (Prima, SegmentNext, Gameranx, GameSkinny, TrueAchievements, Zombies Codex and others) were read only as search-result summaries; WebFetch cannot reach hosts here. Their details are marked as walkthrough-only, and where they disagree the guides name no place. A second pass while writing the cp_town and cp_final guides checked the fields each step depends on against the v1.1.0 token table (C10). For the many that are missing (`mpq_zom_parts_picked_up`, `body_made`, `portal_gun_activated`, `hascraftedentangler` …), the guides read what the scripts do to the world instead: deleted pickups, glows, models, a door's `movedone`, an entity notify on the boss, the game's level omnvars `zm_floppy_count` and `zm_scrap_count`. The research notes record those reads and what is still open. Not run: any of it in game (R-G2) |
+| V151 | `tools/tests/test_guides.py` | ✅ Every guide parses. Ids are unique. Texts fit the tracker (objective 32, location 40, hints 70 / 150 / 300) and contain no `%`. Every `flag:` is set by the stock scripts (directly, or through a function that receives it). Every `notify:`, `count:` and `step.reset` notify is sent (directly or through a variable). Every marker is a struct, entity or interaction the stock scripts look up or register. Every `check` / `locate` step has its function, and every `step.needs` names an earlier step. Every `step.parallel` step is needed by a later step. The four generated guides match `tools/guided/make_guide.py` with their specs, and every map has research. 5 maps, 135 steps |
+| V152 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 84/84 compiled, 42/42 identical between the compilers, `fields` 11 known cases, 0 new (no stock field without a v1.1.0 token in any guide), budget 65,846 bytes. The develop compiler caught one mistake the release compiler let through (an assignment to a call's result in the Rave guide), fixed before release |
+| V153 | `python3 -m unittest discover -s tools/tests` | ✅ 122 tests OK (11 in `test_guides.py`) |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -386,6 +395,19 @@ Open the menu (ADS + Melee), then *Zombies*. Turn on *HUD: zombies* (HUD page) t
 | R-Q3 | *Zombie outlines* ON, in co-op for the guest too; OFF | Every zombie outlined in orange, also behind walls, for every player; OFF: the outlines go within half a second | not run | not run |
 | R-Q4 | *Restart the match* (host, Use twice); as a guest | Everyone sees "The match restarts." and the map starts over from the first round with the starting points; the console shows one new `init` line. Report anything that carried over. Guest: the row is grey | not run | not run |
 | R-Q5 | Chat: `!ix`; `!ix refill`; `!ix save`, walk away, `!ix load`; `!ix tp` looking at a floor; as a guest `!ix refill` | Every line of the command list arrives; ammo refilled; back at the saved spot; teleported. Guest: "Only the host can do that." | not run | not run |
+
+### 4.3e Guided Mode (Phase 13)
+
+Switch it on in the zombies lobby (GUIDED MODE: ON) before starting the map. Start the quest from the beginning of a match, so every step is seen.
+
+| ID | Test | Expected | v1.1.0 | develop |
+|----|------|----------|--------|---------|
+| R-G1 | In the lobby press GUIDED MODE; start a map; quit; start again; then switch it off on the menu's Guided Mode page | The button reads GUIDED MODE: ON and stays ON in the next game; in the match the tracker appears on the right after the intro; OFF: the tracker and the marker go at once | not run | not run |
+| R-G2 | Play the main quest of one map with Guided Mode on, as far as you get (any map; each counts) | Each step closes by itself when you do it: *Objective complete* with a sound, then *New objective*. Report the map and step id (*Full guide*) of any step that does not close, closes early, or whose hint names the wrong place. Steps done in any order (Radioactive Thing body parts and mirrors, Beast from Beyond Entangler and bridge) are announced when done. A failed sonic beam (Radioactive Thing), a wrong phone flyer (Shaolin Shuffle) or N31L turning evil again (Beast from Beyond) sends the guide back to that step | not run | not run |
+| R-G3 | *Guide options* → *Hints* minimal, standard, detailed, full; *Reveal more*; *Next step* with full | The hint grows with the level; *Reveal more* shows the next level for that step; with full the tracker adds the next step and *Next step* shows steps ahead (*AHEAD n/m*) | not run | not run |
+| R-G4 | Walk toward a marked objective; *Guide options*: side left, height ±100, text large, opacity 50, panel compact, then hidden, marker off; open the in-game menu | The gold marker sits on the objective with a falling distance in meters; the tracker moves, grows, fades, shows only the objective, then nothing; marker off removes it. With the menu open the tracker hides and the menu's text is all there (L62) | not run | not run |
+| R-G5 | Co-op: host and guest with Guided Mode on; *Guided: co-op* shared, a guest uses *Mark step complete*; then personal | Both see the same current step from the game's own progress. Shared: the guest is refused, the host's mark counts for both. Personal: a mark counts only for whoever made it | not run | not run |
+| R-G6 | Chat: `!ix guide`, `!ix guide more`, `!ix guide next`, `!ix guide done`; on a map with Guided Mode off | The quest, step n of m, the objective, the place and the hint; more; the next step (with full) or a refusal; the step marked. Off: the same lines and how to switch it on | not run | not run |
 
 ### 4.3d Developer tools (Phase 10)
 

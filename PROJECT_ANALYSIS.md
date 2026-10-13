@@ -443,6 +443,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Duck float (Quacknarok) | BO3 cosmetic asset | No duck model in IW7; any stock model is a substitute | M | PP | DEFERRED |
 | Rampage Inducer (instead of Gambler) | Spawn pacing | Spawn pacing internals (see 3.4) | H | PP | INVESTIGATING |
 | Gambler (random event) | `elmg_gambler*.gsc` | Scripted random events using verified APIs | M | RI | PLANNED |
+| Guided Easter egg mode (not in AAE; asked for after Black Ops 6's guided mode) | – | `ix/guided`: each map's quest read from its own flags, notifies and world changes (`IW_API_NOTES.md` §22), a waypoint marker as the stock revive icon, the game's challenge sounds; a guide per map generated from verified research (`tools/guided/`) | H | RI | TESTING (Phase 13) |
 
 ### 3.8 Client options and HUD
 

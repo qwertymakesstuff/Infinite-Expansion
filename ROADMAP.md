@@ -6,14 +6,14 @@ The phase plan. `README.md` lists every phase with its status; this file holds t
 |-------|-------|--------|
 | 0–10 | Forensics, foundation, characters, core systems, in-game menu, player options, movement, weapons, zombies options, info HUD, quality of life, developer tools | Built (in-game tests pending; `README.md`, `PLAYTEST_CHECKLIST.md`, `TESTING.md`) |
 | 11–12 | Configuration presets (0.11.0), polish (0.12.0) | Built (in-game tests pending) |
-| 13 | **Guided Easter egg mode**: an optional in-game guide to each map's main Easter egg quest | Next, **not started** (below) |
-| 14–21 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Planned, **not started** (below) |
+| 13 | **Guided Mode**: an optional tracker for each map's main Easter egg quest (0.13.0) | Built (in-game tests pending; the scope it was built to is kept below) |
+| 14–21 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Next is Phase 14; **not started** (below) |
 
-The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. On 2026-10-12 the owner removed Phase 13 (a testing phase: start-up, player, zombies, configuration and compatibility checks) and put the guided Easter egg mode in its place, so the fun features are Phases 14–21 again. Testing goes on with each phase as before (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). None of Phases 13–21 is started; nothing below exists in the mod yet.
+The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. On 2026-10-12 the owner removed Phase 13 (a testing phase: start-up, player, zombies, configuration and compatibility checks) and put the guided Easter egg mode in its place, so the fun features are Phases 14–21 again. Testing goes on with each phase as before (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). Phase 13 was built in 0.13.0 (`README.md` *Guided Mode*); its scope stays below as the record of what was asked. None of Phases 14–21 is started; nothing of them exists in the mod yet.
 
 ## Phase 13 — Guided Easter egg mode
 
-An optional Guided Mode for Infinite Warfare zombies (the request calls the mod "All-Spectrum"; it is Infinite Expansion): an in-game companion that helps players follow each map's main Easter egg quest with contextual hints, objectives and directions. It makes the quests easier to follow; it never completes a step for the player. Added on 2026-10-09 by the project owner as Phase 14; made Phase 13 on 2026-10-12, in place of the testing phase, with the same scope; not started.
+An optional Guided Mode for Infinite Warfare zombies (the request calls the mod "All-Spectrum"; it is Infinite Expansion): an in-game companion that helps players follow each map's main Easter egg quest with contextual hints, objectives and directions. It makes the quests easier to follow; it never completes a step for the player. Added on 2026-10-09 by the project owner as Phase 14; made Phase 13 on 2026-10-12, in place of the testing phase, with the same scope. Built in 0.13.0 (2026-10-13), with the owner's emphasis that it should feel like Black Ops 6's guided mode, as if built into Infinite Warfare.
 
 **1. Guided Mode toggle.** A *Guided Easter Egg Mode* option set before loading into a zombies map, for example:
 
