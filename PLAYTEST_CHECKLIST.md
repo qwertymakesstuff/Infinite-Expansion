@@ -1,4 +1,4 @@
-# Play-test checklist (0.13.1)
+# Play-test checklist (0.14.0)
 
 What to try in a real match, and what should happen. Each item names its row in `TESTING.md` §4 (in brackets), where the details are. Tick what works; for anything that does not, see *If something is wrong* below.
 
@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.13.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui`, then `settings: 62 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 65 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*
@@ -100,7 +100,7 @@ In 0.12.0 the options that keep themselves applied sleep while they are off and 
 - [ ] **PL2** *HUD: round* and *HUD: zombies* on, then hold D on *HUD: height*: the numbers glide up without flickering; *HUD: side* right moves them. *(R-H2)*
 - [ ] **PL3** `!ix` and `!ix log 20`: every line arrives. *(R-Q5, R-D8)*
 
-## 11. Guided Mode (Phase 13, new)
+## 11. Guided Mode (Phase 13)
 
 Switch it on in the zombies lobby with **GUIDED MODE** (under CHARACTER) before starting the map, then play the map's main Easter egg quest from the start of a match. Any map counts; note the map for every report.
 
@@ -110,12 +110,23 @@ Switch it on in the zombies lobby with **GUIDED MODE** (under CHARACTER) before 
 - [ ] **G4** *Guide options*: try *Hints* minimal, detailed and full, *Reveal more*, side left, text large, panel compact; open the menu: the tracker hides. *(R-G3, R-G4)*
 - [ ] **G5** Chat `!ix guide`: the current objective and hint. *(R-G6)*
 
-## 12. Co-op (when a friend can join)
+## 12. Emotes (Phase 14, new)
+
+Open the menu's **Emotes** page. Note the map and the emote's id (`!ix emote` lists them) for every report.
+
+- [ ] **EM1** *Emote wheel*: seven names in a ring, *Back* at the bottom. Push the stick or W / A / S / D toward one: it lights up; Use plays it and the menu closes. *(R-E1)*
+- [ ] **EM2** *Browse emotes*: play a Pack-a-Punch, an entrance, a card trick (with its sound) and, in Shaolin Shuffle, a hand gesture (*Bang*). The camera goes behind you for the first three and comes back. Note any that does nothing or looks wrong. *(R-E2)*
+- [ ] **EM3** *Favorite* two emotes: they are first on the wheel. Quit and start again: still there. *(R-E4)*
+- [ ] **EM4** Get hit during an emote: it ends at once, and you can aim and knife again. Try one while sprinting or next to a zombie: a line says why not. *(R-E5)*
+- [ ] **EM5** Chat `!ix emote random`: one plays. *(R-E6)*
+
+## 13. Co-op (when a friend can join)
 
 - [ ] **C1** The friend joins (both with the mod installed by the setup); the host's settings apply to both; the friend's menu rows are grey ("Only the host can change it."). *(R-S2, R-C4)*
 - [ ] **C2** *Zombie outlines* and the HUD work for the friend too; *Restart the match* restarts it for both. *(R-Q3, R-Q4)*
 - [ ] **C3** Guided Mode on: both see the same objective, and a step one of you completes closes for both. *(R-G5)*
+- [ ] **C4** Play an emote while the friend watches: note whether they see your character move. *(R-E3)*
 
-## 13. Clean-up
+## 14. Clean-up
 
 - [ ] **E1** *Settings* → *Reset every setting*, then start a new match: the console says `0 changed from the default`, and the game plays as without the mod. *(R-C6)*

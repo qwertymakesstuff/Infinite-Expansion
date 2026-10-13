@@ -4,6 +4,23 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.0: Emotes (Phase 14) (2026-10-13)
+
+**Added**
+- **Emotes**: your character's own animations, from the menu's new **Emotes** page or `!ix emote`. Infinite Warfare has no dances a mod can use, so the emotes are what each map already plays on its characters:
+  - every character's **Pack-a-Punch** celebration, their **entrance** from the start of the match, and their Fate & Fortune **card trick** with its sound (no card is used);
+  - the **hand gestures** the map itself uses: Devil Horns (Zombies in Spaceland); Bang, Crush, Head Crush, Begone and No (Shaolin Shuffle); Thumbs Up and Point (Attack of the Radioactive Thing).
+
+  19 emotes in Zombies in Spaceland, 15 in Rave in the Redwoods and Shaolin Shuffle, 17 in Attack of the Radioactive Thing, 3 in The Beast from Beyond. The test suite holds each one to the map's own scripts.
+- **The emote wheel**: seven emotes in a ring with *Back* at the bottom; push the stick or W / A / S / D toward one and press Use. The rest of the page: *Browse emotes* by category (Celebration, Poses, Greetings, Taunts, Funny) with *Play*, *Favorite* and *Preview* on each, *Favorites* (the wheel's seven), *Random emote*, *Emote settings* and *Preview* (the last emote again, with the camera behind you).
+- **Favorites are saved** for the host and kept per character across maps.
+- New settings: **Emotes** (on), **Emote: camera** (auto: behind you for whole-body emotes; first; third), **Emote: stop when hit** (on).
+- **Safety**: an emote starts only on the ground with nothing else going on and no zombie within about three meters. It ends when you are hit, go down or die, and never holds you in place. Aiming and the knife come back as it ends, and the camera returns to what *Third person* says.
+
+**Known**
+- Not yet played in a real match: `PLAYTEST_CHECKLIST.md` section 12. What other players see of an emote is not yet seen (`KNOWN_LIMITATIONS.md` L66).
+- No dances, props or other body animations: Infinite Warfare has none a script can play (L64). A guest's favorites last one match (L65).
+
 ### 0.13.1: Guided Mode outlines the item (2026-10-13)
 
 **Changed**

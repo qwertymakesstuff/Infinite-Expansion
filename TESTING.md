@@ -289,6 +289,16 @@ Runtime tests **cannot** be executed in the development environment. Every runti
 | V157 | `python3 -m unittest discover -s tools/tests` | ✅ 122 tests OK (62 settings: the new `guided_outline` has its menu row, README row and fitting help, and presets keep it) |
 | V158 | The 0.13.1 release on GitHub | ✅ The push of `fb0c236` published `v0.13.1` with `Infinite-Expansion-0.13.1.zip`: 708,013 bytes, SHA-256 `7B28CA89…208C` as GitHub lists it, byte for byte a local `git archive` of that commit. The setup's own `Get-IXLatestRelease` and `Save-IXUpdate`, run here against the real GitHub, found it newer than 0.3.2 and 0.13.0, matched size and checksum, and unpacked version 0.13.1, whose 126 files are identical to the commit. Not run: the Windows side of that update (R-U2) |
 
+### 0.14.0 (Emotes, Phase 14)
+
+| # | Check | Result |
+|---|-------|--------|
+| V159 | AAE's emotes studied (the BO3 reference files, downloaded again on the owner's go-ahead and read as data) | ✅ AAE's emotes are chat commands that play BO3 player scenes (`scene::play( "pb_emote_…" )`), some with a prop, in third person with weapons off; it refuses and cancels them on input, movement, damage, going down, a zombie within 3 m or a use trigger nearby. Its design is in `IW_API_NOTES.md` §23; no code was taken. IW7 has neither scenes nor a script call that plays a body animation |
+| V160 | Which gestures each map loads and how the game plays them (`IW_API_NOTES.md` §23) | ✅ Read from the decompiled stock scripts: `register_player_character` arguments 8, 11, 13 in each `<map>_player_character_setup.gsc`; `firegesturegrenade` / `cangiveandfireoffhand` (`cp/utility.gsc`); `gesture_activate` (`zombies_pillage.gsc`) with `playgestureviewmodel` and the body event `gesture008`; each map's `waitgesturelength()`; the card sounds of `play_consumable_activate_sound`. The hand gestures are the ones each map's own scripts play. BO3's `isonslide`, `isswitchingweapons` and `isusingoffhand` are in neither IW7 table, so they are not used |
+| V161 | `tools/tests/test_emotes.py` | ✅ 13 tests: every character emote is the weapon its map registers for that character (and "Everyone" only where all four share it), every entrance is timed with the map's own gesture for that character, the card sounds are the game's, each hand gesture is played by its map's scripts, ids are unique and seven of them fit what `persist.gsc` saves, an id is the same character on every map, names fit the wheel (16 letters at the wheel's 0.85 scale) and the rows, help fits four lines, and an emote takes nothing it does not give back. Writing it found three things, all fixed: the card sounds skipped the jock card's own case (same sound through the default, now as the game writes it), two help texts needed five lines, and `headcrush` made seven saved favorites longer than 64 letters (now `head`) |
+| V162 | `python3 tools/check.py` | ✅ PASS, 0 errors, 0 warnings: 90/90 compiled, 45/45 identical between the compilers (the v1.1.0 compiler's `playlocalsound` mislabel was caught here and goes through `compat::local_sound`), `fields` 11 known cases, 0 new, budget 74,406 bytes |
+| V163 | `python3 -m unittest discover -s tools/tests` | ✅ 135 tests OK (65 settings: `emotes`, `emote_camera` and `emote_cancel_damage` have their menu rows, README rows and fitting help; the wheel's two footer lines fit) |
+
 ## 3. Runtime test environment (for testers)
 
 1. Windows PC with a legally owned Steam copy of *Call of Duty: Infinite Warfare*.
@@ -310,7 +320,7 @@ Result values are **not run**, **pass**, **fail**, or **n/a**. Fill in the `vX.Y
 
 | ID | Test | Expected | v1.1.0 | develop |
 |----|------|----------|--------|---------|
-| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.10.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 62 (0 changed from the default); features: 4; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
+| R-S1 | Load the mod, start a zombies match (`cp_zmb`) | No `script compile error` / `script link error`. Exactly one `[IX] INFO: init 0.14.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `[IX] INFO: client …`, `[IX] INFO: settings: 65 (0 changed from the default); features: 5; chat: !ix`, then `[IX] INFO: ready` once you are in | not run | not run |
 | R-S2 | Zombies co-op: a second player joins the host's match | One `[IX] INFO: init` on the host only; with `ix_debug_log 1`, one `player connected` line per player | not run | not run |
 | R-S3 | Menu opens (ADS + Melee) (R-M1) | Menu visible; weapons/offhands disabled while open | not run | not run |
 | R-S4 | Menu closes (Melee at root) (R-M1) | Menu hidden; weapons restored | not run | not run |
@@ -418,6 +428,19 @@ Switch it on in the zombies lobby (GUIDED MODE: ON) before starting the map. Sta
 | R-G4 | Walk toward a marked objective (an item: a part, a lever, a memento, a boss); then one with no item there; *Guide options*: outline off, then on; side left, height ±100, text large, opacity 50, panel compact, then hidden, marker off; open the in-game menu | The item glows with a yellow outline, also through walls, and only for you; the distance in meters falls. Where no item stands, a gold marker shows instead. Outline off: the gold marker on the item instead. Report an outline on the wrong thing (map, step id). The rest: the tracker moves, grows, fades, shows only the objective, then nothing; marker off removes it. With the menu open the tracker and the outline hide and the menu's text is all there (L62) | not run | not run |
 | R-G5 | Co-op: host and guest with Guided Mode on; *Guided: co-op* shared, a guest uses *Mark step complete*; then personal | Both see the same current step from the game's own progress. Shared: the guest is refused, the host's mark counts for both. Personal: a mark counts only for whoever made it | not run | not run |
 | R-G6 | Chat: `!ix guide`, `!ix guide more`, `!ix guide next`, `!ix guide done`; on a map with Guided Mode off | The quest, step n of m, the objective, the place and the hint; more; the next step (with full) or a refusal; the step marked. Off: the same lines and how to switch it on | not run | not run |
+
+### 4.3f Emotes (Phase 14)
+
+Open the menu's **Emotes** page. Try at least two maps, Shaolin Shuffle among them (the most hand gestures).
+
+| ID | Test | Expected | v1.1.0 | develop |
+|----|------|----------|--------|---------|
+| R-E1 | *Emote wheel*: push the stick (or W / A / S / D) toward each slot, Use; Melee; ADS / Fire. Then *Emote settings* → *Emotes* off, and the wheel again | The ring: seven names around, *Back* at the bottom, the one the stick points at highlighted; Use plays it and the menu closes; Melee goes back; ADS / Fire move around the ring. With Emotes off: "Emotes are off". Nothing of the menu's text is missing | not run | not run |
+| R-E2 | *Browse emotes*: each category, then *Play* on a Pack-a-Punch, an entrance, a card trick and a hand gesture | Each plays as the game plays it: the Pack-a-Punch celebration, the match-start pose, the card trick with its sound, the hand gesture in first person. The camera goes behind you for the first three (*Emote: camera* auto) and comes back. Report one that does nothing or looks broken (map, emote id) | not run | not run |
+| R-E3 | *Preview*; then co-op: play an emote while another player watches you | Preview plays the last emote with the camera behind you. The other player sees your character's body move (L66). Report what they see | not run | not run |
+| R-E4 | *Favorite* three emotes; open the wheel and *Favorites*; quit and start again (host); on another map, check the slots; *Clear favorites* | The favorites are on the wheel in order and saved for the next game; on another map a favorite it does not have leaves an empty slot, and comes back on its own map. Clear empties every slot | not run | not run |
+| R-E5 | Try to emote in the air, sprinting, reloading, on a zipline or ride, next to a zombie; play one and get hit, go down, open the menu; *Emote: stop when hit* off and get hit | It refuses with a line saying why. Hit, down or dead ends it at once: aim, knife, grenades and the camera come back (Third person as set). With *stop when hit* off a hit does not end it. You can always walk; nothing sticks after it ends | not run | not run |
+| R-E6 | Chat: `!ix emote`, `!ix emote pap1`, `!ix emote random`, `!ix emote nothing` | The map's emote ids; the first character's Pack-a-Punch; a random one; "No emote nothing on this map" | not run | not run |
 
 ### 4.3d Developer tools (Phase 10)
 

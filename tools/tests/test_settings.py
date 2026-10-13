@@ -205,7 +205,8 @@ class Settings(unittest.TestCase):
 
     def test_menu_footer_fits(self):
         found = dict(FOOTER_FUNCTION.findall(MENU.read_text()))
-        self.assertEqual(sorted(found), ["footer_move_text", "footer_open_text"])
+        # The emote wheel has its own two lines (menu.gsc draw_wheel).
+        self.assertEqual(sorted(found), ["footer_move_text", "footer_open_text", "footer_wheel_back_text", "footer_wheel_text"])
         lines = [text for body in found.values() for text in re.findall(r'return "([^"]*)";', body)]
         self.assertGreaterEqual(len(lines), 5)
         for line in lines:

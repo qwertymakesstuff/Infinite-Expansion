@@ -70,6 +70,10 @@ Infinite-Expansion/                          (repository)
 │               │   ├── tracker.gsc          which step the quest is at (the game's flags / notifies, marks)
 │               │   ├── panel.gsc            the objective tracker on screen, the marker, notifications
 │               │   └── guides/              one guide per map, data only: cp_zmb, cp_rave, cp_disco, cp_town, cp_final
+│               ├── fun/                     the fun features (Phases 14–21), each its own feature
+│               │   ├── fun.gsc              the module "fun"; registers each fun feature
+│               │   ├── emotes.gsc           emotes: play, safety, favorites, menu actions, !ix emote (Phase 14)
+│               │   └── emote_data.gsc       each map's emotes, data only                  (Phase 14)
 │               ├── qol/                     quality of life
 │               │   ├── qol.gsc              the module; chat shortcuts                     (Phase 9)
 │               │   └── game.gsc             game speed, zombie outlines, restart          (Phase 9)
@@ -111,7 +115,7 @@ iw7-mod loads custom_scripts/cp/ix_main.gsc   (zombies only)
         ├─ level.ix = { version, map, ready = 0, modules = [] }; dvar ix_version
         ├─ core setup():  log → compat (client feature flags) → events → config
         │     → persist (saved-settings layout check) → features → chat; setting debug_log
-        ├─ modules' register(), in entry-script order: player, weapons, zombies, debug, ui
+        ├─ modules' register(), in entry-script order: player, weapons, zombies, qol, debug, guided, fun, ui
         │     (each adds its settings and features; a setting takes its saved ix_<id> value)
         ├─ config::start(): console watcher thread (ix_<id> dvars, every 0.5 s)
         ├─ log "init <version> map=… modules=…", "client fs_game=… omnimovement=…",
@@ -272,7 +276,9 @@ Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...`
   While it is open, weapons, grenades, melee and Use are off through the stock counters `scripts\engine\utility::allow_weapon`, `allow_offhand_weapons`, `allow_melee` and `allow_usability`, once each way, so closing never undoes what the game itself turned off. It closes on last stand, death, the match's end, and when the `menu` feature is switched off; it cannot open while down, in the afterlife arcade or before `ix_ready`.
 - **Telling players how to open it:** 3 s after each round starts (the `round_start` event), each player who has not opened the menu in this match gets one line in the middle of the screen (`iprintlnbold`), and one in the corner about `!ix menu`; a player who joins a round already running gets it 6 s after spawning; never twice within 30 s (`menu_hint` switches it off). Changing `menu_open` tells everyone the new keys and brings the round-start line back.
 - **Access:** every player can open the menu; settings and host-only actions change only for the host, unless the setting `menu_access` is `everyone`.
-- **Tree:** Characters, Player (Phase 4: nine options and a *Position* page with three host-only actions), Movement (Phase 5: thirteen options), Weapons (Phase 6: five options and *Refill ammo*), Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases add Zombies, HUD, Quality of Life, Visuals, Utilities and presets.
+- **Tree:** Characters, Player (Phase 4: nine options and a *Position* page with three host-only actions), Movement (Phase 5: thirteen options), Weapons (Phase 6: five options and *Refill ammo*), Menu, Settings (changed count, *Reset every setting* with confirmation, version), Debug, Close. Later phases added Zombies, HUD, Game, Presets, Guided Mode (Phase 13) and Emotes (Phase 14, §6b).
+- **Rows that compute their text.** A row's `label_fn` / `help_fn` (called on the player with the row's `arg`) replace its label and help when set: the emote slots show the emote in them, *Favorite* shows Yes or No.
+- **Wheel pages.** A page with `page.wheel` is drawn as a ring instead of a list (`draw_wheel`): its eight rows go clockwise from the top on an ellipse inside the panel (`wheel_x` / `wheel_y`, 78 by 46 units), with labels centred at scale 0.85 and the cursor bar a 90-unit cell. The same elements move; nothing new is made (L49). The stick picks a row by its direction (`vectortoyaw` of `getnormalizedmovement()`, once pushed past 60 %); ADS / Fire still step around the ring; Use plays; Melee goes back. The footer shows the wheel's own two lines. A list page puts the elements back (`place_list`).
 - **Actions that move the player** (`position.gsc`): the menu's hold is a link, and a linked player cannot be moved, so such an action calls `menu::close_menu_for_move()` first; `menu::is_menu_link(player)` tells it apart from a link the game made (a ride, a trap), which refuses the action.
 
 ## 6. HUD design (`ix\ui\hud`)
@@ -302,6 +308,14 @@ An optional companion for each map's main Easter egg quest, in the spirit of Bla
   - each marker's struct, entity or interaction must be looked up or registered by them;
   - each `step.needs` must name earlier steps, and each step done in any order must be needed by a later one;
   - every text must fit its length, and every generated guide must match its spec.
+
+## 6b. Emotes (`ix\fun`, Phase 14)
+
+- **A feature of its own.** `fun.gsc` registers the module `fun`; `emotes.gsc` registers the feature `emotes` (on by default) and the settings `emote_camera` and `emote_cancel_damage`. Switching the feature off ends an emote playing (`on_player`). Later fun features go next to it, each its own feature (`ROADMAP.md`, rules for Phases 14–21).
+- **Data.** `emote_data.gsc` `catalog( map )` lists the map's emotes, built when the mod is ready (`level.ix.emotes`): an id (`pap3`, `bang`: chat, favorites), a name, a wheel name, a category, a kind and an asset. `offhand` emotes are a character's Pack-a-Punch, entrance and card gestures, as the map registers them; `gesture` emotes are the hand gestures the map's own scripts play. Ids `papN`, `introN`, `cardN` follow the character's place in `register_player_character`, the same person on every map. `tools/tests/test_emotes.py` holds each to the stock scripts (`IW_API_NOTES.md` §23).
+- **Playing one** (`play`, then `run` on its own thread): `cannot_emote()` says why not (on the ground, nothing else going on, not held, no gesture playing, no zombie within 120 units); `cannot_play()` asks the game whether the weapon in hand takes gestures. Then the camera (`emote_camera`: auto puts whole-body emotes behind the player through `compat::third_person`), aiming and melee off through the stock counters (grenades too for a hand gesture, as `gesture_activate`), and the gesture: `firegesturegrenade`, plus the card's sound; or `playgestureviewmodel` and the body event. It lasts the gesture's own length (`getgestureanimlength`) or its seconds, 1 to 8. `end_on_trouble` waits for the end, damage (`emote_cancel_damage`), death or going down, a new emote, or the feature going off, and `restore` gives back exactly what `run` took; the camera returns to what *Third person* says (`options::apply_view`).
+- **Menu** (`menu_tree.gsc` `emote_pages()`): the Emotes page, with the wheel page (`page.wheel`: seven slots and *Back*), *Browse emotes* (a page per category, a page per emote with *Play*, *Favorite*, *Preview*), *Favorites*, *Random emote*, *Emote settings* and *Preview*. Every action first closes the menu (`menu::close_menu_for_move`), which lets go of the player.
+- **Favorites.** Seven slots, also the wheel's. Until a slot has a favorite, it shows the map's emote in that place. The host's are saved as `ix_emote_favorites` (`persist::save`: ids joined by `.`, `-` for an empty slot). A favorite this map does not have keeps its slot for the maps that have it. A guest's last for the match (L65).
 
 ## 7. Scope rules (zombies only)
 

@@ -248,15 +248,30 @@ The scope is in `ROADMAP.md`. Every guide step is taken from the stock scripts (
 | `!ix guide [next / prev / more / done]` | Guided | 13 | TESTING | The current objective and hint in chat. R-G6 |
 | Guide generator and guide data test | Tooling | 13 | COMPLETE | `tools/guided/make_guide.py`, `tools/tests/test_guides.py` (`TESTING.md` V151) |
 
-## Fun features (Phases 14–21, not started)
+## Emotes (Phase 14, 0.14.0)
+
+The scope is in `ROADMAP.md`. AAE's emotes were studied first (`IW_API_NOTES.md` §23); every emote is a gesture its map loads, checked against the stock scripts by `tools/tests/test_emotes.py`.
+
+| Feature | Category | Phase | Status | Notes |
+|---------|----------|-------|--------|-------|
+| Emotes as a feature of their own (on by default; off ends one playing) | Fun | 14 | TESTING | `ix/fun/emotes.gsc`, feature `emotes`, its own module (`fun`). R-E1 |
+| Each map's emotes: every character's Pack-a-Punch, entrance and card gestures, and the map's hand gestures | Fun | 14 | TESTING | `ix/fun/emote_data.gsc`: Spaceland 19, Rave 15, Shaolin Shuffle 15, Radioactive Thing 17, Beast 3. Off-hand gestures fired as the game fires them, hand gestures as `gesture_activate` plays them; card sounds as the game's. R-E2 |
+| Categories: Celebration, Poses, Greetings, Taunts, Funny | Fun | 14 | TESTING | A category without emotes on the map is left out of *Browse emotes*. R-E2 |
+| Categories Dance, Reactions, Miscellaneous | Fun | 14 | BLOCKED — IW LIMITATION | No such animation a script can play (L64) |
+| Emote menu: wheel, browse, favorites, random, settings, preview | Fun | 14 | TESTING | `ix/ui/menu_tree.gsc` `emote_pages()`. R-E1 |
+| Radial emote wheel | Fun | 14 | TESTING | A menu page drawn as a ring (`page.wheel`, menu.gsc `draw_wheel`): seven slots and *Back* at the bottom, picked by the stick's direction, with the menu's own elements (no new HUD elements, L49). R-E1 |
+| Preview | Fun | 14 | TESTING | The closest stable alternative to a preview screen: the emote played with the camera behind the player (a script cannot show a separate model of the player). R-E3 |
+| Favorites (seven, the wheel's) saved across games | Fun | 14 | TESTING | Host: `ix_emote_favorites` in the config; per character across maps; a guest's for the match (L65). R-E4 |
+| Emote safety (death, down, revive, weapon change, rounds, teleports, menus, interrupts) | Fun | 14 | TESTING | Starts only on the ground with nothing else going on and no zombie within 3 m; ends on damage, down, death, a new emote, Emotes off; never holds the player, aiming, melee (and grenades for a hand gesture) back through the stock counters; the camera back as Third person has it; at most 8 seconds. R-E5 |
+| `!ix emote [name / random / list]` | Fun | 14 | TESTING | R-E6 |
+| Visible to other players | Fun | 14 | NEEDS TESTING | L66, R-E3 |
+
+## Fun features (Phases 15–21, not started)
 
 The full scope is in `ROADMAP.md`. Nothing here is started; each feature is verified against the game first, and dropped or marked BLOCKED if the game cannot support it.
 
 | Feature | Category | Phase | Status | Notes |
 |---------|----------|-------|--------|-------|
-| Emote menu (wheel, browse, favorites, random, settings, preview) and categories | Fun | 14 | PLANNED | Study AAE's emotes first; only animations IW7 really has (L13) |
-| Emote preview and radial emote wheel | Fun | 14 | PLANNED | If technically possible; else the closest stable alternative |
-| Emote safety (death, down, revive, weapon change, rounds, teleports, menus, interrupts) | Fun | 14 | PLANNED | Never trap the player in an animation |
 | Fun player and movement effects (super jump, gravity, speed, spin, poses, landings, third person, size) | Fun | 15 | PLANNED | Shares mechanisms with Phases 4–5; global dvars restored (L17, L20) |
 | Fun zombie effects (speed, health, size, freeze, launch, random) | Fun | 15 | PLANNED | Only what the game exposes; each tested alone |
 | Fun weapon effects (rapid or slow fire, infinite ammo, magazine, damage, recoil, one-shot) | Fun | 15 | PLANNED | Separate from the Phase 6 weapon system |

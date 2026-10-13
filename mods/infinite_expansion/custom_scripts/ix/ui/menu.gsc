@@ -34,6 +34,13 @@
 // number a working IW7 menu keeps to; L49), so the menu has 26 of them and 2
 // archived ones, and the stock game's own elements still fit.
 //
+// A page can be a wheel (page.wheel, the Emotes wheel): its eight rows sit in
+// a ring, the cursor's bar behind the one picked, and the stick or W / A / S
+// / D picks by direction (getnormalizedmovement as an angle); Use plays,
+// Melee goes back, ADS / Fire turn the wheel. It uses the same elements, so
+// the HUD budget is unchanged. A row's label can come from a function
+// (item.label_fn( item.arg )), for rows that change in the match.
+//
 // Opening (menu_open): ads_melee opens it on Melee while ADS is held or the
 // player is aiming (playerads, so toggle ADS works too); crouch_melee on Melee
 // after a moment crouched, not sliding (a slide ends crouched); chat leaves
@@ -578,6 +585,15 @@ input_loop()
             button = state.queued;
             state.queued = undefined;
             held = "";
+        }
+
+        // On a wheel the stick picks by direction; ADS / Fire still turn it.
+        if ( on_wheel() )
+        {
+            follow_stick();
+
+            if ( button == "up" || button == "down" || button == "more" || button == "less" )
+                button = "";
         }
 
         if ( button == "" )
@@ -1263,6 +1279,14 @@ draw()
 
     hud = state.hud;
     page = current_page();
+
+    if ( on_wheel() )
+    {
+        draw_wheel( page );
+        return;
+    }
+
+    place_list();
     hud.title settext( page.title );
     hud.crumb settext( crumb( page ) );
     hud.panel.alpha = hud.panel.shown_alpha;
@@ -1308,9 +1332,187 @@ draw()
     }
 }
 
+// A row's label: its own, or what its function says now (item.label_fn).
+item_label( item )
+{
+    if ( isdefined( item.label_fn ) )
+        return self [[ item.label_fn ]]( item.arg );
+
+    return item.label;
+}
+
+// ---------------------------------------------------------------------------
+// The wheel layout (page.wheel)
+
+on_wheel()
+{
+    page = current_page();
+    return isdefined( page ) && isdefined( page.wheel ) && page.wheel;
+}
+
+// Row r of the ring, clockwise from the top (r * 45 degrees), on an ellipse
+// that fits the panel's rows.
+wheel_x( row )
+{
+    return int( menu_left() + menu_width() / 2 + 78 * sin( row * 45 ) );
+}
+
+wheel_y( row )
+{
+    return int( first_row_top() + rows() * row_height() / 2 - 7 - 46 * cos( row * 45 ) );
+}
+
+wheel_cell()
+{
+    return 90;
+}
+
+// The ring's names are a little smaller than the list's, so a name of
+// sixteen letters fits its cell (tools/tests/test_emotes.py).
+wheel_scale()
+{
+    return 0.85;
+}
+
+place_wheel()
+{
+    state = self.ix.menu;
+
+    if ( isdefined( state.layout ) && state.layout == "wheel" )
+        return;
+
+    state.layout = "wheel";
+    hud = state.hud;
+
+    for ( row = 0; row < rows(); row++ )
+    {
+        hud.labels[row].alignx = "center";
+        hud.labels[row].x = wheel_x( row );
+        hud.labels[row].y = wheel_y( row );
+        hud.labels[row].fontscale = wheel_scale();
+        hud.values[row].alpha = 0;
+    }
+
+    hud.cursor setshader( "white", wheel_cell(), row_height() );
+}
+
+place_list()
+{
+    state = self.ix.menu;
+
+    if ( !isdefined( state.layout ) || state.layout == "list" )
+        return;
+
+    state.layout = "list";
+    hud = state.hud;
+
+    for ( row = 0; row < rows(); row++ )
+    {
+        hud.labels[row].alignx = "left";
+        hud.labels[row].x = menu_left() + 8;
+        hud.labels[row].y = first_row_top() + row * row_height() + 1;
+        hud.labels[row].fontscale = 1;
+    }
+
+    hud.cursor setshader( "white", menu_width() - 4, row_height() );
+    hud.cursor.x = menu_left() + 2;
+
+    // The footer's keys are the list's again.
+    state.pad = undefined;
+    state.open_keys = undefined;
+}
+
+draw_wheel( page )
+{
+    state = self.ix.menu;
+    hud = state.hud;
+    place_wheel();
+    state.top = 0;
+    hud.title settext( page.title );
+    hud.crumb settext( crumb( page ) );
+    hud.panel.alpha = hud.panel.shown_alpha;
+    hud.title.alpha = 1;
+    hud.crumb.alpha = 1;
+    hud.less.alpha = 0;
+    hud.more.alpha = 0;
+
+    for ( row = 0; row < rows(); row++ )
+    {
+        label = hud.labels[row];
+        hud.values[row].alpha = 0;
+
+        if ( row >= page.items.size )
+        {
+            label.alpha = 0;
+            continue;
+        }
+
+        label settext( item_label( page.items[row] ) );
+        label.color = ( 1, 1, 1 );
+
+        if ( row == state.cursor )
+            label.color = accent();
+
+        label.alpha = 1;
+    }
+
+    hud.cursor.x = wheel_x( state.cursor ) - wheel_cell() / 2;
+    hud.cursor.y = wheel_y( state.cursor ) - 1;
+    hud.cursor.alpha = hud.cursor.shown_alpha;
+
+    // The wheel's keys, until a list page puts its own back.
+    hud.footer[0] settext( footer_wheel_text() );
+    hud.footer[1] settext( footer_wheel_back_text() );
+    state.pad = undefined;
+    state.open_keys = undefined;
+
+    foreach ( element in hud.footer )
+        element.alpha = 1;
+
+    lines = wrap( item_help( current_item() ), help_width(), help_lines() );
+
+    for ( line = 0; line < help_lines(); line++ )
+    {
+        if ( line < lines.size )
+        {
+            hud.help[line] settext( lines[line] );
+            hud.help[line].alpha = 1;
+        }
+        else
+            hud.help[line].alpha = 0;
+    }
+}
+
+// The stick or W / A / S / D as a direction: the row it points at. Forward
+// is [0] and right is [1] (move_direction); vectortoyaw turns ( forward,
+// left ) into degrees counter-clockwise, so clockwise from the top is 360
+// minus that.
+follow_stick()
+{
+    move = self getnormalizedmovement();
+
+    if ( move[0] * move[0] + move[1] * move[1] < 0.36 )
+        return;
+
+    clockwise = 360 - vectortoyaw( ( move[0], 0 - move[1], 0 ) );
+    row = int( ( clockwise + 22.5 ) / 45 );
+
+    while ( row >= rows() )
+        row -= rows();
+
+    state = self.ix.menu;
+
+    if ( row == state.cursor || row >= current_page().items.size )
+        return;
+
+    state.cursor = row;
+    state.confirm = undefined;
+    draw();
+}
+
 draw_row( label, value, item )
 {
-    label settext( item.label );
+    label settext( item_label( item ) );
     label.color = ( 1, 1, 1 );
     label.alpha = 1;
     value.alpha = 1;
@@ -1462,6 +1664,16 @@ show_controls()
 }
 
 // The footer's lines (tools/tests/test_settings.py checks that they fit).
+footer_wheel_text()
+{
+    return "Stick or W/A/S/D: pick   Use/Jump: play";
+}
+
+footer_wheel_back_text()
+{
+    return "Melee: back    ADS / Fire: turn the wheel";
+}
+
 footer_move_text( pad )
 {
     if ( pad )

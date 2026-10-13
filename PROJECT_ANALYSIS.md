@@ -468,6 +468,7 @@ The *BO3 Implementation* column comes from S1 (decompiled GSC where a script is 
 | Overhead map view | Keybind | Link the player to a high script origin camera (`playerlinkto`) | M | PP / UNK | INVESTIGATING |
 | Chat commands (`/bal /dep /transfer /save /tp /ammo /ee /?`) | `self waittill("chat", msg)` | iw7-mod `say` notify (`level waittill("say", player, msg)`, v1.0.3+): `!ix` settings commands (Phase 2), `!ix save` / `load` / `tp` / `refill` (Phase 9), `!ix log` (Phase 10); bank and transfer come with those features | E | RI | TESTING (save, tp, ammo, help); bank PLANNED |
 | Weapon inspect / redraw | Third-party script | Already provided by iw7-mod (`startweaponinspection`, actionslot 8) | – | DP | N/A (exists) |
+| Emote wheel and emotes (`/a <n>`: dances, poses, props) | Chat command + BO3 player scenes (`scene::play( "pb_emote_…" )`), third person, weapons off; LUI wheel | No scenes or body animations a script can play in IW7; the gestures each map loads instead (each character's Pack-a-Punch, entrance and card, the map's hand gestures), fired as the game fires them; a ring page of the GSC menu as the wheel; `!ix emote` (`IW_API_NOTES.md` §23). Dances and props: none (L64) | M | PP | TESTING (Phase 14); dances BLOCKED — IW LIMITATION |
 
 ### 3.10 Dev/cheat menu (`elmg_cheats`)
 

@@ -22,6 +22,8 @@ build()
     add_setting( "characters", "character_crossmap", 1 );
     add_setting( "characters", "character_announce", 1 );
 
+    emote_pages();
+
     add_page( "player", "Player", "main" );
     add_setting( "player", "god_mode", 1 );
     add_setting( "player", "damage_taken", 10 );
@@ -207,6 +209,89 @@ build()
     add_action( "debug", "What am I looking at?", "Names the thing in your crosshair: its kind, model and distance.", custom_scripts\ix\debug\tools::look_info, 0, 0 );
 
     add_action( "main", "Close", "Closes the menu. Melee does too.", custom_scripts\ix\ui\menu::close_action, 0, 0 );
+}
+
+// Emotes (Phase 14, ix/fun/emotes.gsc): the wheel, every emote by category
+// with its own page (Play, Favorite, Preview), the favorites, a random one,
+// the settings, and the last one played again from behind.
+emote_pages()
+{
+    add_page( "emotes", "Emotes", "main" );
+    emotes = custom_scripts\ix\fun\emotes::list();
+
+    if ( emotes.size == 0 )
+        add_info( "emotes", "Emotes here", "This map has no emotes the mod can play.", custom_scripts\ix\fun\emotes::count_info );
+    else
+    {
+        // The ring, clockwise from the top: the seven favorites' slots
+        // around, Back at the bottom (menu.gsc draws page.wheel as a ring).
+        wheel = custom_scripts\ix\ui\menu::add_page( "emote_wheel", "Emote wheel", "emotes" );
+        wheel.wheel = 1;
+
+        for ( position = 0; position < 8; position++ )
+        {
+            if ( position == 4 )
+            {
+                add_action( "emote_wheel", "Back", "Back to the Emotes page. Melee does too.", custom_scripts\ix\ui\menu::go_back, 0, 0 );
+                continue;
+            }
+
+            slot = position;
+
+            if ( position > 4 )
+                slot = position - 1;
+
+            row = add_action( "emote_wheel", "", "", custom_scripts\ix\fun\emotes::play_slot, 0, 0, slot );
+            row.label_fn = custom_scripts\ix\fun\emotes::wheel_label;
+            row.help_fn = custom_scripts\ix\fun\emotes::slot_help;
+        }
+
+        add_page( "emote_browse", "Browse emotes", "emotes" );
+
+        foreach ( category in custom_scripts\ix\fun\emote_data::categories() )
+        {
+            found = custom_scripts\ix\fun\emotes::in_category( category );
+
+            if ( found.size == 0 )
+                continue;
+
+            add_page( "emote_cat_" + category, category, "emote_browse" );
+
+            foreach ( emote in found )
+            {
+                page = "emote_" + emote.id;
+                add_page( page, emote.name, "emote_cat_" + category );
+                add_action( page, "Play", emote.help, custom_scripts\ix\fun\emotes::menu_play, 0, 0, emote );
+                row = add_action( page, "Favorite", "On the wheel and the Favorites page (seven slots). Use again to take it off.", custom_scripts\ix\fun\emotes::toggle_favorite, 0, 0, emote );
+                row.label_fn = custom_scripts\ix\fun\emotes::favorite_label;
+                add_action( page, "Preview", "Plays it with the camera behind you, so you see your character do it.", custom_scripts\ix\fun\emotes::menu_preview, 0, 0, emote );
+            }
+        }
+
+        add_page( "emote_favorites", "Favorites", "emotes" );
+
+        for ( slot = 0; slot < custom_scripts\ix\fun\emotes::slot_count(); slot++ )
+        {
+            row = add_action( "emote_favorites", "", "", custom_scripts\ix\fun\emotes::play_slot, 0, 0, slot );
+            row.label_fn = custom_scripts\ix\fun\emotes::slot_label;
+            row.help_fn = custom_scripts\ix\fun\emotes::slot_help;
+        }
+
+        add_action( "emote_favorites", "Clear favorites", "Empties every slot. Use twice.", custom_scripts\ix\fun\emotes::clear_favorites, 1, 0 );
+        add_action( "emotes", "Random emote", "Plays one of this map's emotes, picked at random.", custom_scripts\ix\fun\emotes::random_action, 0, 0 );
+    }
+
+    add_page( "emote_settings", "Emote settings", "emotes" );
+    add_setting( "emote_settings", "emotes", 1 );
+    add_setting( "emote_settings", "emote_camera", 1 );
+    add_setting( "emote_settings", "emote_cancel_damage", 1 );
+    add_reset( "emote_settings" );
+
+    if ( emotes.size > 0 )
+    {
+        row = add_action( "emotes", "Preview emote", "The last emote you played, again, with the camera behind you.", custom_scripts\ix\fun\emotes::preview_action, 0, 0 );
+        row.label_fn = custom_scripts\ix\fun\emotes::preview_label;
+    }
 }
 
 add_page( id, title, parent )

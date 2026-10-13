@@ -66,6 +66,15 @@ The Guided Mode guides (`mods/infinite_expansion/custom_scripts/ix/guided/guides
 - a `check` or `locate` step must have its function, and `step.needs` must name earlier steps;
 - every step done in any order (`step.parallel`) must be needed by a later step, and every generated guide must match its spec.
 
+## Emotes
+
+`tools/tests/test_emotes.py` reads `mods/infinite_expansion/custom_scripts/ix/fun/emote_data.gsc` (Phase 14) the way its `catalog()` builds each map's emotes and holds every one to the decompiled stock scripts:
+
+- a character's Pack-a-Punch, entrance and card gestures must be the weapons the map registers for that character (`register_player_character` arguments 8, 13, 11), and "Everyone" only where all of them share one;
+- an entrance must be timed with the gesture the map's own `waitgesturelength()` uses for that character, and a card's sound must be the one `play_consumable_activate_sound` plays;
+- a hand gesture must be one the map's own scripts play;
+- ids must be unique and short enough that seven saved favorites fit what `persist.gsc` saves; names must fit the wheel and the menu's rows, and help its four lines.
+
 ## Launcher icon
 
 ```bash

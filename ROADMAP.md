@@ -7,9 +7,10 @@ The phase plan. `README.md` lists every phase with its status; this file holds t
 | 0–10 | Forensics, foundation, characters, core systems, in-game menu, player options, movement, weapons, zombies options, info HUD, quality of life, developer tools | Built (in-game tests pending; `README.md`, `PLAYTEST_CHECKLIST.md`, `TESTING.md`) |
 | 11–12 | Configuration presets (0.11.0), polish (0.12.0) | Built (in-game tests pending) |
 | 13 | **Guided Mode**: an optional tracker for each map's main Easter egg quest (0.13.0) | Built (in-game tests pending; the scope it was built to is kept below) |
-| 14–21 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Next is Phase 14; **not started** (below) |
+| 14 | **Emotes**: each map's character animations on an emote wheel, with browsing, favorites, random and preview (0.14.0) | Built (in-game tests pending; the scope it was built to is kept below) |
+| 15–21 | **The rest of the fun features**: fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Next is Phase 15; **not started** (below) |
 
-The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. On 2026-10-12 the owner removed Phase 13 (a testing phase: start-up, player, zombies, configuration and compatibility checks) and put the guided Easter egg mode in its place, so the fun features are Phases 14–21 again. Testing goes on with each phase as before (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). Phase 13 was built in 0.13.0 (`README.md` *Guided Mode*); its scope stays below as the record of what was asked. None of Phases 14–21 is started; nothing of them exists in the mod yet.
+The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. On 2026-10-12 the owner removed Phase 13 (a testing phase: start-up, player, zombies, configuration and compatibility checks) and put the guided Easter egg mode in its place, so the fun features are Phases 14–21 again. Testing goes on with each phase as before (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). Phase 13 was built in 0.13.0 (`README.md` *Guided Mode*); its scope stays below as the record of what was asked. Phase 14 was built in 0.14.0 (`README.md` *Emotes*); its scope stays below too. None of Phases 15–21 is started; nothing of them exists in the mod yet.
 
 ## Phase 13 — Guided Easter egg mode
 
@@ -131,6 +132,8 @@ These come with the request and apply to every fun feature:
 ## Phase 14 — Zombies emote system
 
 A polished, standalone Emotes system made for Infinite Warfare zombies: a real feature of the mod, not a single animation command.
+
+Built in 0.14.0 (2026-10-13). What Infinite Warfare allowed: the emotes are the gestures each map loads (every character's Pack-a-Punch, entrance and card trick, and the map's hand gestures); there are no dances, props or other body animations a script can play, so the Dance, Reactions and Miscellaneous categories are BLOCKED (`KNOWN_LIMITATIONS.md` L64). The wheel is a ring of the menu's own rows (seven emotes, Back at the bottom); the preview is the emote played with the camera behind the player, the closest stable alternative to a preview screen. AAE's emotes were studied first (`IW_API_NOTES.md` §23).
 
 - **Study first:** how the BO3 All-Around Enhancement files do emotes (their UI, animation handling, selection and player-state management; `tools/bo3_reference/extract_aae.sh` unpacks them again), then recreate the functionality with what Infinite Warfare offers.
 - **Animations:** inspect the player animations and assets Infinite Warfare actually has, and use only those that can be played safely. New animations would need new assets (`KNOWN_LIMITATIONS.md` L13).
