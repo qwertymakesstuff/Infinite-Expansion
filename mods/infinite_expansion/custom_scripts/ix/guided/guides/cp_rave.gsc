@@ -6,8 +6,9 @@
 // projector (Pack-a-Punch). Every signal and marker is the stock scripts' own
 // (research: scratchpad guided/cp_rave.md, TESTING.md V150). Steps the game
 // keeps in fields the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md C10:
-// boat parts, film reels, meeting Kevin, the photos) follow from the next
-// step the game reports. Nothing here changes the quest.
+// boat parts, film reels, meeting Kevin, the photos) read the world instead:
+// a part's model gone when taken, a memento's model at its spot when the
+// step starts and gone when it is picked up. Nothing here changes the quest.
 
 guide()
 {
@@ -23,8 +24,11 @@ guide()
         "The broken boat at White Tail Beach is missing its motor parts.",
         "Collect the three boat motor parts (propeller, engine, tiller) around the camp. One is in the Mess Hall; another is in the Recreation Area.",
         "Collect the propeller, engine and tiller parts. Guides put one in the Mess Hall by spawn and one in the Recreation Area, either beside the red/white-flag tent or upstairs near Tuff Nuff. Guides disagree on the third. Follow the markers.",
-        "manual", "locate" );
+        "check", "locate" );
+    step.check = ::boat_parts_found;
     step.locate = ::boat_part;
+    step.total = 3;
+    step.progress = ::boat_part_count;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "ride_boat", "Take the boat to Turtle Island", "White Tail Beach boat",
         "With the motor fixed, the boat can take you across the lake.",
@@ -38,8 +42,11 @@ guide()
         "The projector on Turtle Island needs two film reels.",
         "Find two film reels: one by the docks next to White Tail Beach, one on Turtle Island outside the cabin near the bonfire.",
         "Reel 1 is reportedly in the docks next to White Tail Beach. Reel 2 is on Turtle Island, outside the cabin near the bonfire. The pickups have no hint text (pap_quest_hint_func returns ''), so press use on the reel model itself.",
-        "manual", "locate" );
+        "check", "locate" );
+    step.check = ::film_reels_found;
     step.locate = ::film_reel;
+    step.total = 2;
+    step.progress = ::film_reel_count;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "fix_projector", "Repair the projector", "Projector room, Turtle Island cabin",
         "Bring the reels to the projector in the island cabin.",
@@ -52,13 +59,15 @@ guide()
         "Someone is calling for help in the projector room.",
         "Use the radio in the Turtle Island projector room to talk to Kevin Smith. This starts the Easter egg proper.",
         "In the projector room of the Turtle Island cabin, interact with the radio to talk to Kevin Smith. Wait for his dialogue to finish; the first memento only becomes collectable after a player has met him.",
-        "manual", "sn_structs:survivor_interaction" );
+        "check", "sn_structs:survivor_interaction" );
+    step.check = ::met_kevin;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "find_photo_1", "Find the first photo", "Recreation Area, upper level",
         "Kevin's lost memento lies where the rave takes place.",
         "Search the upper level of the Recreation Area (the rave area). The photo is lying on the floor; pick it up.",
         "Go to the Recreation Area, where the rave is held, and climb to the upper level. The photo is on the floor; use it. Kevin's memory VO plays.",
-        "manual", "ent:j_mem_1" );
+        "check", "ent:j_mem_1" );
+    step.check = ::photo_1_taken;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "ritual_arms", "Do the bonfire ritual (arms)", "Adventure Course bonfire",
         "The photo needs to be charged at a ritual fire.",
@@ -76,7 +85,8 @@ guide()
         "Another memento lies on a balcony near where you started.",
         "Go upstairs in the spawn cabin and out onto the balcony outside the room with the Tuff Nuff machine. Pick up the photo.",
         "From the main spawn cabin, go upstairs to the room with the Tuff Nuff perk machine and step out onto its balcony. The second photo is on the balcony; use it.",
-        "manual", "ent:j_mem_2" );
+        "check", "ent:j_mem_2" );
+    step.check = ::photo_2_taken;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "ritual_legs", "Do the Quickies ritual (legs)", "Recreation Area, Quickies machine",
         "Charge the second photo at another ritual site in the rave area.",
@@ -94,7 +104,8 @@ guide()
         "The last memento waits where the power comes from.",
         "Go back to the generator (power switch) room and pick up the skull on the floor beside the wheel with the zombie on it.",
         "Return to the generator room in the Old Hudson Mine where you pulled the power switch. The final memento, a skull, is on the floor beside the wooden wheel with the zombie strung on it. Pick it up.",
-        "manual", "ent:j_mem_3" );
+        "check", "ent:j_mem_3" );
+    step.check = ::skull_taken;
 
     step = custom_scripts\ix\guided\guided::add_step( guide, "ritual_heads", "Do the Bang Bang ritual (heads)", "Bear Lake, Bang Bang machine",
         "The skull needs a ritual at the lake.",
@@ -134,7 +145,7 @@ guide()
 }
 
 // ---------------------------------------------------------------------------
-// Checks and markers (self = the player)
+// Checks (self = level) and markers (self = the player)
 
 // cp_rave_boat.gsc: the boat's logic starts with its first trip.
 boat_started()
@@ -150,28 +161,130 @@ boat()
     return undefined;
 }
 
-// cp_rave_interactions.gsc: a part's struct holds its model until taken.
+// cp_rave_interactions.gsc init_boat_quest / init_pap_quest: each piece's
+// struct (the ones with a name) holds its model until a player takes it.
 boat_part()
 {
-    return self pieces_left( "boat_quest_piece" );
+    return self custom_scripts\ix\guided\panel::nearest_origin( pieces( "boat_quest_piece", 1 ) );
 }
 
 film_reel()
 {
-    return self pieces_left( "pap_quest_piece" );
+    return self custom_scripts\ix\guided\panel::nearest_origin( pieces( "pap_quest_piece", 1 ) );
 }
 
-pieces_left( name )
+pieces( name, left )
 {
-    left = [];
+    found = [];
 
     foreach ( piece in scripts\engine\utility::getstructarray( name, "script_noteworthy" ) )
     {
-        if ( isdefined( piece.model ) )
-            left[left.size] = piece;
+        if ( isdefined( piece.name ) && isdefined( piece.model ) == left )
+            found[found.size] = piece;
     }
 
-    return self custom_scripts\ix\guided\panel::nearest_origin( left );
+    // Seen in the world once: only then does "none left" mean all taken.
+    if ( left && found.size > 0 )
+    {
+        state = rave_state();
+        state.seen[name] = 1;
+    }
+
+    return found;
+}
+
+rave_state()
+{
+    if ( !isdefined( level.ix.guided.rave ) )
+    {
+        level.ix.guided.rave = spawnstruct();
+        level.ix.guided.rave.seen = [];
+    }
+
+    return level.ix.guided.rave;
+}
+
+pieces_found( name )
+{
+    pieces( name, 1 );
+
+    if ( !isdefined( rave_state().seen[name] ) )
+        return 0;
+
+    return pieces( name, 0 ).size;
+}
+
+all_found( name )
+{
+    return isdefined( rave_state().seen[name] ) && pieces( name, 1 ).size == 0 && pieces( name, 0 ).size > 0;
+}
+
+boat_part_count()
+{
+    return pieces_found( "boat_quest_piece" );
+}
+
+boat_parts_found()
+{
+    return all_found( "boat_quest_piece" );
+}
+
+film_reel_count()
+{
+    return pieces_found( "pap_quest_piece" );
+}
+
+film_reels_found()
+{
+    return all_found( "pap_quest_piece" );
+}
+
+// cp_rave_j_mem_quest.gsc find_thing: once Kevin has been met, a memento's
+// model appears at its spot (j_mem_1, 2, 3) and is deleted when picked up.
+memento_out( name, model )
+{
+    spot = getent( name, "targetname" );
+
+    if ( !isdefined( spot ) )
+        return 0;
+
+    foreach ( thing in getentarray( "script_model", "classname" ) )
+    {
+        if ( isdefined( thing.model ) && thing.model == model && distancesquared( thing.origin, spot.origin ) < 900 )
+        {
+            state = rave_state();
+            state.seen[name] = 1;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+memento_taken( name, model )
+{
+    return !memento_out( name, model ) && isdefined( rave_state().seen[name] );
+}
+
+// The first memento only shows once Kevin has been met (do_find_thing_1).
+met_kevin()
+{
+    return memento_out( "j_mem_1", "cp_rave_quest_photo_03" ) || isdefined( rave_state().seen["j_mem_1"] );
+}
+
+photo_1_taken()
+{
+    return memento_taken( "j_mem_1", "cp_rave_quest_photo_03" );
+}
+
+photo_2_taken()
+{
+    return memento_taken( "j_mem_2", "cp_rave_quest_photo_04" );
+}
+
+skull_taken()
+{
+    return memento_taken( "j_mem_3", "p7_skulls_bones_head_01" );
 }
 
 // cp_interaction.gsc: the "interaction" structs named fix_pap.

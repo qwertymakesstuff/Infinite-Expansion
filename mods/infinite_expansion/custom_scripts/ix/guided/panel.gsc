@@ -356,7 +356,8 @@ header_text( index, current, total )
 {
     count = ( index + 1 ) + "/" + total;
 
-    if ( index < current )
+    // Before the current step, or done ahead of it in any order.
+    if ( index != current && custom_scripts\ix\guided\tracker::is_done( index, self ) )
         return "DONE  " + count;
 
     if ( index > current )
