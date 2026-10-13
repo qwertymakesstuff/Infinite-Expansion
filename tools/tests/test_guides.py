@@ -46,7 +46,7 @@ def looked_up(stock, name, function, key):
     literal = re.search(function + r'(?:array)?\(\s*"' + re.escape(name) + r'",\s*"' + key + '"', stock)
     if literal:
         return True
-    passed = re.search(r'\w+\(\s*"' + re.escape(name) + r'"\s*[,)]', stock)
+    passed = re.search(r'[(,]\s*"' + re.escape(name) + r'"\s*[,)]', stock)
     by_variable = re.search(function + r'(?:array)?\(\s*var_\d+,\s*"' + key + '"', stock)
     return bool(passed and by_variable)
 
