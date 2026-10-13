@@ -4,11 +4,12 @@
 // scripts/cp/maps/cp_rave: Jay's memories, three rituals) and "superslasher"
 // (cp_rave_super_slasher_fight.gsc), after the power, the boat and the
 // projector (Pack-a-Punch). Every signal and marker is the stock scripts' own
-// (research: scratchpad guided/cp_rave.md, TESTING.md V150). Steps the game
-// keeps in fields the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md C10:
-// boat parts, film reels, meeting Kevin, the photos) read the world instead:
-// a part's model gone when taken, a memento's model at its spot when the
-// step starts and gone when it is picked up. Nothing here changes the quest.
+// (research: tools/guided/research/cp_rave.md, TESTING.md V150). Steps the
+// game keeps in fields the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md
+// C10: boat parts, film reels, meeting Kevin, the photos) read the world
+// instead: a part's model gone when taken, a memento's model at its spot when
+// the step starts and gone when it is picked up. Nothing here changes the
+// quest.
 
 guide()
 {

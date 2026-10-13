@@ -3,7 +3,7 @@
 // The main quest is the game's quest line "ufo" (cp_zmb_dj.gsc in
 // scripts/cp/maps/cp_zmb, 12 steps), after the park's power and the portals to the
 // Pack-a-Punch room. Every signal and marker below is the stock scripts' own
-// (research: scratchpad guided/cp_zmb.md, TESTING.md V150):
+// (research: tools/guided/research/cp_zmb.md, TESTING.md V150):
 //   power        5 x level notify "activate_power" (zombie_power.gsc), counted
 //                as cp_zmb_ufo.gsc power_on_monitor counts them
 //   portals      every area portal used once (zombie_fast_travel.gsc, the test

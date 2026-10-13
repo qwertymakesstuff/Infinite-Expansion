@@ -102,6 +102,25 @@ class Guides(unittest.TestCase):
     def setUpClass(cls):
         cls.guides = guides()
 
+    def test_generated_guides_match_their_specs(self):
+        # tools/guided/make_guide.py writes every guide but cp_zmb's from
+        # tools/guided/specs/<map>.py and research/<map>.md: a guide edited by
+        # hand, or a spec changed without regenerating, differs.
+        import importlib.util
+        path = REPO / "tools" / "guided" / "make_guide.py"
+        loader = importlib.util.spec_from_file_location("make_guide", path)
+        make_guide = importlib.util.module_from_spec(loader)
+        loader.loader.exec_module(make_guide)
+        self.assertEqual(make_guide.specs(), ["cp_disco", "cp_final", "cp_rave", "cp_town"])
+        for map_name in make_guide.specs():
+            self.assertEqual((GUIDES / f"{map_name}.gsc").read_text(), make_guide.build(map_name),
+                             f"{map_name}: run python3 tools/guided/make_guide.py {map_name}")
+
+    def test_every_map_has_research(self):
+        for map_name in MAPS:
+            self.assertTrue((REPO / "tools" / "guided" / "research" / f"{map_name}.md").exists(), map_name)
+            self.assertIn(f"tools/guided/research/{map_name}.md", (GUIDES / f"{map_name}.gsc").read_text(), map_name)
+
     def test_every_map_has_a_guide_file_and_a_loader_line(self):
         loader = GUIDED.read_text()
         for map_name in MAPS:

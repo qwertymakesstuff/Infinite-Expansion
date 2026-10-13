@@ -4,16 +4,16 @@
 // scripts/cp/maps/cp_final: N31L's head, the energy doors, the floppy disks,
 // the button, the lever grid, the boss fight), with the Entangler's line
 // "ghostFive" (cp_final_ghost_activation.gsc), the Theater portal and the
-// Pack-a-Punch bridge, and the Cryptid fight (cp_final_rhino_boss.gsc).
-// Every signal and marker is the stock scripts' own (research: scratchpad
-// guided/cp_final.md, TESTING.md V150). Where the game keeps a step in a
-// field the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md C10), the
-// guide reads the world instead: the skull box's models, the Entangler in a
-// player's crafted slot, the opened portal, the game's own disk and scrap
-// counters. Steps done in any order (step.parallel) close by their own
-// signal or with the step that needs them (step.needs). When N31L's hack
-// runs out he turns evil again (neilIsEvil): the guide goes back to the
-// lever grid. Nothing here changes the quest.
+// Pack-a-Punch bridge, and the Cryptid fight (cp_final_rhino_boss.gsc). Every
+// signal and marker is the stock scripts' own (research:
+// tools/guided/research/cp_final.md, TESTING.md V150). Where the game keeps a
+// step in a field the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md C10),
+// the guide reads the world instead: the skull box's models, the Entangler in
+// a player's crafted slot, the opened portal, the game's own disk and scrap
+// counters. Steps done in any order (step.parallel) close by their own signal
+// or with the step that needs them (step.needs). When N31L's hack runs out he
+// turns evil again (neilIsEvil): the guide goes back to the lever grid.
+// Nothing here changes the quest.
 
 guide()
 {

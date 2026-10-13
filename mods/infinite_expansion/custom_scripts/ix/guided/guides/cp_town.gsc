@@ -5,17 +5,17 @@
 // zombie body, three mirrors, the Life and Death Rays, the garage key),
 // "chemistry" (the lab and the Chem Mix), "launchcode" (the safe's codes and
 // the nuke) and "crabBoss" (the fight), after Elvira (cp_town_elvira.gsc).
-// Every signal and marker is the stock scripts' own (research: scratchpad
-// guided/cp_town.md, TESTING.md V150). The deathray line keeps its state in
-// fields the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md C10), so its
-// steps read what the game does to the world instead: a part's glow gone
-// when it is taken, a mirror model on its stand, the card in its slot, the
-// Death Ray signs, the garage door going up. Much of the quest can be done
-// in any order (step.parallel): those steps close by their own signal, or
-// with the step that needs them (step.needs: the Life Ray, the chemistry
-// set, the charged nuke).
-// A failed sonic beam or code entry makes the game play the end of the
-// fight again: the guide goes back too. Nothing here changes the quest.
+// Every signal and marker is the stock scripts' own (research:
+// tools/guided/research/cp_town.md, TESTING.md V150). The deathray line keeps
+// its state in fields the v1.1.0 compiler cannot name (KNOWN_LIMITATIONS.md
+// C10), so its steps read what the game does to the world instead: a part's
+// glow gone when it is taken, a mirror model on its stand, the card in its
+// slot, the Death Ray signs, the garage door going up. Much of the quest can
+// be done in any order (step.parallel): those steps close by their own signal,
+// or with the step that needs them (step.needs: the Life Ray, the chemistry
+// set, the charged nuke). A failed sonic beam or code entry makes the game
+// play the end of the fight again: the guide goes back too. Nothing here
+// changes the quest.
 
 guide()
 {

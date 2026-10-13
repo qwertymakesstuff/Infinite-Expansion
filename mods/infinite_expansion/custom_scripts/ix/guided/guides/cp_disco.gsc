@@ -1,17 +1,17 @@
 // Infinite Expansion - Guided Mode guide: Shaolin Shuffle (cp_disco).
 //
-// The main quest is the game's "skq" (disco_mpq.gsc in scripts/cp/maps/cp_disco,
-// flags skq_*), with Pam Grier's talks (kung_fu_mode.gsc) and the final fight
-// (rat_king_fight.gsc): Chi, then the Rat King's Eye, Brain and Heart, each
-// ending in a fight, then the lair. Every signal and marker is the stock
-// scripts' own (research: scratchpad guided/cp_disco.md, TESTING.md V150).
-// Steps without a signal (a style chosen, Chi level 1, the rooftop cipher)
-// follow from the next step the game reports. A wrong flyer makes the game
-// start the symbol hunt over (puzzle_phone_reset): the guide goes back too.
-// Markers only use names the v1.1.0 compiler knows (KNOWN_LIMITATIONS.md
-// C10): many of this map's own fields (the next cage, the hunted symbol,
-// the ringing phone) are not, so those steps have text directions only.
-// Nothing here changes the quest.
+// The main quest is the game's "skq" (disco_mpq.gsc in
+// scripts/cp/maps/cp_disco, flags skq_*), with Pam Grier's talks
+// (kung_fu_mode.gsc) and the final fight (rat_king_fight.gsc): Chi, then the
+// Rat King's Eye, Brain and Heart, each ending in a fight, then the lair.
+// Every signal and marker is the stock scripts' own (research:
+// tools/guided/research/cp_disco.md, TESTING.md V150). Steps without a signal
+// (a style chosen, Chi level 1, the rooftop cipher) follow from the next step
+// the game reports. A wrong flyer makes the game start the symbol hunt over
+// (puzzle_phone_reset): the guide goes back too. Markers only use names the
+// v1.1.0 compiler knows (KNOWN_LIMITATIONS.md C10): many of this map's own
+// fields (the next cage, the hunted symbol, the ringing phone) are not, so
+// those steps have text directions only. Nothing here changes the quest.
 
 guide()
 {

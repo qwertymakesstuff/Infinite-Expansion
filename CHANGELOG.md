@@ -4,6 +4,29 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.13.0: Guided Mode (Phase 13) (2026-10-13)
+
+**Added**
+- **Guided Mode**: an optional companion for each map's main Easter egg quest, in the spirit of Black Ops 6's guided mode. Off by default; switch it on with the new **GUIDED MODE** button in the zombies lobby or on the menu's new *Guided Mode* page. While it is on:
+  - A tracker on the right of the screen shows the quest, *MAIN QUEST n/m*, the current objective (with a count such as *(2/3)* where the game keeps one) and its hint, a page at a time.
+  - A gold marker with the distance in meters points at the objective wherever the game itself knows the place.
+  - *Objective complete* and *New objective* messages come with the game's own challenge sounds.
+- **Every map has a guide**:
+  - Zombies in Spaceland, The UFO and the Soul Key: 17 steps.
+  - Rave in the Redwoods, The Super Slasher: 18 steps.
+  - Shaolin Shuffle, The Rat King's relics: 34 steps.
+  - Attack of the Radioactive Thing, the nuke: 44 steps.
+  - The Beast from Beyond, N31L and the Cryptids: 22 steps.
+- **The guides follow the game's progress on their own**. Each step reads a flag or notify the game's quest scripts use, or something the game does in the world: a part's glow going out when taken, a mirror on its stand, a door going up. Nothing in a guide is invented, and the test suite holds every signal and marker to the decompiled stock scripts.
+- **Steps the quest allows in any order** are tracked one by one, so a part found early is announced as done. When the game undoes a step, the guide goes back to it: a failed phone puzzle, a failed sonic beam, N31L turning evil again.
+- **Hint levels**: minimal, standard, detailed, and full (every step and its solution, ahead too). *Reveal more* raises the level for one step.
+- **The Guided Mode page**: *Previous step* / *Next step* to look around, *Mark step complete* for anything the game cannot report, *Clear marks*, the *Full guide* list and *Guide options*: side, height, text size, opacity, compact or hidden panel, marker on or off, and in co-op whether a step marked by hand counts for everyone or only you.
+- In chat: `!ix guide` (the current objective and hint), `!ix guide next`, `prev`, `more`, `done`.
+
+**Known**
+- Not yet played through in a real match. `PLAYTEST_CHECKLIST.md` section 11 lists what to try.
+- Some places have no marker because the game never names them (the guide says where in words instead). A step done before Guided Mode was switched on can stay open until a later step closes it or you mark it (`KNOWN_LIMITATIONS.md` L60–L62).
+
 ### 0.12.0: polish (Phase 12) (2026-10-13)
 
 **Changed**
