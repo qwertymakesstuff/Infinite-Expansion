@@ -65,6 +65,11 @@ Infinite-Expansion/                          (repository)
 │               │   ├── rounds.gsc           starting round                                 (Phase 7)
 │               │   ├── points.gsc           points multiplier, power-ups per round        (Phase 7)
 │               │   └── perks.gsc            every perk at each spawn                       (Phase 7)
+│               ├── guided/                  Guided Mode (Phase 13)
+│               │   ├── guided.gsc           the module: settings, menu rows and actions, !ix guide
+│               │   ├── tracker.gsc          which step the quest is at (the game's flags / notifies, marks)
+│               │   ├── panel.gsc            the objective tracker on screen, the marker, notifications
+│               │   └── guides/              one guide per map, data only: cp_zmb, cp_rave, cp_disco, cp_town, cp_final
 │               ├── qol/                     quality of life
 │               │   ├── qol.gsc              the module; chat shortcuts                     (Phase 9)
 │               │   └── game.gsc             game speed, zombie outlines, restart          (Phase 9)
@@ -275,6 +280,17 @@ Modules add commands with `chat::add_command(name, fn, usage)`: `!ix <name> ...`
 - Each info element (round, zombies left, coordinates, speed, weapon/ammo, active modifiers, health) is a feature with its own toggle.
 - Elements are created when enabled and destroyed when disabled; they are **never** recreated per frame.
 - A single per-player update thread ticks every 0.1–0.25 s and skips disabled elements. Numbers use `setvalue`; text changes only when the value changes, which minimises unique strings (`KNOWN_LIMITATIONS.md` L12).
+
+## 6a. Guided Mode (`ix\guided`, Phase 13)
+
+An optional companion for each map's main Easter egg quest, in the spirit of Black Ops 6's Directed Mode, built so that it feels like part of the game and never touches the quest.
+
+- **Choosing it.** The lobby's GUIDED MODE button (`ui_scripts`, under CHARACTER) writes the archived dvar `ix_guided_mode`, which is the setting `guided_mode`; the next match reads it. OFF by default and on a fresh install; no update or map load switches it on. The menu's Guided Mode page switches it too (the host's choice applies, like every setting).
+- **Guides are data.** `guides/<map>.gsc` builds the map's guide with `guided::new_guide( map, map_name, quest, prerequisites )` and one `guided::add_step( guide, id, objective, location, minimal, standard, detailed, detect, marker )` per step; `load_guide()` picks it by map name, never another map's. A map whose guide is not verified returns `undefined`, and the tracker says *GUIDED MODE UNAVAILABLE* for a few seconds. Adding a map is a new data file and one `case` line.
+- **Progress (`tracker.gsc`).** `detect` names how the game itself reports the step: `flag:<name>` (the quest scripts' `flag_set`), `flags:<a>+<b>`, `notify:<name>` (a `level notify` the quest sends), `check` (the guide's own function) or `manual`. Twice a second while Guided Mode is on (asleep otherwise, `config::wait_for_change`), the furthest step the game reports and every step before it count as done: evidence goes backwards, never forwards. A step without a signal is marked by hand (*Mark step complete*), for everyone or for one player (`guided_coop`). The quest is the game's, so what the game reports is the same for every player.
+- **On screen (`panel.gsc`).** Per player, archived elements only, made once while Guided Mode is on and destroyed when it goes off: the panel's back and gold bar, *MAIN QUEST n/m*, the objective, four hint lines (longer hints page every six seconds), the distance in metres, and a waypoint (`setwaypoint( 1, 1 )`, `settargetent` for an entity, as the stock revive icons). The marker only goes where the guide's `marker` names a struct or entity the stock quest scripts look up themselves (`struct:` / `ent:` / `structs:` / `ents:` by targetname); otherwise there is text only. Changes of side, height, size or opacity move the elements in place. Hidden while the mod's menu is open, while dead or spectating, and over the game's menus. When a step is done: *Objective complete* and then *New objective* in the middle of the screen with the game's own challenge sounds (`zmb_challenge_complete`, `zmb_challenge_start`), once per change.
+- **Hint levels.** `guided_hints`: minimal (a short hint), standard (where and what), detailed (step by step, the solution), full (detailed plus the next step, and *Next step* may browse ahead). *Reveal more* raises the level for the step in view; *Previous step* / *Next step* browse; the *Full guide* page lists every step with its state (ahead steps hidden unless full).
+- **Tests.** `tools/tests/test_guides.py` holds every guide to the stock scripts: each flag must be set and each notify sent by the map's own (or the shared zombies) scripts, each marker's targetname looked up by them; and every text to its length.
 
 ## 7. Scope rules (zombies only)
 
