@@ -42,6 +42,7 @@ run()
         {
             destroy_panel();
             state.notified = undefined;
+            state.ahead_seen = undefined;
             custom_scripts\ix\core\config::wait_for_change();
             continue;
         }
@@ -293,6 +294,7 @@ update()
     hidden = mode == "hidden" || custom_scripts\ix\ui\menu::is_open_for( self ) || !isdefined( self.sessionstate ) || self.sessionstate != "playing";
 
     notify_progress( current );
+    notify_ahead( current );
 
     if ( current >= steps.size && index >= steps.size )
     {
@@ -407,6 +409,30 @@ notify_progress( current )
     self thread announce( previous, current );
 }
 
+// A step done in any order (step.parallel) past this player's current one:
+// announced once, as the game reports it. A player who joins later hears
+// only what is done from then on.
+notify_ahead( current )
+{
+    state = self.ix.guided;
+    done = level.ix.guided.done_ahead;
+
+    if ( !isdefined( state.ahead_seen ) )
+        state.ahead_seen = done.size;
+
+    if ( state.ahead_seen >= done.size )
+        return;
+
+    index = done[state.ahead_seen];
+    state.ahead_seen++;
+
+    if ( index > current )
+    {
+        self custom_scripts\ix\core\compat::local_sound( "zmb_challenge_complete" );
+        self iprintlnbold( "Objective complete: " + level.ix.guided.guide.steps[index].objective );
+    }
+}
+
 announce( previous, current )
 {
     self endon( "disconnect" );
@@ -477,6 +503,8 @@ marker_target( step )
             return undefined;
         case "sn_structs":
             return nearest_origin( scripts\engine\utility::getstructarray( parts[1], "script_noteworthy" ) );
+        case "interaction":
+            return nearest_origin( custom_scripts\ix\guided\guided::interactions( parts[1] ) );
     }
 
     return undefined;

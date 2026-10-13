@@ -134,9 +134,12 @@ new_guide( map, map_name, quest, prerequisites )
 // (the step's own check function, step.check) or "manual" (players mark it).
 // marker: "struct:<targetname>", "ent:<targetname>", "structs:<targetname>" /
 // "ents:<targetname>" (the nearest of them), "sn_struct:<script_noteworthy>",
-// "sn_structs:<script_noteworthy>", "locate" (the step's own function,
-// step.locate) or "none". Only places the game's own quest scripts
-// look up themselves.
+// "sn_structs:<script_noteworthy>", "interaction:<name>" (the nearest of the
+// game's interactions of that name: what players press Use on), "locate"
+// (the step's own function, step.locate) or "none". Only places the game's
+// own quest scripts look up themselves.
+// After add_step a guide may set step.parallel = 1: a step the quest lets
+// players do in any order with the steps around it (tracker.gsc).
 add_step( guide, id, objective, location, minimal, standard, detailed, detect, marker )
 {
     step = spawnstruct();
@@ -150,6 +153,7 @@ add_step( guide, id, objective, location, minimal, standard, detailed, detect, m
     step.auto = 0;
     step.seen = 0;
     step.marked = 0;
+    step.parallel = 0;
     guide.steps[guide.steps.size] = step;
     return step;
 }
@@ -181,6 +185,21 @@ nearest_agent( type )
     }
 
     return best;
+}
+
+// The game's interactions of this name (cp_interaction.gsc: the "interaction"
+// structs, named by script_noteworthy): what players press Use on.
+interactions( name )
+{
+    found = [];
+
+    foreach ( spot in scripts\engine\utility::getstructarray( "interaction", "targetname" ) )
+    {
+        if ( isdefined( spot.script_noteworthy ) && spot.script_noteworthy == name )
+            found[found.size] = spot;
+    }
+
+    return found;
 }
 
 // A script model in the world with this model, or undefined.
@@ -227,6 +246,7 @@ on_connect( player, arg )
     state.view = undefined;
     state.extra = 0;
     state.notified = undefined;
+    state.ahead_seen = undefined;
     player.ix.guided = state;
     player thread custom_scripts\ix\guided\panel::run();
 }

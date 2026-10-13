@@ -27,7 +27,7 @@ NEW_GUIDE = re.compile(r'new_guide\(\s*' + r',\s*'.join([STRING] * 4) + r'\s*\)'
 ADD_STEP = re.compile(r'add_step\(\s*guide,\s*' + r',\s*'.join([STRING] * 8) + r'\s*\)')
 LIMITS = {"objective": 32, "location": 40, "minimal": 70, "standard": 150, "detailed": 300}
 DETECT = re.compile(r'^(flag|flags|notify|count):([a-z0-9_+ ]+)(?:\*([1-9][0-9]*))?$|^(check|manual)$')
-MARKER = re.compile(r'^(struct|ent|structs|ents|sn_struct|sn_structs):([a-z0-9_]+)$|^(locate|none)$')
+MARKER = re.compile(r'^(struct|ent|structs|ents|sn_struct|sn_structs|interaction):([a-z0-9_]+)$|^(locate|none)$')
 
 
 def stock_text(map_name):
@@ -61,6 +61,18 @@ def sets_flag(stock, name):
     passed = re.search(r'\w+\([^;\n]*"' + re.escape(name) + r'"\s*\)', stock)
     by_variable = re.search(r'flag_set\(\s*var_\d+\s*\)', stock)
     return bool(initialised and passed and by_variable)
+
+
+def sends_notify(stock, name):
+    """The stock scripts send this level notify: level notify( "name" ), or
+    pass "name" to a function that does level notify( var_N )
+    (cp_town_crab_boss_death_wall.gsc wail_all_player_trigger_teleporter(
+    undefined, "players_trigger_vehicle_teleporter" ))."""
+    if re.search(r'level notify\(\s*"' + re.escape(name) + '"', stock):
+        return True
+    passed = re.search(r'[(,]\s*"' + re.escape(name) + r'"\s*[,)]', stock)
+    by_variable = re.search(r'level notify\(\s*var_\d+\s*\)', stock)
+    return bool(passed and by_variable)
 
 
 def after_step(text, step_id):
@@ -137,7 +149,7 @@ class Guides(unittest.TestCase):
                     for name in names.split("+"):
                         self.assertTrue(sets_flag(stock, name), f"{map_name} {step['id']}: the game never sets flag {name}")
                 elif kind in ("notify", "count"):
-                    self.assertTrue(re.search(r'level notify\(\s*"' + re.escape(names) + '"', stock), f"{map_name} {step['id']}: the game never notifies {names}")
+                    self.assertTrue(sends_notify(stock, names), f"{map_name} {step['id']}: the game never notifies {names}")
                 elif match.group(4) == "check":
                     self.assertIn("step.check = ::", after_step(text, step["id"]), f"{map_name} {step['id']}: no check function")
 
@@ -146,16 +158,17 @@ class Guides(unittest.TestCase):
         for map_name, (_header, steps, text) in self.guides.items():
             stock = stock_text(map_name)
             for step in steps:
-                for name in re.findall(r'step\.reset = "([a-z0-9_]+)";', after_step(text, step["id"])):
-                    self.assertTrue(re.search(r'level notify\(\s*"' + re.escape(name) + '"', stock), f"{map_name} {step['id']}: the game never notifies {name}")
+                for names in re.findall(r'step\.reset = "([a-z0-9_ ]+)";', after_step(text, step["id"])):
+                    for name in names.split():
+                        self.assertTrue(sends_notify(stock, name), f"{map_name} {step['id']}: the game never notifies {name}")
 
-    def test_resets_are_the_games_own(self):
-        # step.reset names a notify the game sends when it undoes a step.
+    def test_parallel_steps_are_closed_by_a_later_step(self):
+        # A step done in any order (step.parallel = 1) is closed by the next
+        # step that needs them all: a guide never ends on one.
         for map_name, (_header, steps, text) in self.guides.items():
-            stock = stock_text(map_name)
-            for step in steps:
-                for name in re.findall(r'step\.reset = "([a-z0-9_]+)";', after_step(text, step["id"])):
-                    self.assertTrue(re.search(r'level notify\(\s*"' + re.escape(name) + '"', stock), f"{map_name} {step['id']}: the game never notifies {name}")
+            parallel = [step["id"] for step in steps if "step.parallel = 1;" in after_step(text, step["id"])]
+            if parallel:
+                self.assertNotEqual(parallel[-1], steps[-1]["id"], f"{map_name}: the last step is parallel")
 
     def test_markers_are_places_the_game_looks_up(self):
         for map_name, (_header, steps, text) in self.guides.items():
@@ -169,6 +182,12 @@ class Guides(unittest.TestCase):
                            "sn_struct": ("getstruct", "script_noteworthy"), "sn_structs": ("getstruct", "script_noteworthy")}
                 if kind in lookups:
                     self.assertTrue(looked_up(stock, name, *lookups[kind]), f"{map_name} {step['id']}: the stock scripts never look up {kind} {name}")
+                elif kind == "interaction":
+                    # An interaction the game registers itself:
+                    # register_interaction( "name", ... ) (cp_interaction.gsc),
+                    # town_register_interaction( 1, "name", ... ) (cp_town).
+                    registered = re.search(r'register_interaction\(\s*(?:\d+,\s*)?"' + re.escape(name) + '"', stock)
+                    self.assertTrue(registered, f"{map_name} {step['id']}: the game registers no interaction {name}")
                 elif match.group(3) == "locate":
                     self.assertIn("step.locate = ::", after_step(text, step["id"]), f"{map_name} {step['id']}: no locate function")
 
