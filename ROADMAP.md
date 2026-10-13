@@ -5,8 +5,8 @@ The phase plan. `README.md` lists every phase with its status; this file holds t
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0–10 | Forensics, foundation, characters, core systems, in-game menu, player options, movement, weapons, zombies options, info HUD, quality of life, developer tools | Built (in-game tests pending; `README.md`, `PLAYTEST_CHECKLIST.md`, `TESTING.md`) |
-| 11–12 | Configuration presets (built, 0.11.0), polish (next) | In progress (`FEATURE_STATUS.md`) |
-| 13 | **Guided Easter egg mode**: an optional in-game guide to each map's main Easter egg quest | Planned, **not started** (below) |
+| 11–12 | Configuration presets (0.11.0), polish (0.12.0) | Built (in-game tests pending) |
+| 13 | **Guided Easter egg mode**: an optional in-game guide to each map's main Easter egg quest | Next, **not started** (below) |
 | 14–21 | **The fun features**: emotes, fun toys, randomizer, favorites and presets, the FUN menu, secrets, co-op show-off features, their tests | Planned, **not started** (below) |
 
 The fun features were added on 2026-10-09 by the project owner as Phases 14–21; the guided Easter egg mode was added the same day as Phase 14, and the fun features moved up one, to Phases 15–22. On 2026-10-12 the owner removed Phase 13 (a testing phase: start-up, player, zombies, configuration and compatibility checks) and put the guided Easter egg mode in its place, so the fun features are Phases 14–21 again. Testing goes on with each phase as before (`PLAYTEST_CHECKLIST.md`, `TESTING.md`). None of Phases 13–21 is started; nothing below exists in the mod yet.

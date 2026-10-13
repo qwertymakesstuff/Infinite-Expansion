@@ -47,6 +47,13 @@ keep_points_multiplier()
 
     for (;;)
     {
+        // The game's own, and nothing to put back: asleep.
+        if ( !changed && custom_scripts\ix\core\config::get( "points_multiplier" ) == 100 )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.25;
         percent = custom_scripts\ix\core\config::get( "points_multiplier" );
 

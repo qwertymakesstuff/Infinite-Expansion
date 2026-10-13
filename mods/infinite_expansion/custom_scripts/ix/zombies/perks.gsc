@@ -26,7 +26,7 @@ on_perks_changed( value, old_value, id )
 
     foreach ( player in level.players )
     {
-        if ( custom_scripts\ix\core\util::is_valid_player( player ) && isalive( player ) && !( isdefined( player.inlaststand ) && player.inlaststand ) )
+        if ( custom_scripts\ix\core\util::is_playing( player ) )
             player thread give_perks();
     }
 }

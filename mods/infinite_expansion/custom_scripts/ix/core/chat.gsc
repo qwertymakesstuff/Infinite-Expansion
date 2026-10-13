@@ -103,8 +103,7 @@ on_chat( player, message )
     }
 }
 
-// A few lines a frame: the game drops a reply when a player's command buffer
-// is full (IW_API_NOTES.md section 19). Runs in its own thread (events.gsc).
+// Runs in its own thread (events.gsc).
 help( player )
 {
     lines = [];
@@ -116,6 +115,14 @@ help( player )
     foreach ( name in level.ix.chat.order )
         lines[lines.size] = prefix() + " " + name + "  " + level.ix.chat.commands[name].usage;
 
+    tell_lines( player, lines );
+}
+
+// Sends the lines to the player, four a frame: the game drops a reply when a
+// player's command buffer is full (IW_API_NOTES.md section 19). It waits, so
+// the caller runs in its own thread.
+tell_lines( player, lines )
+{
     for ( i = 0; i < lines.size; i++ )
     {
         if ( i > 0 && i % 4 == 0 )

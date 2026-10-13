@@ -4,6 +4,13 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.12.0: polish (Phase 12) (2026-10-13)
+
+**Changed**
+- Options that keep themselves applied (unlimited ammo, fire rate and recoil, zombie outlines, points multiplier, most zombies alive, the movement options, zombies ignoring players, the info HUD) no longer check themselves several times a second while they are off: they wait until a setting changes. With everything at its default, the mod does no work during play.
+- *HUD: side* and *HUD: height* move the HUD's numbers instead of making them anew at every step.
+- Shared helpers for the chat replies' pacing and for "is this player playing"; *Start with perks* now also skips spectators.
+
 ### 0.11.0: presets (Phase 11) (2026-10-12)
 
 **Added**

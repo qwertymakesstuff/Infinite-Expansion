@@ -80,7 +80,8 @@ refill_everyone()
     self iprintln( "Ammo and grenades refilled for " + count + " player(s)." );
 }
 
-// unlimited_ammo clip: as the Infinite Ammo power-up, every 0.05 s.
+// unlimited_ammo clip: as the Infinite Ammo power-up, every 0.05 s; asleep
+// while the option is off.
 keep_clip_full()
 {
     self endon( "disconnect" );
@@ -88,6 +89,12 @@ keep_clip_full()
 
     for (;;)
     {
+        if ( custom_scripts\ix\core\config::get( "unlimited_ammo" ) != "clip" )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.05;
 
         if ( custom_scripts\ix\core\config::get( "unlimited_ammo" ) != "clip" || !can_have_ammo() )
@@ -106,7 +113,8 @@ keep_clip_full()
     }
 }
 
-// unlimited_ammo reserve and unlimited_grenades: every half second.
+// unlimited_ammo reserve and unlimited_grenades: every half second; asleep
+// while both are off.
 keep_reserve_full()
 {
     self endon( "disconnect" );
@@ -114,6 +122,12 @@ keep_reserve_full()
 
     for (;;)
     {
+        if ( custom_scripts\ix\core\config::get( "unlimited_ammo" ) != "reserve" && !custom_scripts\ix\core\config::get( "unlimited_grenades" ) )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.5;
 
         if ( !can_have_ammo() )
@@ -181,8 +195,5 @@ is_excluded( weapon )
 // Playing, alive and not down.
 can_have_ammo()
 {
-    if ( !isalive( self ) || !isdefined( self.sessionstate ) || self.sessionstate != "playing" )
-        return 0;
-
-    return !( isdefined( self.inlaststand ) && self.inlaststand );
+    return custom_scripts\ix\core\util::is_playing( self );
 }

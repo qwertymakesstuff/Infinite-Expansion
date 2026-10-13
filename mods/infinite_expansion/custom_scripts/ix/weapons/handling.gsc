@@ -69,12 +69,16 @@ keep_handling()
 
     for (;;)
     {
+        // Both options at the game's own and nothing left to undo: asleep.
+        if ( !fire_rate_set && !recoil_set && custom_scripts\ix\core\config::get( "fire_rate" ) == 100 && !custom_scripts\ix\core\config::get( "no_recoil" ) )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.25;
 
-        if ( !isalive( self ) || !isdefined( self.sessionstate ) || self.sessionstate != "playing" )
-            continue;
-
-        if ( isdefined( self.inlaststand ) && self.inlaststand )
+        if ( !custom_scripts\ix\core\util::is_playing( self ) )
             continue;
 
         berserk = isdefined( self.ix.berserk ) && self.ix.berserk;

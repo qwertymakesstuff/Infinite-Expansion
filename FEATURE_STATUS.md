@@ -24,6 +24,7 @@
 | Cast data test (character table vs. stock scripts, the menu, and the picture pack's card names) | Tooling | 1.5 | COMPLETE | `tools/tests/test_character_data.py` (7 tests; mutation-checked) |
 | Lua UI check (syntax + API names vs. iw7-mod's ui_scripts) | Tooling | 1.5 | COMPLETE | `check.py` `lua`; fixture-tested |
 | Settings test (every setting in the menu and README, valid defaults, help that fits the menu, the init line's count) | Tooling | 4 | COMPLETE | `tools/tests/test_settings.py` (9 tests, 36 settings; checked to fail on a missing row, a wrong count, help that does not fit, a footer line that is too long and a menu over its HUD element budget) |
+| Polish review of every script (Phase 12) | Code quality | 12 | TESTING | Idle option loops sleep in `config::wait_for_change()`; the info HUD moves its elements instead of making them anew; `chat::tell_lines`, `util::is_playing`; `agents::stock_max_zombies()`. Findings and what was left as is: `TESTING.md` V146; in game: `PLAYTEST_CHECKLIST.md` PL1–PL3 |
 
 ## Installer (Windows)
 

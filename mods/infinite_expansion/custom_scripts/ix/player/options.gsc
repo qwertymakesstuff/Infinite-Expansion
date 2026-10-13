@@ -97,6 +97,12 @@ keep_ignored()
             self.ignoreme = isdefined( self.enabledignoreme ) && self.enabledignoreme >= 1;
             forced = 0;
         }
+        else
+        {
+            // Not for this player: asleep until a setting changes.
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
 
         wait 0.25;
     }

@@ -112,6 +112,15 @@ starts_with( text, prefix )
     return text.size >= prefix.size && getsubstr( text, 0, prefix.size ) == prefix;
 }
 
+// Alive, in the match (not spectating) and not down.
+is_playing( player )
+{
+    if ( !is_valid_player( player ) || !isalive( player ) || !isdefined( player.sessionstate ) || player.sessionstate != "playing" )
+        return 0;
+
+    return !( isdefined( player.inlaststand ) && player.inlaststand );
+}
+
 // For a setting whose words are off / host / everyone: whether it is on for
 // this player.
 applies_to( id, player )

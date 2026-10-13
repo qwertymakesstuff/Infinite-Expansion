@@ -277,6 +277,16 @@ describe_range( setting )
     return "valid";
 }
 
+// Waits until any setting changes, and one frame more, so that the setting's
+// own on_change (started in the same frame) has run. A loop that keeps an
+// option applied calls it while its options are at rest, instead of checking
+// them again and again (Phase 12).
+wait_for_change()
+{
+    level waittill( "ix_setting_changed" );
+    wait 0.05;
+}
+
 // Polls every ix_<id> dvar for changes made in the console.
 watch_dvars()
 {

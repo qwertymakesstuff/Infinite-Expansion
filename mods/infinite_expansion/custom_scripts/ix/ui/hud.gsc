@@ -13,7 +13,8 @@
 // never become new strings: KNOWN_LIMITATIONS.md L12). A player sees only so
 // many HUD elements, and the menu holds most of the non-archived ones
 // (L49), so the HUD's elements are archived ones: two per row, at most ten.
-// The rows are made when an option changes and destroyed when it goes off,
+// The rows are made when a row goes on or off (a new side or height only
+// moves them) and destroyed when it goes off,
 // so a HUD that is all off has no elements at all; the game frees a player's
 // elements when they leave, as it does the menu's. The HUD hides while the
 // menu is open, while the player is not playing (dead, spectating after a
@@ -50,7 +51,9 @@ on_connect( player, arg )
     player thread update_loop();
 }
 
-// An option changed: every player's rows are made again.
+// An option changed: every player's rows are made again when a row went on
+// or off; a new side or height only moves the elements there are (A / D held
+// on HUD: height steps it many times).
 on_hud_changed( value, old_value, id )
 {
     if ( !isdefined( level.players ) )
@@ -58,7 +61,12 @@ on_hud_changed( value, old_value, id )
 
     foreach ( player in level.players )
     {
-        if ( custom_scripts\ix\core\util::is_valid_player( player ) && isdefined( player.ix ) && isdefined( player.ix.hud ) )
+        if ( !custom_scripts\ix\core\util::is_valid_player( player ) || !isdefined( player.ix ) || !isdefined( player.ix.hud ) )
+            continue;
+
+        if ( id == "hud_side" || id == "hud_height" )
+            player place_rows();
+        else
             player build_rows();
     }
 }
@@ -134,13 +142,32 @@ build_rows()
     {
         row = spawnstruct();
         row.id = id;
-        top = hud.rows.size * 12 - custom_scripts\ix\core\config::get( "hud_height" );
+        top = row_top( hud.rows.size );
         row.label = hud_text( right, top, ( 0.75, 0.75, 0.75 ), 0 );
         row.label settext( row_label( id ) );
         row.value = hud_text( right, top, ( 1, 1, 1 ), 1 );
         row.shown = undefined;
         hud.rows[hud.rows.size] = row;
     }
+}
+
+// The rows there are, at the side and height the options say.
+place_rows()
+{
+    right = custom_scripts\ix\core\config::get( "hud_side" ) == "right";
+
+    for ( i = 0; i < self.ix.hud.rows.size; i++ )
+    {
+        row = self.ix.hud.rows[i];
+        place( row.label, right, row_top( i ), 0 );
+        place( row.value, right, row_top( i ), 1 );
+    }
+}
+
+// A row's top: 12 units a row, moved by hud_height.
+row_top( index )
+{
+    return index * 12 - custom_scripts\ix\core\config::get( "hud_height" );
 }
 
 destroy_rows()
@@ -165,6 +192,21 @@ destroy_rows()
 hud_text( right, top, color, is_value )
 {
     element = newclienthudelem( self );
+    place( element, right, top, is_value );
+    element.font = "default";
+    element.fontscale = 0.9;
+    element.color = color;
+    element.sort = 10;
+    element.foreground = 1;
+    element.hidewheninmenu = 1;
+    element.hidewhendead = 1;
+    element.archived = 1;
+    element.alpha = 0;
+    return element;
+}
+
+place( element, right, top, is_value )
+{
     element.vertalign = "middle";
     element.aligny = "top";
     element.y = top - 40;
@@ -194,17 +236,6 @@ hud_text( right, top, color, is_value )
         else
             element.x = 6;
     }
-
-    element.font = "default";
-    element.fontscale = 0.9;
-    element.color = color;
-    element.sort = 10;
-    element.foreground = 1;
-    element.hidewheninmenu = 1;
-    element.hidewhendead = 1;
-    element.archived = 1;
-    element.alpha = 0;
-    return element;
 }
 
 // Five times a second: the numbers; hidden while the menu is open or the
@@ -216,6 +247,13 @@ update_loop()
 
     for (;;)
     {
+        // No rows: asleep until a setting changes (and its rows are made).
+        if ( self.ix.hud.rows.size == 0 )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.2;
         hud = self.ix.hud;
 

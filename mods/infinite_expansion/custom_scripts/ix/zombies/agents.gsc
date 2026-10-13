@@ -39,6 +39,8 @@ register()
 {
     custom_scripts\ix\core\config::add_enum( "zombie_speed", "default", "default walk run sprint", "Zombie speed", "How zombies move. default: the game's mix, faster each round.", ::on_speed_changed );
     custom_scripts\ix\core\config::add_int( "zombie_health", 100, 10, 1000, "Zombie health", "Percent of the game's zombie health, for zombies out now and new ones. 100 is the game's own.", ::on_health_changed );
+    // The default is the game's own, stock_max_zombies() (a literal here, which
+    // test_settings.py and README.md read).
     custom_scripts\ix\core\config::add_int( "max_zombies", 24, 1, 64, "Max zombies alive", "Most zombies out at once. 24 is the game's own; many more can slow the game down.", ::on_max_changed );
 
     level.ix.zombies.stock_movemode = [];
@@ -286,11 +288,17 @@ sample_zombie()
 // ---------------------------------------------------------------------------
 // Most alive at once
 
+// What the wave loop sets when a round starts (zombies_spawning.gsc).
+stock_max_zombies()
+{
+    return 24;
+}
+
 on_max_changed( value, old_value, id )
 {
-    // Back to the game's 24 during a round: at once, not at the next round.
-    if ( value == 24 && isdefined( level.max_static_spawned_enemies ) && level.max_static_spawned_enemies > 0 )
-        level.max_static_spawned_enemies = 24;
+    // Back to the game's own during a round: at once, not at the next round.
+    if ( value == stock_max_zombies() && isdefined( level.max_static_spawned_enemies ) && level.max_static_spawned_enemies > 0 )
+        level.max_static_spawned_enemies = stock_max_zombies();
 }
 
 keep_max_zombies()
@@ -299,11 +307,18 @@ keep_max_zombies()
 
     for (;;)
     {
+        // The game's own number: asleep until a setting changes.
+        if ( custom_scripts\ix\core\config::get( "max_zombies" ) == stock_max_zombies() )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.5;
         wanted = custom_scripts\ix\core\config::get( "max_zombies" );
 
         // 0: between rounds, before the first, and at a map event's end.
-        if ( wanted == 24 || !isdefined( level.max_static_spawned_enemies ) || level.max_static_spawned_enemies <= 0 )
+        if ( wanted == stock_max_zombies() || !isdefined( level.max_static_spawned_enemies ) || level.max_static_spawned_enemies <= 0 )
             continue;
 
         if ( level.max_static_spawned_enemies != wanted )

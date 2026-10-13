@@ -192,7 +192,8 @@ on_connect( player, arg )
         player thread keep_movement();
 }
 
-// For the whole match: what the options say, four times a second.
+// For the whole match: what the options say, four times a second; asleep
+// while every one of them is at the game's own.
 keep_movement()
 {
     self endon( "disconnect" );
@@ -205,6 +206,13 @@ keep_movement()
 
     for (;;)
     {
+        // Every option at the game's own and nothing to put back: asleep.
+        if ( movement_at_rest( state ) )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.25;
 
         if ( !can_move_freely() )
@@ -265,14 +273,24 @@ keep_movement()
     }
 }
 
+// Nothing for keep_movement to do: the options at the game's own, and none of
+// its own changes left to undo.
+movement_at_rest( state )
+{
+    if ( state.wall_run || state.double_jump || state.mantle || state.slide_off )
+        return 0;
+
+    if ( custom_scripts\ix\core\config::get( "wall_run" ) || custom_scripts\ix\core\config::get( "double_jump" ) || custom_scripts\ix\core\config::get( "mantle" ) )
+        return 0;
+
+    return custom_scripts\ix\core\config::get( "slide" ) && !custom_scripts\ix\core\config::get( "unlimited_boost" );
+}
+
 // Playing on their own feet: not down, not in the afterlife arcade, not taken
 // by a ride or a booth, where the game sets movement for its own purposes.
 can_move_freely()
 {
-    if ( !isalive( self ) || !isdefined( self.sessionstate ) || self.sessionstate != "playing" )
-        return 0;
-
-    if ( isdefined( self.inlaststand ) && self.inlaststand )
+    if ( !custom_scripts\ix\core\util::is_playing( self ) )
         return 0;
 
     if ( isdefined( self.in_afterlife_arcade ) && self.in_afterlife_arcade )

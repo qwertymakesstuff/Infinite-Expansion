@@ -176,6 +176,7 @@ config::find(id) / exists(id) / changed_count() / to_text(setting, value) / desc
 - **Source of truth at runtime:** `level.ix.config.settings[id]` (`.value`, `.text`, `.default_value`, `.type`, range, `.label`, `.help`); `level.ix.config.order` keeps registration order.
 - **Live console overrides.** Every setting is mirrored to dvar `ix_<id>`. A watcher thread polls these dvars every 0.5 s and applies changes, so `set ix_<id> <value>` in the console works live; an invalid value is logged and the dvar put back, and a cleared dvar means the default. This replaces AAE's `/d name value`.
 - **Change notification.** Each change logs `setting <id> = <value> (<source>)`, notifies `level "ix_setting_changed", id`, and runs `level thread [[on_change]](value, old_value, id)`. The value found at registration does not count as a change.
+- **Sleeping loops (Phase 12).** A loop that keeps an option applied (unlimited ammo, fire rate and recoil, zombie outlines, the points multiplier, most zombies alive, the movement options, zombies ignoring players, the info HUD) checks its options at the top of each pass; while they are all at the game's own and it has nothing left to undo, it calls `config::wait_for_change()` (`level waittill "ix_setting_changed"`, then one frame, so the setting's own `on_change` has run) instead of polling. With every option at its default, none of them does any work.
 - **Persistence (`ix\core\persist`).** Every change is saved as an archived dvar: `executecommand("seta ix_<id> <value>")`, the way the CHARACTER menu saves `ix_character`. iw7-mod keeps archived dvars in the host's config, so the next game starts with them, and registration reads them back. This needs neither `fs_game` nor file access, so it works in the install friends can join (L9, L30). Only values made of letters, digits, `_`, `.` and `-` (at most 64) are ever written, so no value can add a console command.
 - **Layout version.** `ix_settings_version` (now 1) records which layout of settings was saved; `persist::migrate(from)` converts old values once when a later version renames or changes a setting. An invalid saved value is replaced by the default at registration, and saved again.
 - **Presets (`ix\core\presets`, Phase 11).** Default, Classic, Enhanced, Testing and Developer are data: `add( id, title, help, "id=value …" )`, the settings each changes from their defaults, written as `to_text` writes them. `apply( id, source )` gives every *governed* setting (all but `kept_settings()`: the menu's own settings, the HUD's position and the characters) the preset's value or its default, through `config::set`, so each module hears of its change as usual, and returns how many changed. Custom is the host's own: `save_custom` stores every governed setting as the archived dvar `ix_custom_<id>` (and `ix_custom_saved 1`); a setting a later version adds gets its default. `matching()` names the preset the settings match now (the menu's *In use*). Menu: the Presets page; chat: `!ix preset [name | save]`. `test_settings.py` checks that every preset value names a real, governed setting with a valid value that is not its default.
@@ -206,7 +207,7 @@ One listener thread exists per source notify (per player for player events), sta
 
 ### 4.4 Utilities (`ix\core\util`, `ix\core\log`, `ix\core\compat`)
 
-- **util:** `is_valid_player`, `is_human`, `dvar_string`, `join(items, separator)`, `parse_bool(text)`, `is_number(text, allow_fraction)`, `array_contains(items, value)`, `starts_with(text, prefix)`, `applies_to(setting, player)` (for an off / host / everyone setting: whether it is on for that player). Single characters are taken with `getsubstr(text, i, i + 1)`, as the stock scripts do.
+- **util:** `is_valid_player`, `is_human`, `is_playing(player)` (alive, in the match and not down; Phase 12), `dvar_string`, `join(items, separator)`, `parse_bool(text)`, `is_number(text, allow_fraction)`, `array_contains(items, value)`, `starts_with(text, prefix)`, `applies_to(setting, player)` (for an off / host / everyone setting: whether it is on for that player). Single characters are taken with `getsubstr(text, i, i + 1)`, as the stock scripts do.
 - **log:** `ix\core\log::info/warn/error/debug(msg)`, which calls `print("[IX] LEVEL: …")` (iw7-mod console) and keeps the last 32 lines in `level.ix.log` (`log::recent()`). Debug output is gated by the setting `debug_log` (dvar `ix_debug_log`).
 - **compat:** the **only** place raw ids appear, each with its real name in a comment:
   - `god_off()` → `_meth_80A1`
@@ -220,7 +221,7 @@ One listener thread exists per source notify (per player for player events), sta
 
 ### 4.5 Chat commands (`ix\core\chat`)
 
-Typed in the game's chat; replies go only to the player who typed, with iw7-mod's `tell()`.
+Typed in the game's chat; replies go only to the player who typed, with iw7-mod's `tell()`. Replies of several lines go through `chat::tell_lines(player, lines)`, four a frame (the game drops lines when a player's command buffer is full, `IW_API_NOTES.md` §19).
 
 | Command | Who | Does |
 |---------|-----|------|

@@ -1,4 +1,4 @@
-# Play-test checklist (0.11.0)
+# Play-test checklist (0.12.0)
 
 What to try in a real match, and what should happen. Each item names its row in `TESTING.md` §4 (in brackets), where the details are. Tick what works; for anything that does not, see *If something is wrong* below.
 
@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.11.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui`, then `settings: 52 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.12.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,ui`, then `settings: 52 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*
@@ -92,11 +92,19 @@ Turn on *HUD: zombies* (HUD page) first, to see the counts. *Zombies* → *In ef
 - [ ] **PR2** Change any option by hand: *In use* says *Your own*. *Default*: everything back to the game's own, but your *Menu: open with*, the HUD's side and height and your character settings stay. *(R-C10)*
 - [ ] **PR3** *Custom* before saving: it says nothing is saved. Set a few options, *Save as Custom*, *Default*, then *Custom*: your options are back. Quit the game, start it again: `!ix preset` still knows Custom. *(R-C10)*
 
-## 10. Co-op (when a friend can join)
+## 10. After the polish (Phase 12, new)
+
+In 0.12.0 the options that keep themselves applied sleep while they are off and wake when a setting changes.
+
+- [ ] **PL1** Start with every option at its default (*Presets* → *Default*) and play a round. Then switch on, one at a time: *Unlimited ammo* clip, *Fire rate* 200, *Zombie outlines*, *Wall run*, *Zombies ignore players* host, *Points multiplier* 200, *Max zombies alive* 4, *HUD: round*. Each works within a second, and switched off again each goes back to the game's own. *(V146)*
+- [ ] **PL2** *HUD: round* and *HUD: zombies* on, then hold D on *HUD: height*: the numbers glide up without flickering; *HUD: side* right moves them. *(R-H2)*
+- [ ] **PL3** `!ix` and `!ix log 20`: every line arrives. *(R-Q5, R-D8)*
+
+## 11. Co-op (when a friend can join)
 
 - [ ] **C1** The friend joins (both with the mod installed by the setup); the host's settings apply to both; the friend's menu rows are grey ("Only the host can change it."). *(R-S2, R-C4)*
 - [ ] **C2** *Zombie outlines* and the HUD work for the friend too; *Restart the match* restarts it for both. *(R-Q3, R-Q4)*
 
-## 11. Clean-up
+## 12. Clean-up
 
 - [ ] **E1** *Settings* → *Reset every setting*, then start a new match: the console says `0 changed from the default`, and the game plays as without the mod. *(R-C6)*

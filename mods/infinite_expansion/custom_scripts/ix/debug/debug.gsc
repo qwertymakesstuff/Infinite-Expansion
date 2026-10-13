@@ -49,17 +49,13 @@ log_command( words )
     if ( first < 0 )
         first = 0;
 
-    self tell( "Infinite Expansion log, the last " + ( lines.size - first ) + " lines:" );
+    reply = [];
+    reply[0] = "Infinite Expansion log, the last " + ( lines.size - first ) + " lines:";
 
-    // A few lines a frame: the game drops a reply when a player's command
-    // buffer is full (IW_API_NOTES.md section 19).
     for ( i = first; i < lines.size; i++ )
-    {
-        self tell( without_quotes( lines[i] ) );
+        reply[reply.size] = without_quotes( lines[i] );
 
-        if ( ( i - first ) % 4 == 3 )
-            wait 0.05;
-    }
+    custom_scripts\ix\core\chat::tell_lines( self, reply );
 }
 
 // tell() puts its text inside double quotes, so a " in a line would cut it.

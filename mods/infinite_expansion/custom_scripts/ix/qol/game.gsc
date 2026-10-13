@@ -78,6 +78,13 @@ keep_outlines()
 
     for (;;)
     {
+        // Off and none shown: asleep until a setting changes.
+        if ( !shown && !custom_scripts\ix\core\config::get( "zombie_outlines" ) )
+        {
+            custom_scripts\ix\core\config::wait_for_change();
+            continue;
+        }
+
         wait 0.5;
 
         if ( !isdefined( level.agentarray ) )
