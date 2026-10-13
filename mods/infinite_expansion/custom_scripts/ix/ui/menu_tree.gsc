@@ -130,6 +130,7 @@ build()
     add_setting( "guided_options", "guided_hints", 1 );
     add_setting( "guided_options", "guided_panel", 1 );
     add_setting( "guided_options", "guided_marker", 1 );
+    add_setting( "guided_options", "guided_outline", 1 );
     add_setting( "guided_options", "guided_side", 1 );
     add_setting( "guided_options", "guided_height", 10 );
     add_setting( "guided_options", "guided_text", 1 );

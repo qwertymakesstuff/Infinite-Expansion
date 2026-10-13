@@ -178,6 +178,9 @@ create()
     hud.unit settext( "m" );
     hud.shown = [];
     hud.back_height = -1;
+    hud.marker_check = 0;
+    hud.marker_outline = -1;
+    hud.outline_shown = 0;
     self.ix.guided.hud = hud;
     self.ix.guided.layout = -1;
 }
@@ -550,9 +553,113 @@ update_marker( target, hidden )
     if ( !isvector( target ) )
         position = target.origin;
 
-    if ( !isdefined( hud.marker ) || !same_target( hud.marker_target, target ) )
+    // What shows: the item itself, outlined, when there is one (guided_outline);
+    // otherwise the waypoint. Looked at again every two seconds, as quest
+    // items appear and go, and when the setting changes.
+    outline = custom_scripts\ix\core\config::get( "guided_outline" );
+
+    if ( !same_target( hud.marker_target, target ) || gettime() >= hud.marker_check || hud.marker_outline != outline )
     {
-        remove_marker();
+        item = undefined;
+
+        if ( outline )
+            item = item_at( target, position );
+
+        if ( isdefined( hud.outlined ) && ( !isdefined( item ) || item != hud.outlined ) )
+            clear_outline();
+
+        hud.outlined = item;
+        hud.outline_shown = 0;
+        hud.marker_target = target;
+        hud.marker_check = gettime() + 2000;
+        hud.marker_outline = outline;
+    }
+
+    if ( isdefined( hud.outlined ) )
+    {
+        remove_icon();
+
+        if ( hidden && hud.outline_shown )
+        {
+            clear_outline();
+            hud.outline_shown = 0;
+        }
+        else if ( !hidden && !hud.outline_shown )
+        {
+            // The colour the game outlines the Entangler's items with
+            // (crafted_entangler.gsc), through walls (depth 0, as the stock
+            // power-up outlines enemies).
+            scripts\cp\cp_outline::enable_outline_for_player( hud.outlined, self, outline_colour(), 0, 0, "high" );
+            hud.outline_shown = 1;
+        }
+    }
+    else
+        show_icon( target, position, hidden );
+
+    meters = int( distance( self.origin, position ) * 0.0254 + 0.5 );
+
+    if ( !isdefined( hud.meters ) || hud.meters != meters )
+    {
+        hud.distance setvalue( meters );
+        hud.meters = meters;
+    }
+
+    hud.distance.alpha = visible( hidden );
+    hud.unit.alpha = visible( hidden );
+}
+
+outline_colour()
+{
+    return 5;
+}
+
+// The thing to outline for a target: the target itself when it is a script
+// model or an agent (a boss), else the script model standing on that spot
+// (within 32 units), if any. Effect holders (tag_origin models) never count.
+item_at( target, position )
+{
+    if ( !isvector( target ) )
+    {
+        if ( isagent( target ) )
+            return target;
+
+        if ( isdefined( target.classname ) && target.classname == "script_model" && is_item_model( target ) )
+            return target;
+    }
+
+    best = undefined;
+    best_gap = 1024;
+
+    foreach ( thing in getentarray( "script_model", "classname" ) )
+    {
+        if ( !is_item_model( thing ) )
+            continue;
+
+        gap = distancesquared( thing.origin, position );
+
+        if ( gap < best_gap )
+        {
+            best = thing;
+            best_gap = gap;
+        }
+    }
+
+    return best;
+}
+
+is_item_model( thing )
+{
+    return isdefined( thing.model ) && thing.model != "" && !custom_scripts\ix\core\util::starts_with( thing.model, "tag_origin" );
+}
+
+// The waypoint, where no item can be outlined.
+show_icon( target, position, hidden )
+{
+    hud = self.ix.guided.hud;
+
+    if ( !isdefined( hud.marker ) || !same_target( hud.icon_target, target ) )
+    {
+        remove_icon();
         marker = newclienthudelem( self );
         marker setshader( "white", 7, 7 );
         marker.color = gold();
@@ -577,20 +684,10 @@ update_marker( target, hidden )
         }
 
         hud.marker = marker;
-        hud.marker_target = target;
+        hud.icon_target = target;
     }
 
     hud.marker.alpha = visible( hidden );
-    meters = int( distance( self.origin, position ) * 0.0254 + 0.5 );
-
-    if ( !isdefined( hud.meters ) || hud.meters != meters )
-    {
-        hud.distance setvalue( meters );
-        hud.meters = meters;
-    }
-
-    hud.distance.alpha = visible( hidden );
-    hud.unit.alpha = visible( hidden );
 }
 
 same_target( a, b )
@@ -604,6 +701,26 @@ same_target( a, b )
     return a == b;
 }
 
+remove_icon()
+{
+    hud = self.ix.guided.hud;
+
+    if ( isdefined( hud.marker ) )
+        hud.marker destroy();
+
+    hud.marker = undefined;
+    hud.icon_target = undefined;
+}
+
+clear_outline()
+{
+    hud = self.ix.guided.hud;
+
+    if ( isdefined( hud.outlined ) )
+        scripts\cp\cp_outline::disable_outline_for_player( hud.outlined, self );
+}
+
+// The icon and the outline both go.
 remove_marker()
 {
     hud = self.ix.guided.hud;
@@ -611,10 +728,10 @@ remove_marker()
     if ( !isdefined( hud ) )
         return;
 
-    if ( isdefined( hud.marker ) )
-        hud.marker destroy();
-
-    hud.marker = undefined;
+    remove_icon();
+    clear_outline();
+    hud.outlined = undefined;
+    hud.outline_shown = 0;
     hud.marker_target = undefined;
 }
 

@@ -4,6 +4,15 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.13.1: Guided Mode outlines the item (2026-10-13)
+
+**Changed**
+- **Guided Mode's marker is now the item itself.** The part, lever, memento or boss the current step is about glows with a yellow outline, for you only and also through walls, instead of an icon floating above it. A place with no item to outline still gets the gold marker. The tracker still shows how far it is.
+- New setting **Guided: outline** (on by default, *Guide options* page): off brings back the gold marker everywhere.
+
+**Known**
+- The outline picks the script model standing on the objective's spot; next to a decoration it may pick the wrong one (`KNOWN_LIMITATIONS.md` L63). Report the map and the step.
+
 ### 0.13.0: Guided Mode (Phase 13) (2026-10-13)
 
 **Added**

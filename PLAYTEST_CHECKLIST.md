@@ -1,4 +1,4 @@
-# Play-test checklist (0.13.0)
+# Play-test checklist (0.13.1)
 
 What to try in a real match, and what should happen. Each item names its row in `TESTING.md` §4 (in brackets), where the details are. Tick what works; for anything that does not, see *If something is wrong* below.
 
@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.13.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui`, then `settings: 61 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.13.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui`, then `settings: 62 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*
@@ -105,7 +105,7 @@ In 0.12.0 the options that keep themselves applied sleep while they are off and 
 Switch it on in the zombies lobby with **GUIDED MODE** (under CHARACTER) before starting the map, then play the map's main Easter egg quest from the start of a match. Any map counts; note the map for every report.
 
 - [ ] **G1** GUIDED MODE: ON in the lobby; after the match's intro the tracker shows on the right: *MAIN QUEST 1/n*, the first objective and a hint. Quit and start again: still ON. *(R-G1)*
-- [ ] **G2** Do the first steps of the quest: each one closes by itself, with *Objective complete* and a sound, then *New objective*. Where there is a marker, it sits on the objective and the meters fall as you walk to it. *(R-G2, R-G4)*
+- [ ] **G2** Do the first steps of the quest: each one closes by itself, with *Objective complete* and a sound, then *New objective*. Where the game knows the place, the item to use glows with a yellow outline (also through walls), or a gold marker shows where there is no item; the meters fall as you walk to it. Note any outline on the wrong thing. *(R-G2, R-G4)*
 - [ ] **G3** A step that does not close by itself, closes too early, or whose hint names the wrong place: note its id (Guided Mode page → *Full guide*), then *Mark step complete* and go on. *(R-G2)*
 - [ ] **G4** *Guide options*: try *Hints* minimal, detailed and full, *Reveal more*, side left, text large, panel compact; open the menu: the tracker hides. *(R-G3, R-G4)*
 - [ ] **G5** Chat `!ix guide`: the current objective and hint. *(R-G6)*

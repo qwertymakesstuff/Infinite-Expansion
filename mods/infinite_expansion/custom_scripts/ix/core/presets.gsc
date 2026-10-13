@@ -77,7 +77,7 @@ find( id )
 // No preset changes these.
 kept_settings()
 {
-    return [ "menu", "menu_open", "menu_access", "menu_hint", "hud_side", "hud_height", "character_select", "character_specials", "character_crossmap", "character_announce", "guided_mode", "guided_hints", "guided_panel", "guided_marker", "guided_side", "guided_height", "guided_text", "guided_opacity", "guided_coop" ];
+    return [ "menu", "menu_open", "menu_access", "menu_hint", "hud_side", "hud_height", "character_select", "character_specials", "character_crossmap", "character_announce", "guided_mode", "guided_hints", "guided_panel", "guided_marker", "guided_outline", "guided_side", "guided_height", "guided_text", "guided_opacity", "guided_coop" ];
 }
 
 // Every setting a preset governs, in the settings' own order.

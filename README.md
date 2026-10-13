@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: 0.13.0 — Phase 13 done: [Guided Mode](#guided-mode), an optional tracker for each map's main Easter egg quest (objective, hints, a marker, steps that complete themselves), with a guide for all five maps. Off by default: the lobby's GUIDED MODE button switches it on. Not yet played through in a real match. Before that: [presets](#presets) and a polish pass (Phases 11–12). Next: Phase 14, emotes.**
+> **Status: 0.13.1 — Phase 13 done: [Guided Mode](#guided-mode), an optional tracker for each map's main Easter egg quest (objective, hints, the item to use outlined, steps that complete themselves), with a guide for all five maps. Off by default: the lobby's GUIDED MODE button switches it on. Not yet played through in a real match. Before that: [presets](#presets) and a polish pass (Phases 11–12). Next: Phase 14, emotes.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -92,9 +92,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.13.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui
+[IX] INFO: init 0.13.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 61 (0 changed from the default); features: 4; chat: !ix
+[IX] INFO: settings: 62 (0 changed from the default); features: 4; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -243,7 +243,7 @@ An optional companion for each map's main Easter egg quest, in the spirit of Bla
 While it is on, every player sees:
 
 - **The tracker** on the right of the screen: *MAIN QUEST 3/17*, the current objective, where it is, and a hint. A count follows the objective where the game keeps one, *(2/3)*. A long hint turns its pages every six seconds.
-- **A gold marker** on the objective, with the distance in meters, wherever the game itself knows the place. Elsewhere the hint says where to go.
+- **The item itself outlined**: the part, lever, memento or boss the step is about glows with a yellow outline, also through walls, so you can see where it is from anywhere. A spot with no item to outline gets a gold marker instead. The tracker shows how far it is in meters. Where the game itself never names the place, the hint says where to go. *Guided: outline* off brings back the marker everywhere.
 - ***Objective complete*** and ***New objective*** messages, with the game's own challenge sounds.
 
 The guide **follows the game by itself**. Each step reads what the game's quest scripts do: a flag, a notify, or a change in the world (a part's glow going out when it is taken, a mirror on its stand, a door going up). Steps the quest allows in any order are tracked one by one, so a part found early is announced as done. When the game undoes a step, the guide goes back too: a failed puzzle, a boss phase played again, N31L turning evil again. Nothing in a guide is invented: every signal and marker is one the game's own scripts use (`tools/guided/research/`, checked by `tools/tests/test_guides.py`). The guide never changes the quest.
@@ -358,6 +358,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `guided_hints` | standard | minimal, standard, detailed, full | How much the guide says; full: every step and solution, ahead too |
 | `guided_panel` | full | full, compact, hidden | The tracker: objective and hint / the objective only / none |
 | `guided_marker` | 1 | 0/1 | The marker on the objective and how far it is |
+| `guided_outline` | 1 | 0/1 | The marker outlines the item itself (also through walls); spots with no item keep the icon |
 | `guided_side` | right | right, left | Which side of the screen the tracker is on |
 | `guided_height` | 0 | -150–150 | Moves the tracker down (more) or up (less) |
 | `guided_text` | normal | small, normal, large | The tracker's text size |

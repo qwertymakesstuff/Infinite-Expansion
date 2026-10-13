@@ -27,6 +27,7 @@
 //   guided_hints    standard  minimal / standard / detailed / full
 //   guided_panel    full      full / compact (the objective only) / hidden
 //   guided_marker   1         the marker and how far it is
+//   guided_outline  1         the marker outlines the item itself (else an icon)
 //   guided_side     right     right / left
 //   guided_height   0         -150 to 150: down (more) or up (less)
 //   guided_text     normal    small / normal / large
@@ -41,6 +42,7 @@ register()
     custom_scripts\ix\core\config::add_enum( "guided_hints", "standard", "minimal standard detailed full", "Guided: hints", "How much the guide says. full: every step and solution, ahead too.", ::on_view_changed );
     custom_scripts\ix\core\config::add_enum( "guided_panel", "full", "full compact hidden", "Guided: panel", "full: objective and hint. compact: the objective only. hidden: none.", ::on_view_changed );
     custom_scripts\ix\core\config::add_bool( "guided_marker", 1, "Guided: marker", "A marker on the objective and how far it is, where the game itself knows the place.", ::on_view_changed );
+    custom_scripts\ix\core\config::add_bool( "guided_outline", 1, "Guided: outline", "The marker outlines the item itself, also through walls. Spots with no item keep the icon.", ::on_view_changed );
     custom_scripts\ix\core\config::add_enum( "guided_side", "right", "right left", "Guided: side", "Which side of the screen the tracker is on.", ::on_view_changed );
     custom_scripts\ix\core\config::add_int( "guided_height", 0, -150, 150, "Guided: height", "Moves the tracker down (more) or up (less).", ::on_view_changed );
     custom_scripts\ix\core\config::add_enum( "guided_text", "normal", "small normal large", "Guided: text size", "The tracker's text size.", ::on_view_changed );
