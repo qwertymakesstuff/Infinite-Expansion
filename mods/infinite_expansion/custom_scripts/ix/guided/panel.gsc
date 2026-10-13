@@ -305,7 +305,12 @@ update()
     {
         step = steps[index];
         show_text( hud.header, "header", header_text( index, current, steps.size ) );
-        show_text( hud.objective, "objective", step.objective );
+        objective = step.objective;
+
+        if ( index == current )
+            objective = objective + custom_scripts\ix\guided\tracker::progress_text( step );
+
+        show_text( hud.objective, "objective", objective );
         lines = hint_page( step, index, current );
         target = undefined;
 

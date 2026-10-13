@@ -129,7 +129,8 @@ new_guide( map, map_name, quest, prerequisites )
 }
 
 // detect: "flag:<name>" (done once the game sets that flag), "flags:<a>+<b>"
-// (all of them), "notify:<name>" (done once level gets that notify), "check"
+// (all of them), "notify:<name>" (done once level gets that notify),
+// "count:<name>*<n>" (after n of that notify, shown as (2/3)), "check"
 // (the step's own check function, step.check) or "manual" (players mark it).
 // marker: "struct:<targetname>", "ent:<targetname>", "structs:<targetname>" /
 // "ents:<targetname>" (the nearest of them), "locate" (the step's own

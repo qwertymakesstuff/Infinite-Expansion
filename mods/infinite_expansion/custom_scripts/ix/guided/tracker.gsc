@@ -24,6 +24,16 @@ start( guide )
     {
         if ( custom_scripts\ix\core\util::starts_with( step.detect, "notify:" ) )
             level thread watch_notify( step, getsubstr( step.detect, 7, step.detect.size ) );
+
+        // "count:<notify>*<n>": done after n of them, as a stock script
+        // counts them itself (the five power switches, three defenses).
+        if ( custom_scripts\ix\core\util::starts_with( step.detect, "count:" ) )
+        {
+            parts = strtok( getsubstr( step.detect, 6, step.detect.size ), "*" );
+            step.total = int( parts[1] );
+            step.ix_count = 0;
+            level thread watch_count( step, parts[0] );
+        }
     }
 
     level thread track( guide );
@@ -34,6 +44,34 @@ watch_notify( step, name )
     level endon( "game_ended" );
     level waittill( name );
     step.seen = 1;
+}
+
+watch_count( step, name )
+{
+    level endon( "game_ended" );
+
+    for (;;)
+    {
+        level waittill( name );
+        step.ix_count++;
+    }
+}
+
+// How far into a step the game is, as " (2/3)", or "" when the step has no
+// count (count: steps, and guide steps with a progress function and total).
+progress_text( step )
+{
+    if ( !isdefined( step.total ) )
+        return "";
+
+    done = 0;
+
+    if ( isdefined( step.ix_count ) )
+        done = step.ix_count;
+    else if ( isdefined( step.progress ) )
+        done = [[ step.progress ]]();
+
+    return " (" + int( min( done, step.total ) ) + "/" + step.total + ")";
 }
 
 // While Guided Mode is on: the furthest step the game reports.
@@ -86,6 +124,9 @@ detected( step )
 
     if ( custom_scripts\ix\core\util::starts_with( detect, "notify:" ) )
         return step.seen;
+
+    if ( custom_scripts\ix\core\util::starts_with( detect, "count:" ) )
+        return step.ix_count >= step.total;
 
     if ( detect == "check" && isdefined( step.check ) )
         return [[ step.check ]]();

@@ -26,7 +26,7 @@ STRING = r'"((?:[^"\\]|\\.)*)"'
 NEW_GUIDE = re.compile(r'new_guide\(\s*' + r',\s*'.join([STRING] * 4) + r'\s*\)')
 ADD_STEP = re.compile(r'add_step\(\s*guide,\s*' + r',\s*'.join([STRING] * 8) + r'\s*\)')
 LIMITS = {"objective": 32, "location": 40, "minimal": 70, "standard": 150, "detailed": 300}
-DETECT = re.compile(r'^(flag|flags|notify):([a-z0-9_+]+)$|^(check|manual)$')
+DETECT = re.compile(r'^(flag|flags|notify|count):([a-z0-9_+]+)(?:\*([1-9][0-9]*))?$|^(check|manual)$')
 MARKER = re.compile(r'^(struct|ent|structs|ents):([a-z0-9_]+)$|^(locate|none)$')
 
 
@@ -106,12 +106,14 @@ class Guides(unittest.TestCase):
                 match = DETECT.match(step["detect"])
                 self.assertTrue(match, f"{map_name} {step['id']}: detect {step['detect']}")
                 kind, names = match.group(1), match.group(2)
+                # A count is "count:<notify>*<n>"; only a count has "*<n>".
+                self.assertEqual(kind == "count", match.group(3) is not None, f"{map_name} {step['id']}: detect {step['detect']}")
                 if kind in ("flag", "flags"):
                     for name in names.split("+"):
                         self.assertRegex(stock, r'flag_set\(\s*"' + re.escape(name) + '"', f"{map_name} {step['id']}: the game never sets flag {name}")
-                elif kind == "notify":
+                elif kind in ("notify", "count"):
                     self.assertRegex(stock, r'level notify\(\s*"' + re.escape(names) + '"', f"{map_name} {step['id']}: the game never notifies {names}")
-                elif match.group(3) == "check":
+                elif match.group(4) == "check":
                     self.assertIn("step.check = ::", after_step(text, step["id"]), f"{map_name} {step['id']}: no check function")
 
     def test_markers_are_places_the_game_looks_up(self):
