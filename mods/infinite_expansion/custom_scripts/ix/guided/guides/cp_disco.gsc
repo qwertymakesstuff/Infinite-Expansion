@@ -231,6 +231,7 @@ guide()
 
     return guide;
 }
+
 // ---------------------------------------------------------------------------
 // Checks and markers (self = the player)
 
