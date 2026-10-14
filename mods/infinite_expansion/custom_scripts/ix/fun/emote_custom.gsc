@@ -8,8 +8,9 @@
 //     held where they stand (a tag_origin anchor and playerlinktodelta, as
 //     the menu holds them), with weapons, grenades, melee and Use off;
 //   - a script_model takes their body (the model field) and every model
-//     attached to it, with its tag (head, hair), the way the stock
-//     scripts\code\character.gsc save() and load() copy a character;
+//     attached to it (head, hair), read the way the stock
+//     scripts\code\character.gsc save() copies a character and attached
+//     the way zombies_loadout.gsc dresses a player: attach( part, "", 1 );
 //   - the animation plays on it with scriptmodelplayanim, as the stock
 //     scripts play their character animations (cp_zmb_dj.gsc on the DJ,
 //     cp_rave_boat.gsc on Kevin Smith), each one precached with
@@ -188,18 +189,17 @@ start( emote )
     standin setmodel( self.model );
     count = self getattachsize();
 
+    // Each part as the game dresses a character: with no tag, so the part
+    // follows the body's own bones (zombies_loadout.gsc setcharactermodels,
+    // cp_agent_utils.gsc set_agent_model: attach( part, "", 1 )). Attached to
+    // the tag the game reports instead, the head stayed put while the body
+    // moved, and vanished once the animation started (second in-game report).
     for ( i = 0; i < count; i++ )
     {
         model = self getattachmodelname( i );
-        tag = self getattachtagname( i );
 
-        if ( !isdefined( model ) || model == "" )
-            continue;
-
-        if ( !isdefined( tag ) )
-            tag = "";
-
-        standin attach( model, tag );
+        if ( isdefined( model ) && model != "" )
+            standin attach( model, "", 1 );
     }
 
     state.standin = standin;

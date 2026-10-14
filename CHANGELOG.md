@@ -4,6 +4,11 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.3: The custom emote keeps its head (2026-10-14)
+
+**Fixed** (third in-game report)
+- **The copy's head vanished as soon as the custom animation started.** The copy attached the head to the tag the game reported for it, so the head stayed where it was while the body moved. It is now attached the way the game dresses every character, with no tag, so it follows the body's own bones (`zombies_loadout.gsc` `setcharactermodels`).
+
 ### 0.14.2: Emotes held in place, with empty hands (2026-10-14)
 
 From the second in-game report (the custom emote played its pose on a copy of the character, so the stand-in works in the game).

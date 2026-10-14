@@ -80,12 +80,20 @@ class CustomEmotes(unittest.TestCase):
 
     def test_copies_the_character_as_the_stock_scripts_do(self):
         start = function(self.custom, "start")
-        for call in ("setmodel( self.model )", "getattachsize()", "getattachmodelname( i )", "getattachtagname( i )",
-                     "attach( model, tag )", "scriptmodelplayanim( emote.asset, 1 )"):
+        for call in ("setmodel( self.model )", "getattachsize()", "getattachmodelname( i )",
+                     'attach( model, "", 1 )', "scriptmodelplayanim( emote.asset, 1 )"):
             self.assertIn(call, start)
+        # The tag the game reports is not used: with it the head did not follow
+        # the animated body (second in-game report).
+        self.assertNotIn("getattachtagname", start)
         character = (DUMP / "code" / "character.gsc").read_text()
-        for call in ("self.model", "getattachsize()", "getattachmodelname(", "getattachtagname(", "self attach("):
+        for call in ("self.model", "getattachsize()", "getattachmodelname("):
             self.assertIn(call, character)
+        # How the game dresses a player and an agent: every part with no tag.
+        loadout = (DUMP / "cp" / "zombies" / "zombies_loadout.gsc").read_text()
+        self.assertIn('self attach( var_1, "", 1 );', function(loadout, "setcharactermodels"))
+        agents = (DUMP / "cp" / "cp_agent_utils.gsc").read_text()
+        self.assertIn('var_0 attach( var_4, "", 1 );', function(agents, "set_agent_model"))
 
     def test_built_ins_are_used_as_the_stock_scripts_use_them(self):
         uses = {
