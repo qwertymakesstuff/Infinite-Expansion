@@ -13,6 +13,7 @@ Run: python3 -m unittest discover -s tools/tests -v
 import itertools
 import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -270,6 +271,69 @@ class MenuScript(unittest.TestCase):
         self.assertEqual(self.run_harness("name_default"), ["name Rankzies1", "sets 1"])
         self.assertEqual(self.run_harness("name_custom"), ["name Custom", "sets 0"])
         self.assertEqual(self.run_harness("name_missing"), ["name Unknown Soldier", "sets 0"])
+
+
+    def emotes(self, lines, *options):
+        """(commands, count, {n: dvar}) of the custom emotes list holding these lines."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "ix_emotes.txt"
+            path.write_bytes("\r\n".join(lines).encode() + b"\r\n")
+            out = self.run_harness("emotes", f"emotes={path}", *options)
+        commands = [line[5:] for line in out if line.startswith("exec ")]
+        count = [line[6:] for line in out if line.startswith("count ")][0]
+        dvars = {int(line.split(" ")[1]): line.split(" ", 2)[2] for line in out if line.startswith("emote ")}
+        return commands, count, dvars
+
+    def test_custom_emotes_are_handed_to_the_mod(self):
+        lines = ["# Infinite Expansion custom emotes", "# id|animation|seconds|loop|category|wheel name|menu name",
+                 "u1|ix_emote_proof|5.033|0|Custom|Hoff decks|Test - Hoff at the decks",
+                 "u2|ix_emote_wave|2|1|Greetings|Wave|My wave"]
+        commands, count, dvars = self.emotes(lines)
+        self.assertEqual(commands, ["loadzone ix_emotes", "set ix_emotes_loaded 1",
+                                    "set ix_emote_1 u1|ix_emote_proof|5.033|0|Custom|Hoff_decks|Test_-_Hoff_at_the_decks",
+                                    "set ix_emote_2 u2|ix_emote_wave|2|1|Greetings|Wave|My_wave",
+                                    "set ix_emote_count 2", "set ix_emotes_zone 1"])
+        self.assertEqual(count, "2")
+        # Loaded earlier this session: not loaded again, handed over again.
+        commands, _, _ = self.emotes(lines, "emotesloaded=1")
+        self.assertEqual(commands[0], "set ix_emotes_zone 0")
+        self.assertNotIn("loadzone ix_emotes", commands)
+        self.assertEqual(commands[-1], "set ix_emotes_zone 1")
+
+    def test_custom_emote_lines_that_are_refused(self):
+        bad = [
+            "u1|ix_emote_a;quit|1|0|Custom|A|A",          # a second command
+            "u2|stock_anim|1|0|Custom|A|A",               # not one of the pack's names
+            "x3|ix_emote_c|1|0|Custom|A|A",               # not a custom id
+            "u1234567|ix_emote_d|1|0|Custom|A|A",         # id too long for the saved favorites
+            "u5|ix_emote_e|1,5|0|Custom|A|A",             # a comma for the decimal point
+            "u6|ix_emote_f|1|2|Custom|A|A",               # loop is 0 or 1
+            'u7|ix_emote_g|1|0|Custom|A "b"|A',           # quotes
+            "u8|ix_emote_h|1|0|Custom|A wheel name too long|A",
+            "u9|ix_emote_i|1|0|Custom|A|A name far too long for a menu row",
+            "u10|ix_emote_j|1|0|Custom|A|A|extra",
+            "u11|ix_emote_k|1|0|Custom|A",
+        ]
+        commands, count, dvars = self.emotes(bad)
+        self.assertEqual(commands, [])
+        self.assertEqual(dvars, {})
+        # At most 20, and good lines among bad ones still count.
+        many = [f"u{n}|ix_emote_{n}|1|0|Custom|E{n}|Emote {n}" for n in range(1, 26)]
+        _, count, dvars = self.emotes(bad[:2] + many)
+        self.assertEqual(count, "20")
+        self.assertEqual(sorted(dvars), list(range(1, 21)))
+        self.assertTrue(dvars[1].startswith("u1|ix_emote_1|"))
+
+    def test_custom_emotes_off_or_missing(self):
+        good = ["u1|ix_emote_proof|5|0|Custom|Hoff decks|Test"]
+        for options in (("custom=0",), ("emotezone=0",)):
+            commands, count, dvars = self.emotes(good, *options)
+            self.assertEqual((commands, count, dvars), ([], "nil", {}), options)
+        # Switched off after it was handed over this session: the mod no longer gets it.
+        commands, _, _ = self.emotes(good, "custom=0", "emotesloaded=1")
+        self.assertEqual(commands, ["set ix_emotes_zone 0"])
+        # Without a list, the script runs no command for the emotes at all.
+        self.assertEqual(self.run_harness("emotes"), ["count nil"])
 
 
 if __name__ == "__main__":

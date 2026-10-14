@@ -193,6 +193,79 @@ end
 
 pcall(loadPictures)
 
+-- Custom emotes, when the player built them with "Build Custom Emotes"
+-- (installer/IXEmotes.ps1): the zone iw7-mod/zone/ix_emotes.ff with the
+-- animations, and next to it the list of emotes it holds, one per line:
+--   id|animation|seconds|loop|category|wheel name|menu name
+-- The zone is loaded once per session, like the pictures, so the animations
+-- exist in this player's game whoever hosts. The list goes to the mod's GSC
+-- (custom_scripts/ix/fun/emote_custom.gsc) in dvars, read when a map loads;
+-- only the host's list is used. Values are kept to letters, digits and a few
+-- signs, with spaces written as "_", so a "set" command passes them as they
+-- are. ix_emote_custom 0 (the menu's Emote: custom emotes) turns them off.
+local emoteZone = "ix_emotes"
+local emoteList = "iw7-mod/zone/ix_emotes.txt"
+local maxEmotes = 20
+
+local function emoteText(text, longest)
+    if not text or text == "" or string.len(text) > longest or string.find(text, "[^%w %.%-]") then
+        return nil
+    end
+    return (string.gsub(text, " ", "_"))
+end
+
+local function emoteRecord(line)
+    local id, asset, seconds, loop, category, wheel, name =
+        string.match(line, "^(u[%l%d]+)|(ix_emote_[%l%d_]+)|(%d+%.?%d*)|([01])|([^|]+)|([^|]+)|([^|]+)$")
+    if not id or string.len(id) > 6 or string.len(asset) > 48 then
+        return nil
+    end
+    category = emoteText(category, 16)
+    wheel = emoteText(wheel, 14)
+    name = emoteText(name, 27)
+    if not category or not wheel or not name then
+        return nil
+    end
+    return table.concat({ id, asset, seconds, loop, category, wheel, name }, "|")
+end
+
+local function loadEmotes()
+    -- Set by an earlier visit to the menus this session; read again below.
+    local _, before = pcall(Engine.GetDvarString, "ix_emotes_zone")
+    if before == "1" then
+        Engine.Exec("set ix_emotes_zone 0")
+    end
+    local ok, setting = pcall(Engine.GetDvarString, "ix_emote_custom")
+    if ok and setting == "0" then
+        return
+    end
+    if not io.fileexists(emoteList) or not io.zoneexists(emoteZone) then
+        return
+    end
+    local records = {}
+    for line in string.gmatch(io.readfile(emoteList) or "", "[^\r\n]+") do
+        local record = emoteRecord(line)
+        if record and #records < maxEmotes then
+            records[#records + 1] = record
+        end
+    end
+    if #records == 0 then
+        return
+    end
+    local _, loaded = pcall(Engine.GetDvarString, "ix_emotes_loaded")
+    if loaded ~= "1" then
+        Engine.Exec("loadzone " .. emoteZone)
+        Engine.Exec("set ix_emotes_loaded 1")
+    end
+    for i = 1, #records do
+        Engine.Exec("set ix_emote_" .. i .. " " .. records[i])
+    end
+    Engine.Exec("set ix_emote_count " .. #records)
+    Engine.Exec("set ix_emotes_zone 1")
+end
+
+pcall(loadEmotes)
+
 -- The map the lobby has selected, as the pack names it.
 local mapKeys = { cp_zmb = "zmb", cp_rave = "rave", cp_disco = "disco", cp_town = "town", cp_final = "final" }
 

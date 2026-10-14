@@ -84,10 +84,10 @@ catalog( map )
 }
 
 // The order the browse pages list them in; a category without emotes on this
-// map is left out.
+// map is left out. Custom holds the player's own animations (emote_custom.gsc).
 categories()
 {
-    return [ "Celebration", "Poses", "Greetings", "Taunts", "Funny" ];
+    return [ "Custom", "Celebration", "Poses", "Greetings", "Taunts", "Funny" ];
 }
 
 // ---------------------------------------------------------------------------

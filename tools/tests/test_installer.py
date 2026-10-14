@@ -37,7 +37,13 @@ LAUNCHER = REPO / "Infinite Expansion Setup.cmd"
 PICTURES_CORE = INSTALLER / "IXPictures.Core.ps1"
 PICTURES = INSTALLER / "IXPictures.ps1"
 PICTURES_LAUNCHER = REPO / "Build Character Pictures.cmd"
+EMOTES_CORE = INSTALLER / "IXEmotes.Core.ps1"
+EMOTES = INSTALLER / "IXEmotes.ps1"
+EMOTES_LAUNCHER = REPO / "Build Custom Emotes.cmd"
 FAKE_ZONETOOL = Path(__file__).resolve().parent / "fake_zonetool.py"
+_FAKE_SPEC = importlib.util.spec_from_file_location("fake_zonetool", FAKE_ZONETOOL)
+FAKE = importlib.util.module_from_spec(_FAKE_SPEC)
+_FAKE_SPEC.loader.exec_module(FAKE)
 FAKE_CSC = Path(__file__).resolve().parent / "fake_csc.py"
 GAME_LAUNCHER_SOURCE = INSTALLER / "IXLauncher.cs"
 GAME_LAUNCHER_ICON = INSTALLER / "ix-launcher.ico"
@@ -1264,6 +1270,193 @@ class PicturesScript(unittest.TestCase):
             self.assertFalse((game / "fake_zonetool.log").exists())
 
 
+def install_mod(game, tmp):
+    run_pwsh("param([string]$Core, [string]$Game, [string]$Package)\n. $Core\nInstall-IX $Game $Package | Out-Null\n",
+             CORE, game, PACKAGE, workdir=tmp)
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class EmotesScript(unittest.TestCase):
+    """installer/IXEmotes.ps1 (step 1, the proof) end to end, with the stand-in for x64-zt."""
+
+    PROOF_LINE = "u1|ix_emote_proof|5.033|0|Custom|Hoff decks|Test - Hoff at the decks"
+
+    def run_emotes(self, game, config):
+        (game / "fake_zonetool.json").write_text(json.dumps(config))
+        return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(EMOTES), "-GameDir", str(game),
+                               "-ZoneTool", str(FAKE_ZONETOOL), "-NoPause"], capture_output=True, text=True, timeout=600)
+
+    def assert_no_work_left(self, game):
+        for name in ("dump", "zonetool", "zone_source", "ix-zonetool.exe", "zone/ix_emotes.ff", "ix_emotes.ff"):
+            self.assertFalse((game / name).exists(), name)
+
+    def test_builds_and_installs_the_proof(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            (game / "zone").mkdir()
+            install_mod(game, tmp)
+            result = self.run_emotes(game, {})
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            pack = json.loads((game / "iw7-mod" / "zone" / "ix_emotes.ff").read_text())
+            self.assertEqual(pack["rows"][1:], ["xanim,ix_emote_proof"])
+            [xanim] = pack["xanims"]
+            # Renamed inside too; everything after the name is the dumped animation's.
+            self.assertEqual((xanim["name"], xanim["inner"]), ("ix_emote_proof", "ix_emote_proof"))
+            original = FAKE.make_xab("IW7_cp_zom_hoff_dj_desk_01")
+            self.assertEqual(bytes.fromhex(xanim["tail"]), original[original.index(0, 144) + 1:])
+            listed = (game / "iw7-mod" / "zone" / "ix_emotes.txt").read_text().splitlines()
+            self.assertEqual(listed[2:], [self.PROOF_LINE])
+            self.assertTrue(all(line.startswith("#") for line in listed[:2]))
+            self.assert_no_work_left(game)
+            log = (game / "fake_zonetool.log").read_text()
+            self.assertEqual(log.count("args -unbuffered-io"), 3)
+            self.assertIn("'dumpcsv cp_zmb\\n'", log)
+            self.assertIn("'dumpcsv patch_cp_zmb\\n'", log)
+            self.assertIn("'dumpasset xanim IW7_cp_zom_hoff_dj_desk_01\\n'", log)
+            self.assertIn("args -buildzone ix_emotes -unbuffered-io", log)
+            self.assertIn("'dumpcsv ix_emotes\\n'", log)
+            self.assertNotIn("closed", log)
+            self.assertNotIn("EOF", log)
+            self.assertNotIn("crash", log)
+            self.assertIn("IW7_cp_zom_hoff_dj_desk_01 (cp_zmb, 5.033 s) is now ix_emote_proof", result.stdout)
+            self.assertNotIn("unchecked", result.stdout)
+            self.assertIn("Its 3 bone names", result.stdout)
+            self.assertIn("bones (3): bone_a bone_b bone_c", result.stdout)
+
+    def test_type_name_and_zone_come_from_the_listing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            install_mod(game, tmp)
+            # The game names animations otherwise, and the patch zone replaces
+            # the map zone's copy; 60 frames at 24 per second, a looping one.
+            config = {"xanim_type": "xanimparts", "xanim_frames": [60, 24.0, 1],
+                      "xanim_zones": {"cp_zmb": ["iw7_cp_zom_hoff_dj_desk_01"], "patch_cp_zmb": ["IW7_CP_ZOM_HOFF_DJ_DESK_01"]}}
+            result = self.run_emotes(game, config)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            pack = json.loads((game / "iw7-mod" / "zone" / "ix_emotes.ff").read_text())
+            self.assertEqual(pack["rows"][1:], ["xanimparts,ix_emote_proof"])
+            log = (game / "fake_zonetool.log").read_text()
+            self.assertIn("'loadzone patch_cp_zmb\\n'", log)
+            self.assertIn("'dumpasset xanimparts IW7_CP_ZOM_HOFF_DJ_DESK_01\\n'", log)
+            listed = (game / "iw7-mod" / "zone" / "ix_emotes.txt").read_text().splitlines()
+            self.assertEqual(listed[2], "u1|ix_emote_proof|2.5|0|Custom|Hoff decks|Test - Hoff at the decks")
+            # Without a zone\ folder x64-zt builds into the game folder, which is cleaned up too.
+            self.assert_no_work_left(game)
+
+    def test_animation_not_found(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            install_mod(game, tmp)
+            result = self.run_emotes(game, {"xanim_zones": {}})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("did not list the animation iw7_cp_zom_hoff_dj_desk_01 in cp_zmb or patch_cp_zmb", result.stdout)
+            self.assertFalse((game / "iw7-mod" / "zone" / "ix_emotes.ff").exists())
+            self.assertFalse((game / "iw7-mod" / "zone" / "ix_emotes.txt").exists())
+            # Never a dumpasset with a type the listing did not give.
+            self.assertNotIn("dumpasset", (game / "fake_zonetool.log").read_text())
+            self.assert_no_work_left(game)
+
+    def test_pack_that_does_not_load_is_not_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            (game / "zone").mkdir()
+            install_mod(game, tmp)
+            result = self.run_emotes(game, {"crash_on_csv": ["ix_emotes"]})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("could not load the emote pack it built, so it was not installed", result.stdout)
+            self.assertFalse((game / "iw7-mod" / "zone" / "ix_emotes.ff").exists())
+            self.assert_no_work_left(game)
+
+    def test_mod_not_installed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            result = self.run_emotes(game, {})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("Install Infinite Expansion first", result.stdout)
+            self.assertFalse((game / "fake_zonetool.log").exists())
+
+
+SCENARIO_XAB = r"""
+param([string]$Setup, [string]$Pictures, [string]$Emotes, [string]$Dir, [string]$Out)
+$ErrorActionPreference = 'Stop'
+. $Setup
+. $Pictures
+. $Emotes
+$r = [ordered]@{}
+$header = Read-IXXabHeader (Join-Path $Dir 'good.xab')
+$r.header = @($header.Name, $header.Frames, $header.Framerate, $header.Loop, $header.Seconds)
+$copy = Copy-IXXabRenamed (Join-Path $Dir 'good.xab') (Join-Path $Dir 'out') 'ix_emote_x'
+$r.copy = [IO.Path]::GetFileName($copy)
+$r.copyName = (Read-IXXabHeader $copy).Name
+$r.bones = @(Read-IXXabBones (Join-Path $Dir 'good.xab'))
+$r.copyBones = @(Read-IXXabBones $copy)
+$r.repeated = @(Read-IXXabBones (Join-Path $Dir 'repeated.xab'))
+$r.none = @(Read-IXXabBones (Join-Path $Dir 'none.xab')).Count
+$r.bad = @()
+foreach ($name in @('short.xab', 'notarray.xab', 'noname.xab')) {
+    try {
+        Read-IXXabHeader (Join-Path $Dir $name) | Out-Null
+        $r.bad += 'read'
+    }
+    catch {
+        $r.bad += $_.Exception.Message
+    }
+}
+# A PC set to German writes 5,033; the list needs 5.033 whatever the language.
+[Threading.Thread]::CurrentThread.CurrentCulture = [Globalization.CultureInfo]::GetCultureInfo('de-DE')
+$r.seconds = Format-IXSeconds 5.0333333
+$r.line = Format-IXEmoteLine ([pscustomobject]@{ Id = 'u2'; Asset = 'ix_emote_x'; Seconds = 1.5; Loop = $true; Category = 'Custom'; Wheel = 'W'; Name = 'N' })
+ConvertTo-Json -InputObject $r -Depth 4 | Set-Content -LiteralPath $Out
+"""
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class EmoteFiles(unittest.TestCase):
+    """Reading and renaming x64-zt's .xab files (IXEmotes.Core.ps1), on made-up files."""
+
+    def test_header_rename_and_bad_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            good = FAKE.make_xab("iw7_some_anim", frames=90, framerate=30.0, flags=1)
+            (Path(tmp) / "good.xab").write_bytes(good)
+            (Path(tmp) / "repeated.xab").write_bytes(FAKE.make_xab("anim", bones=["j_a", "j_b", "j_a"]))
+            (Path(tmp) / "none.xab").write_bytes(FAKE.make_xab("anim", bones=[]))
+            (Path(tmp) / "short.xab").write_bytes(good[:100])
+            (Path(tmp) / "notarray.xab").write_bytes(b"\x06" + good[1:])
+            (Path(tmp) / "noname.xab").write_bytes(good[:142] + b"\x08" + good[143:])
+            out = Path(tmp) / "out.json"
+            run_pwsh(SCENARIO_XAB, CORE, PICTURES_CORE, EMOTES_CORE, tmp, out, workdir=tmp)
+            r = json.loads(out.read_text(encoding="utf-8-sig"))
+            self.assertEqual(r["header"], ["iw7_some_anim", 90, 30.0, True, 3.0])
+            self.assertEqual((r["copy"], r["copyName"]), ("ix_emote_x.xab", "ix_emote_x"))
+            self.assertEqual(r["bones"], FAKE.FAKE_BONES)
+            self.assertEqual(r["copyBones"], FAKE.FAKE_BONES)
+            self.assertEqual(r["repeated"], ["j_a", "j_b", "j_a"])
+            self.assertEqual(r["none"], 0)
+            renamed = (Path(tmp) / "out" / "ix_emote_x.xab").read_bytes()
+            self.assertEqual(renamed[:144], good[:144])
+            self.assertEqual(renamed[renamed.index(0, 144):], good[good.index(0, 144):])
+            self.assertEqual(r["bad"], ["short.xab is not an animation as x64-zt dumps it.",
+                                        "notarray.xab is not an animation as x64-zt dumps it.",
+                                        "noname.xab has no name where x64-zt writes it."])
+            self.assertEqual(r["seconds"], "5.033")
+            self.assertEqual(r["line"], "u2|ix_emote_x|1.5|1|Custom|W|N")
+
+    def test_uninstall_removes_the_emote_pack(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            _steam, game = make_game(Path(tmp))
+            install_mod(game, tmp)
+            zone = game / "iw7-mod" / "zone"
+            zone.mkdir(parents=True, exist_ok=True)
+            (zone / "ix_emotes.ff").write_bytes(b"ff")
+            (zone / "ix_emotes.txt").write_text("u1|ix_emote_proof|1|0|Custom|A|A\n")
+            (zone / "other.ff").write_bytes(b"keep")
+            run_pwsh("param([string]$Core, [string]$Game, [string]$Package)\n. $Core\nUninstall-IX $Game $Package | Out-Null\n",
+                     CORE, game, PACKAGE, workdir=tmp)
+            self.assertFalse((zone / "ix_emotes.ff").exists())
+            self.assertFalse((zone / "ix_emotes.txt").exists())
+            self.assertTrue((zone / "other.ff").exists())
+
+
 SCENARIO_LAUNCHER_SOURCE = r"""
 param([string]$Source, [string]$Work, [string]$Out)
 $ErrorActionPreference = 'Stop'
@@ -1920,7 +2113,8 @@ def local(tag):
 
 class SetupFiles(unittest.TestCase):
     def test_scripts_are_ascii(self):
-        for path in (CORE, GUI, LINT, LAUNCHER, PICTURES_CORE, PICTURES, PICTURES_LAUNCHER, GAME_LAUNCHER_SOURCE):
+        for path in (CORE, GUI, LINT, LAUNCHER, PICTURES_CORE, PICTURES, PICTURES_LAUNCHER, EMOTES_CORE, EMOTES,
+                     EMOTES_LAUNCHER, GAME_LAUNCHER_SOURCE):
             data = path.read_bytes()
             self.assertTrue(all(b < 128 for b in data), f"{path.name} has non-ASCII bytes")
 
@@ -1951,7 +2145,8 @@ class SetupFiles(unittest.TestCase):
                          "run python3 tools/make_launcher_icon.py")
 
     def test_launcher_uses_crlf(self):
-        for path, script in ((LAUNCHER, b"installer\\IXSetup.ps1"), (PICTURES_LAUNCHER, b"installer\\IXPictures.ps1")):
+        for path, script in ((LAUNCHER, b"installer\\IXSetup.ps1"), (PICTURES_LAUNCHER, b"installer\\IXPictures.ps1"),
+                             (EMOTES_LAUNCHER, b"installer\\IXEmotes.ps1")):
             data = path.read_bytes()
             self.assertEqual(data.count(b"\n"), data.count(b"\r\n"), f"{path.name}: cmd.exe needs CRLF line endings")
             self.assertIn(script, data)
@@ -1959,7 +2154,7 @@ class SetupFiles(unittest.TestCase):
     @unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
     def test_powershell_51_compatible(self):
         result = subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(LINT), str(CORE), str(GUI),
-                                 str(PICTURES_CORE), str(PICTURES)],
+                                 str(PICTURES_CORE), str(PICTURES), str(EMOTES_CORE), str(EMOTES)],
                                 capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "")

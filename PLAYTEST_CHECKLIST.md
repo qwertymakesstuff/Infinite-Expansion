@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 65 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 66 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*
@@ -120,12 +120,24 @@ Open the menu's **Emotes** page. Note the map and the emote's id (`!ix emote` li
 - [ ] **EM4** Get hit during an emote: it ends at once, and you can aim and knife again. Try one while sprinting or next to a zombie: a line says why not. *(R-E5)*
 - [ ] **EM5** Chat `!ix emote random`: one plays. *(R-E6)*
 
+## 12b. Custom emotes, step 1 (experimental, new)
+
+First, with the game closed, double-click **`Build Custom Emotes.cmd`** in the mod's folder. It takes a few minutes (x64-zt loads Spaceland's zone twice). Keep `%TEMP%\InfiniteExpansionEmotes.log` whatever happens: it also holds the animation's bone names, which step 2 needs.
+
+- [ ] **CE1** The window ends with "Done." and "… is now ix_emote_proof in …\iw7-mod\zone\ix_emotes.ff". If it fails, send the log (and any `minidumps\zonetool-crash-*.zip`); nothing is installed then. *(R-E7)*
+- [ ] **CE2** Start the game, Solo Match on any map. Console: `[IX] INFO: emotes: 1 custom from ix_emotes`. `listassetpool 6 ix_*` in the console lists `ix_emote_proof`. *(R-E7)*
+- [ ] **CE3** *Emotes* → *Browse emotes* → *Custom* → *Test - Hoff at the decks* → *Play*: you disappear, a copy of your character works the DJ decks in your place, the camera is behind you; after about 5 seconds the copy is gone and you are back, with your weapon. Try it as two different characters. *(R-E8)*
+- [ ] **CE4** Play it again and walk (or press Melee or Use) after a second: it stops at once. Play it and let a zombie hit you: it stops. Nothing stays behind: no copy, no invisible you, no stuck weapon. *(R-E8)*
+- [ ] **CE5** *Emote settings* → *Emote: custom emotes* off: *Play* says "Custom emotes are off". At the next map the console no longer says `1 custom`. *(R-E9)*
+
 ## 13. Co-op (when a friend can join)
 
 - [ ] **C1** The friend joins (both with the mod installed by the setup); the host's settings apply to both; the friend's menu rows are grey ("Only the host can change it."). *(R-S2, R-C4)*
 - [ ] **C2** *Zombie outlines* and the HUD work for the friend too; *Restart the match* restarts it for both. *(R-Q3, R-Q4)*
 - [ ] **C3** Guided Mode on: both see the same objective, and a step one of you completes closes for both. *(R-G5)*
 - [ ] **C4** Play an emote while the friend watches: note whether they see your character move. *(R-E3)*
+- [ ] **C5** Custom emote, friend **with** the pack (they ran `Build Custom Emotes.cmd` too): you play *Test - Hoff at the decks*; they should see the copy work the decks and you vanish; then they play it and you watch. *(R-E7)*
+- [ ] **C6** Custom emote, friend **without** the pack (they delete or rename their `iw7-mod\zone\ix_emotes.ff` and restart): can they join your match at all? What do they see when you play it? Copy both consoles' lines around that moment. *(R-E7)*
 
 ## 14. Clean-up
 

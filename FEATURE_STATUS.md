@@ -266,6 +266,22 @@ The scope is in `ROADMAP.md`. AAE's emotes were studied first (`IW_API_NOTES.md`
 | `!ix emote [name / random / list]` | Fun | 14 | TESTING | R-E6 |
 | Visible to other players | Fun | 14 | NEEDS TESTING | L66, R-E3 |
 
+### Custom emotes (after Phase 14, in progress: step 1 of 4)
+
+Your own full-body animations, played on a copy of your character (`IW_API_NOTES.md` §24). The plan's four steps are in `ROADMAP.md`.
+
+| Feature | Category | Phase | Status | Notes |
+|---------|----------|-------|--------|-------|
+| Stand-in body: player hidden and held, a copy with their body and attachments plays the animation, camera behind, everything back on every way out | Fun | 14+ | TESTING | `ix/fun/emote_custom.gsc`; `tools/tests/test_custom_emotes.py`. R-E8 |
+| Custom category on the emote pages, favorites, `!ix emote u1` | Fun | 14+ | TESTING | Appended to the map's emotes; ids `u1`…; R-E8 |
+| Setting to switch them off | Fun | 14+ | TESTING | `emote_custom` (on), from the next map; at the next game start the pack is not loaded. R-E9 |
+| Step 1: proof pack from a game animation (`Build Custom Emotes.cmd`) | Tooling | 14+ | NEEDS TESTING | `installer/IXEmotes.Core.ps1`: x64-zt lists `cp_zmb` / `patch_cp_zmb`, dumps `IW7_cp_zom_hoff_dj_desk_01`, renames it `ix_emote_proof`, builds and re-lists `ix_emotes`; logs the bone names. L69, R-E7 |
+| Menu script loads the pack and hands the list to the GSC | UI | 14+ | TESTING | `ui_scripts/InfiniteExpansion/__init__.lua` `loadEmotes()`; `tools/tests/test_menu_script.py` |
+| Seen by other players; a guest without the pack | Fun | 14+ | NEEDS TESTING | L67, R-E7 |
+| Step 2: converter (SEAnim, Cast, then glTF/GLB) through one intermediate, `.xab` reader and writer proven by byte-for-byte round trips | Tooling | 14+ | PLANNED | `ROADMAP.md` |
+| Step 3: *Build Custom Emotes* in the setup, a manifest, host-side checks | Tooling | 14+ | PLANNED | `ROADMAP.md` |
+| Step 4: docs, tests, version, release | — | 14+ | PLANNED | |
+
 ## Fun features (Phases 15–21, not started)
 
 The full scope is in `ROADMAP.md`. Nothing here is started; each feature is verified against the game first, and dropped or marked BLOCKED if the game cannot support it.

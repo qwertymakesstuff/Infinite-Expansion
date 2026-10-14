@@ -21,6 +21,8 @@
 --               and returns (restore_focus), then players2=<n> are in it
 --   mainmenu    the zombies main menu's button list (iw7-mod's replacement)
 --   name_default / name_custom / name_missing   the Steam name file
+--   emotes      the custom emotes list: prints the commands the script runs
+--               and the ix_emote_* dvars it leaves
 -- Shared options:
 --   character=<key>   the saved ix_character
 --   keys=a,b          soul keys the player has (soul_key_1 ...)
@@ -32,6 +34,12 @@
 --   map=<name>        ui_mapname, the map the lobby has selected
 --   pictures=0        ix_pictures 0
 --   loaded=1          the pack was loaded earlier this session (ix_pictures_loaded)
+--   emotes=<file>     the custom emotes list (iw7-mod/zone/ix_emotes.txt) is
+--                     this file of the test's
+--   emotezone=0       ... but iw7-mod/zone/ix_emotes.ff is missing
+--   custom=0          ix_emote_custom 0
+--   emotesloaded=1    the emote pack was loaded earlier this session, and
+--                     handed to the mod (ix_emotes_loaded, ix_emotes_zone)
 --
 -- The stock lobby stand-ins follow the game's ui/frontend/cp/cpprivatematchbuttons.lua
 -- and cpprivatematchmenu.lua (IW_API_NOTES.md section 16): element names,
@@ -242,7 +250,8 @@ end
 function WipeGlobalModelsAtPath() end
 
 local dvars = { name = "Unknown Soldier", ix_character = options.character, ix_character_specials = options.specials,
-    ui_mapname = options.map, ix_pictures = options.pictures, ix_pictures_loaded = options.loaded }
+    ui_mapname = options.map, ix_pictures = options.pictures, ix_pictures_loaded = options.loaded,
+    ix_emote_custom = options.custom, ix_emotes_loaded = options.emotesloaded, ix_emotes_zone = options.emotesloaded }
 local stats = { characterSelect = 0, keys = set(options.keys), merits = set(options.merits) }
 local execs, nameSets = {}, 0
 
@@ -291,18 +300,31 @@ Engine = {
 local nameFile = nil
 local nameFilePath = "iw7-mod/ui_scripts/InfiniteExpansion/steam-name.txt"
 local pictureListPath = "iw7-mod/zone/ix_portraits.txt"
+local emoteListPath = "iw7-mod/zone/ix_emotes.txt"
 io.fileexists = function(path)
     if path == pictureListPath then
         return options.pack ~= nil
     end
+    if path == emoteListPath then
+        return options.emotes ~= nil
+    end
     return nameFile ~= nil and path == nameFilePath
 end
 io.zoneexists = function(name)
+    if name == "ix_emotes" then
+        return options.emotes ~= nil and options.emotezone ~= "0"
+    end
     return options.pack ~= nil and options.zone ~= "0" and name == "ix_portraits"
 end
 io.readfile = function(path)
     if path == pictureListPath then
         return (string.gsub(options.pack or "", ",", "\r\n")) .. "\r\n"
+    end
+    if path == emoteListPath then
+        local handle = assert(io.open(options.emotes, "rb"))
+        local text = handle:read("*a")
+        handle:close()
+        return text
     end
     assert(path == nameFilePath, "unexpected file " .. tostring(path))
     return nameFile
@@ -587,6 +609,17 @@ elseif scenario == "menu" then
         execs, requests = {}, {}
         row.buttonOnClickFunction(button, {})
         print(string.format("click %d exec=%s requests=%s", index, table.concat(execs, ";"), table.concat(requests, ",")))
+    end
+elseif scenario == "emotes" then
+    dofile(script)
+    for _, command in ipairs(execs) do
+        print("exec " .. command)
+    end
+    print("count " .. tostring(dvars.ix_emote_count))
+    for i = 1, 25 do
+        if dvars["ix_emote_" .. i] then
+            print("emote " .. i .. " " .. dvars["ix_emote_" .. i])
+        end
     end
 elseif scenario == "mainmenu" then
     dofile(script)

@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: 0.14.0 — Phase 14 done: [Emotes](#emotes), your character's own animations of each map (their Pack-a-Punch celebration, their entrance, their card trick, the map's hand gestures) on an emote wheel in the menu, with browsing, favorites, a random pick and a preview from behind. Before that: [Guided Mode](#guided-mode) (Phase 13), an optional tracker for each map's main Easter egg quest. Neither is played through in a real match yet. Next: Phase 15, fun toys.**
+> **Status: 0.14.0 — Phase 14 done: [Emotes](#emotes), your character's own animations of each map (their Pack-a-Punch celebration, their entrance, their card trick, the map's hand gestures) on an emote wheel in the menu, with browsing, favorites, a random pick and a preview from behind. Before that: [Guided Mode](#guided-mode) (Phase 13), an optional tracker for each map's main Easter egg quest. Neither is played through in a real match yet. In progress: [custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own animations, played on a copy of your character (step 1 of 4: a proof with one of the game's own animations). Then Phase 15, fun toys.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -94,7 +94,7 @@ Start a zombies match and open the console (`~`). It should show:
 ```text
 [IX] INFO: init 0.14.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 65 (0 changed from the default); features: 5; chat: !ix
+[IX] INFO: settings: 66 (0 changed from the default); features: 5; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -292,10 +292,10 @@ Every character of the map is there, not only yours: in Zombies in Spaceland you
 | Row | Does |
 |-----|------|
 | **Emote wheel** | Seven emotes in a ring, *Back* at the bottom. Push the stick (or W / A / S / D) toward one, Use or Jump plays it. Until you pick favorites, it shows the map's first seven |
-| **Browse emotes** | The emotes by category (Celebration, Poses, Greetings, Taunts, Funny); each has *Play*, *Favorite* and *Preview* |
+| **Browse emotes** | The emotes by category (Custom, Celebration, Poses, Greetings, Taunts, Funny); each has *Play*, *Favorite* and *Preview*. *Custom* appears only with a custom emote pack ([below](#custom-emotes-experimental-step-1-a-proof)) |
 | **Favorites** | Your seven favorites, the wheel's; *Clear favorites* |
 | **Random emote** | One of the map's emotes, picked at random |
-| **Emote settings** | Emotes on or off, the camera, whether damage ends one |
+| **Emote settings** | Emotes on or off, the camera, whether damage ends one, custom emotes on or off |
 | **Preview** | The last emote again, with the camera behind you |
 
 The menu closes as an emote starts. A whole-body emote turns the camera behind you so you can see your character (*Emote: camera*: auto, first, third); a hand gesture stays in first person. The camera comes back when it ends. In chat: `!ix emote` lists the map's emotes, `!ix emote <name>` plays one (`!ix emote pap1`, `!ix emote bang`), `!ix emote random`.
@@ -303,6 +303,18 @@ The menu closes as an emote starts. A whole-body emote turns the camera behind y
 An emote never holds you: you can walk, and it ends at once if you are hit (*Emote: stop when hit*), go down or die. It does not start in the air, while sprinting, reloading, throwing, climbing or wall running, on a ride or an arcade game, during another gesture, with a weapon the game plays no gestures over, or with a zombie within about three meters. While it plays you cannot aim or knife.
 
 The host's favorites are saved, as settings are, and kept per character across maps (the third character's Pack-a-Punch is `pap3` everywhere). A guest's last for the match (L65). Others in the match see your character's body play it as they do at Pack-a-Punch; this is not yet seen in a real match (L66).
+
+### Custom emotes (experimental, step 1: a proof)
+
+Full-body emotes from animations you make yourself, which you see from behind and other players see too. Infinite Warfare moves a player's body with an animation state machine that no script can drive, so a custom emote is played on a **copy of your character**: you are hidden and held where you stand, a model with your body and head takes your place and plays the animation, and the camera goes behind you. Everything comes back when it ends: at the end of the animation, when you move or press Melee or Use, when a zombie comes within about three meters, when you are hit (*Emote: stop when hit*), go down or die, or when the match ends. It starts only where other emotes start (on the ground, nothing else going on, no zombie close). While it plays you cannot shoot, throw, knife or use anything.
+
+The animations are in a small zone, `iw7-mod\zone\ix_emotes.ff`, that **`Build Custom Emotes.cmd`** makes on your PC (with the game closed; it downloads x64-zt as the picture pack does, and removes it and its work files afterwards). The menu script loads it when the game starts, and the emotes appear under *Browse emotes* → *Custom*; they can be favorites and go on the wheel. `!ix emote` lists them too (ids `u1`, `u2` …).
+
+**Step 1 (now)** is a proof that uses none of your own art: the builder copies one of the game's own animations, The Hoff working his DJ decks in Zombies in Spaceland, under a new name (`ix_emote_proof`), and *Custom* has one row, *Test - Hoff at the decks*. It also writes the animation's bone names into its log (`%TEMP%\InfiniteExpansionEmotes.log`): the skeleton your own animations will use. Converting your own animations (SEAnim, Cast, glTF) is step 2; the setup button, the manifest and the host-side checks are step 3 (`ROADMAP.md`).
+
+**Every player needs the same pack.** The animation must exist in each player's own game. What a player without the pack sees, or whether they can still join, is not known yet (`KNOWN_LIMITATIONS.md` L67): please test it.
+
+*Emote: custom emotes* (`emote_custom`, on) switches them off. It applies from the next map, because the animations are announced to the game while a map loads; after a restart of the game the pack is not even loaded. UNINSTALL removes the pack.
 
 ## Settings and chat commands
 
@@ -397,6 +409,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `emotes` | 1 | 0/1 | [Emotes](#emotes): your character's animations of this map, from the menu or `!ix emote` |
 | `emote_camera` | auto | auto, first, third | Where the camera is during an emote; auto: behind you for whole-body emotes |
 | `emote_cancel_damage` | 1 | 0/1 | Taking damage ends an emote at once |
+| `emote_custom` | 1 | 0/1 | [Custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own pack; applies from the next map |
 | `game_speed` | 100 | 25–200 | Percent of the speed of the whole match |
 | `zombie_outlines` | 0 | 0/1 | Zombies outlined through walls, for everyone |
 | `dev_tools` | 0 | 0/1 | Unlocks the Debug page's developer tools |
@@ -466,7 +479,7 @@ This is the newest and least tested part of the mod: `TESTING.md` R-PK1 to R-PK5
 | `TESTING.md` | Verification levels, verification log, runtime test checklist |
 | `CHANGELOG.md` | History |
 | `tools/README.md` | Offline toolchain: both iw7-mod compilers, `ixcc`, `check.py` and its tests, the Guided Mode guide generator (`tools/guided/`) |
-| `installer/` | The Windows setup: `IXSetup.ps1` (window), `IXSetup.Core.ps1` (install logic), `IXSetup.xaml` (layout and artwork); the launcher's source, `IXLauncher.cs`; the picture pack: `IXPictures.ps1` and `IXPictures.Core.ps1` |
+| `installer/` | The Windows setup: `IXSetup.ps1` (window), `IXSetup.Core.ps1` (install logic), `IXSetup.xaml` (layout and artwork); the launcher's source, `IXLauncher.cs`; the picture pack: `IXPictures.ps1` and `IXPictures.Core.ps1`; custom emotes: `IXEmotes.ps1` and `IXEmotes.Core.ps1` |
 
 ## Roadmap
 

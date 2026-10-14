@@ -75,6 +75,18 @@ The Guided Mode guides (`mods/infinite_expansion/custom_scripts/ix/guided/guides
 - a hand gesture must be one the map's own scripts play;
 - ids must be unique and short enough that seven saved favorites fit what `persist.gsc` saves; names must fit the wheel and the menu's rows, and help its four lines.
 
+## Custom emotes
+
+`tools/tests/test_custom_emotes.py` reads `ix/fun/emote_custom.gsc`, the menu script and `installer/IXEmotes.Core.ps1` (custom emotes, step 1):
+
+- the animations are precached in `register()`, which runs while the level loads and never waits or threads;
+- `start()` never waits, and `stop()` undoes each thing it does (the four stock counters, `playerhide`, the link, the anchor and the copy, also deleted by the level when the player leaves); `restore` and the end of the match reach `stop()`;
+- the copy is made as the stock `scripts\code\character.gsc` copies a character, and the built-ins are used as the stock scripts use them (`playerhide` / `playershow`, `precachempanim`, `scriptmodelplayanim( name, 1 )`);
+- the GSC's limits match the menu script's (ids of at most six letters, names of 14 and 27, 20 emotes), and names and help fit the menu;
+- the proof's names pass those rules, and its animation is one the stock scripts precache and play on a character model.
+
+`test_installer.py` runs the proof build (`EmotesScript`, `EmoteFiles`) against `fake_zonetool.py`, which also answers `dumpcsv` (a zone's assets with the game's type names), `dumpasset <type> <name>` for an animation (a made-up `.xab` in x64-zt's layout from `make_xab`; an unknown type name crashes it, as `type_to_int` would give -1) and build rows of animations; `fake_zonetool.json` can rename the animation type (`xanim_type`), move or remove the animation (`xanim_zones`), change its frames (`xanim_frames`) or make the new zone fail to load (`crash_on_csv`). `test_menu_script.py` covers the menu script's list loading (scenario `emotes` of `menu_harness.lua`).
+
 ## Launcher icon
 
 ```bash

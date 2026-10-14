@@ -34,6 +34,9 @@ $IXPlayerNameFile = 'ui_scripts/InfiniteExpansion/steam-name.txt'
 # Character pictures for the CHARACTER menu, a zone built on the player's PC
 # (IXPictures.Core.ps1) and kept where iw7-mod finds custom zones.
 $IXPictureZone = 'ix_portraits'
+# Custom emotes, a zone of animations built on the player's PC
+# (IXEmotes.Core.ps1), kept in the same place.
+$IXEmoteZone = 'ix_emotes'
 # The launcher in the game folder, compiled on the player's PC from the
 # installer folder's IXLauncher.cs, with ix-launcher.ico built in.
 $IXLauncherName = 'Infinite Expansion.exe'
@@ -553,9 +556,34 @@ function Remove-IXPicturePack {
     return $found
 }
 
+function Get-IXEmotePackPath {
+    param([string]$GameDir)
+    return Join-IXPath (Get-IXTarget $GameDir) @('zone', ($IXEmoteZone + '.ff'))
+}
+
+# The list of emotes in the zone, which the menu script reads.
+function Get-IXEmoteListPath {
+    param([string]$GameDir)
+    return Join-IXPath (Get-IXTarget $GameDir) @('zone', ($IXEmoteZone + '.txt'))
+}
+
+# Deletes the custom emotes zone and its list, if built. $true if the zone was there.
+function Remove-IXEmotePack {
+    param([string]$GameDir)
+    $path = Get-IXEmotePackPath $GameDir
+    $found = [IO.File]::Exists($path)
+    foreach ($file in @($path, (Get-IXEmoteListPath $GameDir))) {
+        if ([IO.File]::Exists($file)) {
+            [IO.File]::Delete($file)
+            Remove-IXEmptyParents (Get-IXTarget $GameDir) $file
+        }
+    }
+    return $found
+}
+
 # Removes the recorded files (or, without a record, the package's own file list),
-# the record, the character pictures zone, the Mods-menu copy, and the launcher
-# with its desktop shortcut.
+# the record, the character pictures and custom emotes zones, the Mods-menu
+# copy, and the launcher with its desktop shortcut.
 function Uninstall-IX {
     param([string]$GameDir, [string]$PackageRoot)
     $target = Get-IXTarget $GameDir
@@ -574,6 +602,9 @@ function Uninstall-IX {
         [IO.File]::Delete($record)
     }
     if (Remove-IXPicturePack $GameDir) {
+        $removed++
+    }
+    if (Remove-IXEmotePack $GameDir) {
         $removed++
     }
     $old = Remove-IXOldCopy $GameDir $files

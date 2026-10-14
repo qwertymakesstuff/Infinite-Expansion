@@ -11,6 +11,9 @@
 //            (an off-hand "throw": first person, and the body for others)
 //   gesture  playgestureviewmodel with the body event the stock
 //            gesture_activate plays with it ("power_active_cp", "gesture008")
+//   custom   the player's own animation from Build Custom Emotes, on a copy
+//            of their character while they are hidden and held in place
+//            (emote_custom.gsc), in the Custom category
 // While it plays, aiming and melee are off through the stock counters, so the
 // game's own changes to them stand (and grenades, for a hand gesture, as
 // gesture_activate does). The camera may go behind the player for
@@ -32,6 +35,7 @@
 //   emotes               1     feature: emotes on
 //   emote_camera         auto  auto: behind you for whole-body emotes; first; third
 //   emote_cancel_damage  1     damage ends an emote
+//   emote_custom         1     custom emotes (emote_custom.gsc)
 
 register()
 {
@@ -43,6 +47,7 @@ register()
     level.ix.emotes = spawnstruct();
     level.ix.emotes.list = [];
     level.ix.emotes.by_id = [];
+    custom_scripts\ix\fun\emote_custom::register();
 
     custom_scripts\ix\core\events::subscribe( "player_connect", ::on_connect );
     custom_scripts\ix\core\events::subscribe( "player_laststand", ::on_down );
@@ -59,6 +64,9 @@ load_when_ready()
         level waittill( "ix_ready" );
 
     level.ix.emotes.list = custom_scripts\ix\fun\emote_data::catalog( level.ix.map );
+
+    foreach ( emote in custom_scripts\ix\fun\emote_custom::list() )
+        level.ix.emotes.list[level.ix.emotes.list.size] = emote;
 
     foreach ( emote in level.ix.emotes.list )
         level.ix.emotes.by_id[emote.id] = emote;
@@ -173,6 +181,9 @@ cannot_play( emote )
     if ( emote.kind == "offhand" && !scripts\cp\utility::cangiveandfireoffhand( self getcurrentweapon() ) )
         return "Not with this weapon in hand.";
 
+    if ( emote.kind == "custom" )
+        return self custom_scripts\ix\fun\emote_custom::cannot_play();
+
     return "";
 }
 
@@ -212,6 +223,17 @@ run( emote, preview )
 
     if ( state.camera )
         self custom_scripts\ix\core\compat::third_person( 1 );
+
+    // The stand-in: emote_custom.gsc holds the player and does the rest.
+    if ( emote.kind == "custom" )
+    {
+        self thread custom_scripts\ix\fun\emote_custom::end_on_game_end();
+        custom_scripts\ix\core\log::debug( "emotes: " + self.name + " plays " + emote.id );
+        self custom_scripts\ix\fun\emote_custom::start( emote );
+        self custom_scripts\ix\fun\emote_custom::play_until_done( emote );
+        self notify( "ix_emote_end" );
+        return;
+    }
 
     self scripts\engine\utility::allow_ads( 0 );
     self scripts\engine\utility::allow_melee( 0 );
@@ -264,6 +286,9 @@ restore( emote )
     if ( emote.kind == "gesture" && self isgestureplaying( emote.asset ) )
         self stopgestureviewmodel( emote.asset, 0.2 );
 
+    if ( emote.kind == "custom" )
+        self custom_scripts\ix\fun\emote_custom::stop();
+
     if ( state.locked )
     {
         self scripts\engine\utility::allow_ads( 1 );
@@ -308,7 +333,8 @@ duration( emote )
 // behind the player.
 wants_third_person( emote, preview )
 {
-    if ( preview )
+    // A custom emote is only seen on the copy of the character.
+    if ( preview || emote.kind == "custom" )
         return 1;
 
     switch ( custom_scripts\ix\core\config::get( "emote_camera" ) )

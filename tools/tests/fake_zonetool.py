@@ -16,10 +16,26 @@ Like the real one on a real install:
   - "dumpasset image" crashes, as it did on every map on a player's PC: an
     image's pixels are freed once its zone has loaded.
 
+For the custom emotes (installer/IXEmotes.Core.ps1), as x64-zt's source has it
+(IW_API_NOTES.md section 24):
+  - "dumpcsv <zone>" loads the zone and lists its assets, "<type>,<name>", in
+    dump/<zone>/<zone>.csv, with the game's own type names; a zone's
+    animations are ZONE_XANIMS;
+  - "dumpasset <type> <name>" of a loaded animation writes
+    dump/assets/xanim/<name>.xab in x64-zt's format (make_xab: made-up
+    numbers, no game data); an unknown type name crashes it (type_to_int
+    gives -1);
+  - a build row "<type>,<name>" of that type reads zonetool/<zone>/xanim/<name>.xab;
+    the zone it builds can be listed with dumpcsv again.
+
 fake_zonetool.json in the game folder sets what it does:
     missing        images the "game" does not have
     missing_zones  zones that are not installed ("could not be found")
     crash_on       zones whose dumpzone makes it exit with code 3
+    xanim_type     the game's name for animations (default "xanim")
+    xanim_zones    {zone: [animation, ...]} in place of ZONE_XANIMS
+    xanim_frames   [frames, framerate, flags] of every dumped animation
+    crash_on_csv   zones whose dumpcsv makes it exit with code 7
     hang           true: print the ready line, then never answer again
 Every command it receives is appended to fake_zonetool.log, as Python repr,
 after a "pid <n>" line, so a test can tell whether it was ended.
@@ -54,6 +70,42 @@ ZONE_IMAGES = {
 }
 
 
+# Where the custom emotes' proof looks for its animation; made up for the test.
+ZONE_XANIMS = {"cp_zmb": ["IW7_cp_zom_hoff_dj_desk_01", "iw7_cp_zom_hoff_dj_idle_01"], "patch_cp_zmb": []}
+
+
+# Made-up bone names for the stand-in's animations (not read from any game file).
+FAKE_BONES = ["bone_a", "bone_b", "bone_c"]
+
+
+def make_xab(name, frames=151, framerate=30.0, flags=0, bones=None):
+    """An animation file laid out as x64-zt's xanim_parts::dump writes one:
+    XAnimParts (0x88 bytes) as an array of one, the name as a string, the bone
+    names as strings (a repeated one as a reference back, DUMP_TYPE_OFFSET),
+    then the rest (here a made-up raw block). The numbers are not a real
+    animation."""
+    import struct
+    bones = FAKE_BONES if bones is None else bones
+    parts = bytearray(0x88)
+    if bones:
+        struct.pack_into("<Q", parts, 8, 0x1234)
+    struct.pack_into("<f", parts, 100, framerate)
+    struct.pack_into("<H", parts, 116, frames)
+    parts[118] = flags
+    parts[128] = len(bones)
+    data = bytes([8, 1]) + struct.pack("<I", 1) + bytes(parts)
+    data += bytes([6, 1]) + name.encode() + b"\0"
+    entries = [None, name]
+    for bone in bones:
+        if bone in entries:
+            data += bytes([9]) + struct.pack("<II", entries.index(bone), 0)
+        else:
+            entries.append(bone)
+            data += bytes([6, 1]) + bone.encode() + b"\0"
+    rest = b"made-up animation data"
+    return data + bytes([10, 1]) + struct.pack("<I", len(rest)) + rest
+
+
 def say(text):
     sys.stdout.write(text + "\n")
     sys.stdout.flush()
@@ -71,7 +123,25 @@ def write(path, data):
 
 
 def zone_exists(zone, config):
+    if zone == "ix_emotes":
+        return os.path.isfile("zone/ix_emotes.ff") or os.path.isfile("ix_emotes.ff")
     return zone in ZONE_IMAGES and zone not in config.get("missing_zones", [])
+
+
+def zone_xanims(zone, config):
+    return config.get("xanim_zones", ZONE_XANIMS).get(zone, [])
+
+
+def dump_csv(zone, config):
+    """dumpcsv: the zone's assets as "<type>,<name>" lines."""
+    kind = config.get("xanim_type", "xanim")
+    if zone == "ix_emotes":
+        path = "zone/ix_emotes.ff" if os.path.isfile("zone/ix_emotes.ff") else "ix_emotes.ff"
+        rows = [f"{kind},{x['name']}" for x in json.load(open(path, encoding="utf-8")).get("xanims", [])]
+    else:
+        rows = [f"image,{name}" for name in ZONE_IMAGES[zone]] + [f"{kind},{name}" for name in zone_xanims(zone, config)]
+    write(f"dump/{zone}/{zone}.csv", "".join(row + "\n" for row in rows).encode())
+    say(f'Csv "{zone}" dumped...')
 
 
 def dump_material(name):
@@ -142,6 +212,29 @@ def console(config):
         elif words[:2] == ["dumpasset", "image"]:
             log("dumpasset image: crash")
             return 5
+        elif words[0] == "dumpcsv":
+            zone = words[1]
+            if zone in config.get("crash_on_csv", []):
+                return 7
+            if not zone_exists(zone, config):
+                say(f'Zone "{zone}" could not be found!')
+            elif zone in loaded:
+                say(f'zone "{zone}" is already loaded...')
+            else:
+                dump_csv(zone, config)
+                loaded.add(zone)
+        elif words[0] == "dumpasset" and words[1] not in ("material", "image"):
+            if words[1] != config.get("xanim_type", "xanim"):
+                log("dumpasset with an unknown type: crash")
+                return 6
+            names = {n.lower(): n for zone in loaded for n in zone_xanims(zone, config)}
+            name = names.get(words[2].lower())
+            if name is None:
+                say("Asset not found")
+            else:
+                frames, framerate, flags = config.get("xanim_frames", [151, 30.0, 0])
+                write(f"dump/assets/xanim/{name}.xab", make_xab(name, frames, framerate, flags))
+                say("Dumped to dump/assets")
         elif words[0] == "dumpzone" and words[1:2] == ["iw7"] and words[3:] == ["image"]:
             zone = words[2]
             if zone in config.get("crash_on", []):
@@ -158,8 +251,24 @@ def console(config):
 def build(zone):
     rows = [line for line in open(f"zone_source/{zone}.csv", encoding="utf-8").read().splitlines() if line]
     source = f"zonetool/{zone}"
+    config = json.load(open(CONFIG, encoding="utf-8")) if os.path.isfile(CONFIG) else {}
+    kind = config.get("xanim_type", "xanim")
     materials = []
+    xanims = []
     for row in rows:
+        if row.startswith(kind + ","):
+            name = row.split(",", 1)[1]
+            path = f"{source}/xanim/{name}.xab"
+            if not os.path.isfile(path):
+                say(f"missing {path}")
+                return 2
+            data = open(path, "rb").read()
+            if data[:6] != bytes([8, 1, 1, 0, 0, 0]) or data[142:144] != bytes([6, 1]):
+                say(f"{path} is not an animation")
+                return 2
+            inner = data[144:data.index(0, 144)].decode()
+            xanims.append({"name": name, "inner": inner, "size": len(data), "tail": data[data.index(0, 144) + 1:].hex()})
+            continue
         if not row.startswith("material,"):
             continue
         name = row.split(",", 1)[1]
@@ -173,7 +282,7 @@ def build(zone):
                 return 2
         materials.append({"name": name, "image": open(f"{source}/images/{name}.iw7Image", "rb").read().decode()})
     target = f"zone/{zone}.ff" if os.path.isdir("zone") else f"{zone}.ff"
-    write(target, json.dumps({"rows": rows, "materials": materials}).encode())
+    write(target, json.dumps({"rows": rows, "materials": materials, "xanims": xanims}).encode())
     say(f'Building fastfile "{zone}"')
     return 0
 

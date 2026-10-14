@@ -4,6 +4,16 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+Custom emotes, step 1 of 4 (on the branch, not released yet):
+
+**Added**
+- **Custom emotes on a copy of your character.** Infinite Warfare's player body cannot be given new animations by a script, so a custom emote hides you, holds you in place and plays the animation on a model with your body and head, with the camera behind you; everything comes back when it ends (the end of the animation, moving, Melee or Use, a zombie close by, a hit, going down or dying, the end of the match). They appear in a new **Custom** category of *Browse emotes*, can be favorites and are listed by `!ix emote`.
+- **`Build Custom Emotes.cmd`**: builds `iw7-mod\zone\ix_emotes.ff` on your PC with x64-zt. Step 1 is a proof with none of your own art: it copies one of the game's own animations (The Hoff at his DJ decks, Zombies in Spaceland) under a new name, lists the built zone again before installing it, and writes the animation's bone names to its log. The menu script loads the pack when the game starts.
+- New setting **Emote: custom emotes** (`emote_custom`, on; applies from the next map). UNINSTALL removes the pack.
+
+**Known**
+- Not yet run on a real install: x64-zt has not built the pack yet, and nothing of it has been seen in a match. What a player without the pack sees, or whether they can join, is the main question of the test (`KNOWN_LIMITATIONS.md` L67–L69, `TESTING.md` R-E7–R-E9).
+
 ### 0.14.0: Emotes (Phase 14) (2026-10-13)
 
 **Added**

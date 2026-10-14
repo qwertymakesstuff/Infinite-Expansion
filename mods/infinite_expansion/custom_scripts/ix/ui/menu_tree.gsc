@@ -285,6 +285,7 @@ emote_pages()
     add_setting( "emote_settings", "emotes", 1 );
     add_setting( "emote_settings", "emote_camera", 1 );
     add_setting( "emote_settings", "emote_cancel_damage", 1 );
+    add_setting( "emote_settings", "emote_custom", 1 );
     add_reset( "emote_settings" );
 
     if ( emotes.size > 0 )
