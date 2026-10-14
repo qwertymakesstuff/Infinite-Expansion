@@ -341,17 +341,30 @@ class Emotes(unittest.TestCase):
             self.assertIn('add_setting( "emote_settings", "' + setting + '", 1 );', body)
         self.assertIn("emote_pages();", tree)
 
-    def test_an_emote_cannot_hold_the_player(self):
+    def test_an_emote_gives_back_what_it_takes(self):
+        # Since 0.14.2 (owner's request) an emote holds the player in place, so
+        # the camera can go round the character, and puts the weapon away;
+        # everything comes back in restore().
         text = EMOTES.read_text()
         run = re.search(r"^run\( emote, preview \)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
         restore = re.search(r"^restore\( emote \)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
-        # Everything taken is given back: the stock counters, the camera.
+        # Everything taken is given back: the stock counters, the camera, the
+        # hold, the weapon.
         for taken, given in (("allow_ads( 0 )", "allow_ads( 1 )"), ("allow_melee( 0 )", "allow_melee( 1 )"),
                              ("allow_offhand_weapons( 0 )", "allow_offhand_weapons( 1 )"),
-                             ("compat::third_person( 1 )", "options::apply_view()")):
+                             ("compat::third_person( 1 )", "options::apply_view()"),
+                             ("emote_custom::hold();", "emote_custom::release();"),
+                             ("self empty_hands();", "self weapon_back();")):
             self.assertIn(taken, run)
             self.assertIn(given, restore)
-        for held in ("freezecontrols", "linkto", "allowmovement", "disableweapons", "takeweapon", "setstance"):
+        hands = re.search(r"^empty_hands\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
+        back = re.search(r"^weapon_back\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
+        self.assertIn("allow_weapon_switch( 0 )", hands)
+        self.assertIn("allow_weapon_switch( 1 )", back)
+        # Only the game's own empty hands are ever taken, never a weapon of the player's.
+        self.assertEqual(re.findall(r"takeweapon\( (.*?) \);", text), ["gunless()"])
+        self.assertIn('return "iw7_gunless_zm";', text)
+        for held in ("freezecontrols", "allowmovement", "disableweapons", "setstance", "takeallweapons"):
             self.assertNotIn(held, text)
         trouble = re.search(r"^end_on_trouble\(\)\s*\{(.*?)^\}", text, re.M | re.S).group(1)
         for ending in ('"death"', '"last_stand"', '"damage"', '"ix_emote_end"'):

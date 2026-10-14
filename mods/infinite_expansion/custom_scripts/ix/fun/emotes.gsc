@@ -24,8 +24,11 @@
 // reloading, throwing, mantling, wall running, on a ladder, held by anything,
 // in a gesture) and no zombie within about three meters; it ends early on
 // damage (emote_cancel_damage), on going down or dying, on a new emote, and
-// when Emotes go off. It never holds the player: they can move, and the game
-// stays in charge of their weapons.
+// when Emotes go off. While it plays the player is held where they stand
+// (emote_custom.gsc hold, as the menu holds them), so the camera can go round
+// the character while the body keeps facing one way; moving, Melee or Use, or
+// a zombie coming close ends it. Their weapon is put away meanwhile
+// (emote_empty_hands: the game's own empty hands, iw7_gunless_zm).
 //
 // Favorites: seven slots, the wheel's. The host's are saved
 // (ix_emote_favorites, as settings are, persist.gsc); a guest's last for the
@@ -35,6 +38,7 @@
 //   emotes               1     feature: emotes on
 //   emote_camera         auto  auto: behind you for whole-body emotes; first; third
 //   emote_cancel_damage  1     damage ends an emote
+//   emote_empty_hands    1     the weapon put away during a stock emote
 //   emote_custom         1     custom emotes (emote_custom.gsc)
 
 register()
@@ -43,6 +47,7 @@ register()
     feature.on_player = ::on_feature;
     custom_scripts\ix\core\config::add_enum( "emote_camera", "auto", "auto first third", "Emote: camera", "auto: behind you for whole-body emotes, as you see your character; first; third.", undefined );
     custom_scripts\ix\core\config::add_bool( "emote_cancel_damage", 1, "Emote: stop when hit", "Taking damage ends an emote at once.", undefined );
+    custom_scripts\ix\core\config::add_bool( "emote_empty_hands", 1, "Emote: empty hands", "Your weapon is put away for an emote, as in the afterlife arcade, and comes back after it.", undefined );
 
     level.ix.emotes = spawnstruct();
     level.ix.emotes.list = [];
@@ -251,6 +256,14 @@ run( emote, preview )
     state.locked = 1;
     custom_scripts\ix\core\log::debug( "emotes: " + self.name + " plays " + emote.id );
 
+    // Held in place, so the camera can go round the character while the body
+    // keeps facing the way it did; moving ends it (emote_custom.gsc hold).
+    self thread custom_scripts\ix\fun\emote_custom::end_on_game_end();
+    self custom_scripts\ix\fun\emote_custom::hold();
+
+    if ( custom_scripts\ix\core\config::get( "emote_empty_hands" ) )
+        self empty_hands();
+
     if ( emote.kind == "offhand" )
     {
         scripts\cp\utility::firegesturegrenade( self, emote.asset );
@@ -268,8 +281,51 @@ run( emote, preview )
             self playanimscriptevent( "power_active_cp", "gesture008" );
     }
 
-    wait duration( emote );
+    self custom_scripts\ix\fun\emote_custom::hold_until( duration( emote ) );
     self notify( "ix_emote_end" );
+}
+
+// The weapon out of the hands for the emote: the game's own empty hands
+// (iw7_gunless_zm), given and taken as the stock scripts do it (the afterlife
+// arcade, cp_town_crab_boss_bomb.gsc), with weapon switching off meanwhile.
+// Not when the player already has them (the afterlife arcade).
+empty_hands()
+{
+    state = self.ix.emote;
+
+    if ( self hasweapon( gunless() ) )
+        return;
+
+    state.weapon = self getcurrentweapon();
+    self giveweapon( gunless() );
+    self switchtoweaponimmediate( gunless() );
+    self scripts\engine\utility::allow_weapon_switch( 0 );
+    // Let the switch finish before the gesture goes over it.
+    wait 0.1;
+}
+
+gunless()
+{
+    return "iw7_gunless_zm";
+}
+
+// The weapon back in the hands, if empty_hands() took it.
+weapon_back()
+{
+    state = self.ix.emote;
+
+    if ( !isdefined( state.weapon ) )
+        return;
+
+    self scripts\engine\utility::allow_weapon_switch( 1 );
+
+    if ( self hasweapon( gunless() ) )
+        self takeweapon( gunless() );
+
+    if ( self hasweapon( state.weapon ) )
+        self switchtoweaponimmediate( state.weapon );
+
+    state.weapon = undefined;
 }
 
 // Whatever ends an emote early; then everything is put back, once.
@@ -299,6 +355,11 @@ restore( emote )
 
     if ( emote.kind == "custom" )
         self custom_scripts\ix\fun\emote_custom::stop();
+    else
+    {
+        self custom_scripts\ix\fun\emote_custom::release();
+        self weapon_back();
+    }
 
     if ( state.locked )
     {

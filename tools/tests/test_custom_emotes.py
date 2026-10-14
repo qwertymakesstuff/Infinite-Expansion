@@ -53,20 +53,26 @@ class CustomEmotes(unittest.TestCase):
 
     def test_start_never_waits_and_stop_undoes_it(self):
         start, stop = function(self.custom, "start"), function(self.custom, "stop")
+        hold, release = function(self.custom, "hold"), function(self.custom, "release")
+        self.assertIn("self hold();", start)
+        self.assertIn("self release();", stop)
+        self.assertIn("playerlinktodelta", hold)
+        self.assertIn("unlink()", release)
+        self.assertIn("delete()", release)
+        self.assertIn("level thread clean_up_if_gone( self, anchor, undefined );", hold)
         self.assertNotIn("wait", start)
         for flag in re.findall(r"allow_(\w+)\( 0 \)", start):
             self.assertIn(f"allow_{flag}( 1 )", stop, flag)
         self.assertEqual(len(re.findall(r"allow_\w+\( 0 \)", start)), 4)
         self.assertIn("playerhide()", start)
         self.assertIn("playershow()", stop)
-        self.assertIn("playerlinktodelta", start)
-        self.assertIn("unlink()", stop)
         # The anchor and the stand-in: deleted on the way out, or by the level
         # when the player leaves.
-        self.assertEqual(start.count('spawn( "script_model"'), 2)
-        self.assertEqual(stop.count("delete()"), 2)
+        self.assertEqual(start.count('spawn( "script_model"'), 1)
+        self.assertEqual(hold.count('spawn( "script_model"'), 1)
+        self.assertEqual(stop.count("delete()"), 1)
         self.assertEqual(function(self.custom, "clean_up_if_gone").count("delete()"), 2)
-        self.assertIn("level thread clean_up_if_gone( self, anchor, standin );", start)
+        self.assertIn("level thread clean_up_if_gone( self, undefined, standin );", start)
         # emotes.gsc puts it back on every way out (restore), and ends it with the match.
         self.assertIn("emote_custom::stop();", function(self.emotes, "restore"))
         self.assertIn("emote_custom::end_on_game_end();", function(self.emotes, "run"))

@@ -4,6 +4,17 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.2: Emotes held in place, with empty hands (2026-10-14)
+
+From the second in-game report (the custom emote played its pose on a copy of the character, so the stand-in works in the game).
+
+**Changed**
+- **Every emote holds you in place**, as the custom emote already did, so you can turn the camera all the way round and look at your character from the front while the body keeps facing one way. Move, or press Melee or Use, to end it; a zombie coming within about three meters ends it too. Whether the body really keeps facing one way while you turn is not yet seen in a match (`KNOWN_LIMITATIONS.md` L71).
+- **Your weapon is put away during an emote**: the game's own empty hands (`iw7_gunless_zm`, which the afterlife arcade gives on every map) for the length of the emote, and your weapon back afterwards, with weapon switching off meanwhile. New setting **Emote: empty hands** (on); off keeps the weapon in hand as before.
+
+**Known**
+- The custom emote's copy looked as if part of the body were missing in the report's picture; what is missing is not yet known (`TESTING.md` R-E8).
+
 ### 0.14.1: Custom emotes, step 1 (a proof), and emote fixes (2026-10-14)
 
 Custom emotes, step 1 of 4: a proof with one of the game's own animations. Released so that the launcher brings it, and every fix after it, by itself.

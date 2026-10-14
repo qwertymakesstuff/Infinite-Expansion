@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: 0.14.1 — Phase 14 done: [Emotes](#emotes), your character's own animations of each map (their Pack-a-Punch celebration, their entrance, their card trick, the map's hand gestures) on an emote wheel in the menu, with browsing, favorites, a random pick and a preview from behind. Before that: [Guided Mode](#guided-mode) (Phase 13), an optional tracker for each map's main Easter egg quest. Neither is played through in a real match yet. In progress: [custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own animations, played on a copy of your character (step 1 of 4: a proof with one of the game's own animations). Then Phase 15, fun toys.**
+> **Status: 0.14.2 — Phase 14 done: [Emotes](#emotes), your character's own animations of each map (their Pack-a-Punch celebration, their entrance, their card trick, the map's hand gestures) on an emote wheel in the menu, with browsing, favorites, a random pick and a preview from behind. Before that: [Guided Mode](#guided-mode) (Phase 13), an optional tracker for each map's main Easter egg quest. Neither is played through in a real match yet. In progress: [custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own animations, played on a copy of your character (step 1 of 4: a proof with one of the game's own animations). Then Phase 15, fun toys.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -92,9 +92,9 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.14.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui
+[IX] INFO: init 0.14.2 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
-[IX] INFO: settings: 66 (0 changed from the default); features: 5; chat: !ix
+[IX] INFO: settings: 67 (0 changed from the default); features: 5; chat: !ix
 [IX] INFO: ready
 ```
 
@@ -295,14 +295,14 @@ Every character of the map is there, not only yours: in Zombies in Spaceland you
 | **Browse emotes** | The emotes by category (Custom, Celebration, Poses, Greetings, Taunts, Funny); each has *Play*, *Favorite* and *Preview*. *Custom* appears only with a custom emote pack ([below](#custom-emotes-experimental-step-1-a-proof)) |
 | **Favorites** | Your seven favorites, the wheel's; *Clear favorites* |
 | **Random emote** | One of the map's emotes, picked at random |
-| **Emote settings** | Emotes on or off, the camera, whether damage ends one, custom emotes on or off |
+| **Emote settings** | Emotes on or off, the camera, whether damage ends one, empty hands, custom emotes on or off |
 | **Preview** | The last emote again, with the camera behind you |
 
 The menu closes as an emote starts. A whole-body emote turns the camera behind you so you can see your character (*Emote: camera*: auto, first, third); a hand gesture stays in first person. The camera comes back when it ends. In chat: `!ix emote` lists the map's emotes, `!ix emote <name>` plays one (`!ix emote pap1`, `!ix emote bang`), `!ix emote random`.
 
 **A key for the wheel.** `!ix wheel` opens the menu straight at the emote wheel, and closes the menu when it is open. A mod cannot read a keyboard key itself (`KNOWN_LIMITATIONS.md` L70), but a key can say that line for you. Type this once in the console (`~`): `bind b "say !ix wheel"`. Then **B** brings the wheel up and puts it away. The game keeps binds in your config; `unbind b` removes it. Like every `!ix` command, the line shows in the match's chat (L39).
 
-An emote never holds you: you can walk, and it ends at once if you are hit (*Emote: stop when hit*), go down or die. It does not start in the air, while sprinting, reloading, throwing, climbing or wall running, on a ride or an arcade game, during another gesture, with a weapon the game plays no gestures over, or with a zombie within about three meters. While it plays you cannot aim or knife.
+While an emote plays you are held where you stand, so you can turn the camera all the way round and see your character from the front while the body keeps facing one way (not yet seen in a match, L71). **Move** (or press Melee or Use) to end it. Your weapon is put away for it, the game's own empty hands as in the afterlife arcade, and comes back after it (*Emote: empty hands*, on). It also ends at once if you are hit (*Emote: stop when hit*), go down, die, or a zombie comes within about three meters. It does not start in the air, while sprinting, reloading, throwing, climbing or wall running, on a ride or an arcade game, during another gesture, with a weapon the game plays no gestures over, or with a zombie within about three meters. While it plays you cannot aim or knife.
 
 The host's favorites are saved, as settings are, and kept per character across maps (the third character's Pack-a-Punch is `pap3` everywhere). A guest's last for the match (L65). Others in the match see your character's body play it as they do at Pack-a-Punch; this is not yet seen in a real match (L66).
 
@@ -412,6 +412,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `emotes` | 1 | 0/1 | [Emotes](#emotes): your character's animations of this map, from the menu or `!ix emote` |
 | `emote_camera` | auto | auto, first, third | Where the camera is during an emote; auto: behind you for whole-body emotes |
 | `emote_cancel_damage` | 1 | 0/1 | Taking damage ends an emote at once |
+| `emote_empty_hands` | 1 | 0/1 | Your weapon is put away during an emote (the game's empty hands) and comes back after it |
 | `emote_custom` | 1 | 0/1 | [Custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own pack; applies from the next map |
 | `game_speed` | 100 | 25–200 | Percent of the speed of the whole match |
 | `zombie_outlines` | 0 | 0/1 | Zombies outlined through walls, for everyone |

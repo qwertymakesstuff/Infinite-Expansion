@@ -175,12 +175,7 @@ cannot_play()
 start( emote )
 {
     state = self.ix.emote;
-
-    anchor = spawn( "script_model", self.origin );
-    anchor setmodel( "tag_origin" );
-    anchor.angles = ( 0, self.angles[1], 0 );
-    self playerlinktodelta( anchor, "tag_origin", 1, 180, 180, 85, 85 );
-    state.anchor = anchor;
+    self hold();
 
     self scripts\engine\utility::allow_weapon( 0 );
     self scripts\engine\utility::allow_offhand_weapons( 0 );
@@ -210,8 +205,61 @@ start( emote )
     state.standin = standin;
     self playerhide();
     state.hidden = 1;
-    level thread clean_up_if_gone( self, anchor, standin );
+    level thread clean_up_if_gone( self, undefined, standin );
     standin scriptmodelplayanim( emote.asset, 1 );
+}
+
+// Holds the player where they stand, as the menu does (menu.gsc hold): a
+// tag_origin anchor at their feet and playerlinktodelta with the view free,
+// so the camera behind them can go all the way round. Every emote does this
+// (emotes.gsc run); release() lets go.
+hold()
+{
+    state = self.ix.emote;
+    anchor = spawn( "script_model", self.origin );
+    anchor setmodel( "tag_origin" );
+    anchor.angles = ( 0, self.angles[1], 0 );
+    self playerlinktodelta( anchor, "tag_origin", 1, 180, 180, 85, 85 );
+    state.anchor = anchor;
+    level thread clean_up_if_gone( self, anchor, undefined );
+}
+
+release()
+{
+    state = self.ix.emote;
+
+    if ( !isdefined( state.anchor ) )
+        return;
+
+    if ( self islinked() && self getlinkedparent() == state.anchor )
+        self unlink();
+
+    state.anchor delete();
+    state.anchor = undefined;
+}
+
+// A held stock emote (emotes.gsc run): until its time is up, the player moves
+// or presses Melee or Use, a zombie comes close, or the game takes the player.
+hold_until( seconds )
+{
+    state = self.ix.emote;
+    armed = 0;
+
+    for ( waited = 0; waited < seconds; waited += 0.05 )
+    {
+        wait 0.05;
+
+        if ( !self islinked() || self getlinkedparent() != state.anchor )
+            return;
+
+        if ( self custom_scripts\ix\fun\emotes::zombie_near( 120 ) )
+            return;
+
+        if ( !wants_out() )
+            armed = 1;
+        else if ( armed )
+            return;
+    }
 }
 
 // Until the animation ends (a looping one: until stopped). A key or button
@@ -279,14 +327,7 @@ stop()
         state.hidden = 0;
     }
 
-    if ( isdefined( state.anchor ) )
-    {
-        if ( self islinked() && self getlinkedparent() == state.anchor )
-            self unlink();
-
-        state.anchor delete();
-        state.anchor = undefined;
-    }
+    self release();
 
     if ( isdefined( state.held ) && state.held )
     {
