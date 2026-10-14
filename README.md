@@ -4,7 +4,7 @@ A modular enhancement framework for the **zombies** mode of **Call of Duty: Infi
 
 The BO3 mod serves only as a reference. Nothing is copied from it, and every feature is rebuilt on top of what Infinite Warfare and the **iw7-mod** client actually expose.
 
-> **Status: 0.14.0 — Phase 14 done: [Emotes](#emotes), your character's own animations of each map (their Pack-a-Punch celebration, their entrance, their card trick, the map's hand gestures) on an emote wheel in the menu, with browsing, favorites, a random pick and a preview from behind. Before that: [Guided Mode](#guided-mode) (Phase 13), an optional tracker for each map's main Easter egg quest. Neither is played through in a real match yet. In progress: [custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own animations, played on a copy of your character (step 1 of 4: a proof with one of the game's own animations). Then Phase 15, fun toys.**
+> **Status: 0.14.1 — Phase 14 done: [Emotes](#emotes), your character's own animations of each map (their Pack-a-Punch celebration, their entrance, their card trick, the map's hand gestures) on an emote wheel in the menu, with browsing, favorites, a random pick and a preview from behind. Before that: [Guided Mode](#guided-mode) (Phase 13), an optional tracker for each map's main Easter egg quest. Neither is played through in a real match yet. In progress: [custom emotes](#custom-emotes-experimental-step-1-a-proof) from your own animations, played on a copy of your character (step 1 of 4: a proof with one of the game's own animations). Then Phase 15, fun toys.**
 > [Zombies options](#zombies-options): zombie speed and health, most zombies alive, a points multiplier, power-ups per round, the starting round and every perk at spawn. [The info HUD](#the-info-hud): round, zombies left and alive, health and speed. [Game options](#game-options): game speed, zombie outlines, a restart, *Reset this page* and chat shortcuts. [Developer tools](#developer-tools), locked until the host unlocks them. Before that: [weapon](#weapon-options), [movement](#movement-options) and [player options](#player-options), all in the in-game menu (ADS + Melee), which shows and changes every setting. The mod [updates itself](#updates) from this project's GitHub releases. Everything passes every offline check with both iw7-mod compilers; [`PLAYTEST_CHECKLIST.md`](PLAYTEST_CHECKLIST.md) is the list to go through in a real match, and `TESTING.md` §4 has every check in detail.
 
 ## Requirements
@@ -66,7 +66,7 @@ From 0.3.2 on, new versions install themselves; no more downloading zips:
 - **To turn it off**, click **AUTO-UPDATE: ON** at the bottom of the setup window (it then reads OFF; the choice is saved in `%LOCALAPPDATA%\InfiniteExpansion\settings.ini`). The launcher then starts the game without asking GitHub; the setup window still says when a new version is out. To skip it once, add `--ix-no-update` to the end of the shortcut's *Target*.
 - **What is sent:** one anonymous request to GitHub's public release page, the same as opening it in a browser. GitHub answers 60 of those an hour per internet connection; after that the check is skipped until the next hour.
 
-**For maintainers:** `.github/workflows/release.yml` publishes a release by itself whenever a push changes `level.ix.version` in `bootstrap.gsc` and there is no release `v<version>` yet, with that version's section of `CHANGELOG.md` as its notes. Every change meant for players therefore needs a new version number, and players get it the next time they start the game.
+**For maintainers:** `.github/workflows/release.yml` publishes a release by itself whenever a push changes `level.ix.version` in `bootstrap.gsc` and there is no release `v<version>` yet, with that version's section of `CHANGELOG.md` as its notes. Every change meant for players therefore needs a new version number, and players get it the next time they start the game. Work in progress is released the same way, from whichever branch it is on: every push that changes the mod or the setup raises the version (the last number for fixes and steps, `0.14.1`, `0.14.2` …), so testers with AUTO-UPDATE on always play the newest build. A push that changes only documentation or tests needs no new version.
 
 ### Windows warnings and logs
 
@@ -92,7 +92,7 @@ The mod then runs in every zombies match you host, and friends can join you. The
 Start a zombies match and open the console (`~`). It should show:
 
 ```text
-[IX] INFO: init 0.14.0 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui
+[IX] INFO: init 0.14.1 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui
 [IX] INFO: client fs_game=0 omnimovement=… sprint_unlimited=… air_control=…
 [IX] INFO: settings: 66 (0 changed from the default); features: 5; chat: !ix
 [IX] INFO: ready

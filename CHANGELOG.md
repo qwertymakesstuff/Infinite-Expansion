@@ -4,7 +4,9 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
-Custom emotes, step 1 of 4 (on the branch, not released yet):
+### 0.14.1: Custom emotes, step 1 (a proof), and emote fixes (2026-10-14)
+
+Custom emotes, step 1 of 4: a proof with one of the game's own animations. Released so that the launcher brings it, and every fix after it, by itself.
 
 **Added**
 - **Custom emotes on a copy of your character.** Infinite Warfare's player body cannot be given new animations by a script, so a custom emote hides you, holds you in place and plays the animation on a model with your body and head, with the camera behind you; everything comes back when it ends (the end of the animation, moving, Melee or Use, a zombie close by, a hit, going down or dying, the end of the match). They appear in a new **Custom** category of *Browse emotes*, can be favorites and are listed by `!ix emote`.
@@ -18,7 +20,7 @@ Custom emotes, step 1 of 4 (on the branch, not released yet):
 - **`!ix wheel`**: opens the menu at the emote wheel, or closes the menu. A mod cannot read a keyboard key, so bind one to it: `bind b "say !ix wheel"` in the console makes **B** bring the wheel up and put it away (`KNOWN_LIMITATIONS.md` L70).
 
 **Known**
-- Not yet run on a real install: x64-zt has not built the pack yet, and nothing of it has been seen in a match. What a player without the pack sees, or whether they can join, is the main question of the test (`KNOWN_LIMITATIONS.md` L67–L69, `TESTING.md` R-E7–R-E9).
+- Not yet seen working on a real install: x64-zt has not built the pack yet, and nothing of it has been seen in a match. What a player without the pack sees, or whether they can join, is the main question of the test (`KNOWN_LIMITATIONS.md` L67–L69, `TESTING.md` R-E7–R-E9).
 
 ### 0.14.0: Emotes (Phase 14) (2026-10-13)
 

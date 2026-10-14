@@ -386,6 +386,8 @@ register()
 
 Players get new versions from the project's GitHub releases; nobody has to download a zip again after installing 0.3.2 (README "Updates").
 
+Every push that changes the mod or the setup raises `level.ix.version`, on any branch, work in progress included (since 0.14.1, at the owner's request), so the launcher brings each build to testers by itself; fixes and steps raise the last number. Documentation-only or test-only pushes keep it.
+
 ```text
 push that changes level.ix.version ──► .github/workflows/release.yml
                                         └─ no release v<version> yet: git archive → Infinite-Expansion-<version>.zip
