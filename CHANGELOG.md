@@ -4,6 +4,14 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.4: The custom emote's copy gets its head another way too (2026-10-14)
+
+**Fixed** (fourth in-game report: the copy still had no head)
+- The copy also takes the head from the name the game keeps for it (`headmodel`, set when your character is dressed) when the list of attached models does not give it. With **Debug log** on (`!ix set debug_log 1`), the console names the body and every part the copy got (`emotes: copy of …`), so a missing part shows up there.
+
+**Known**
+- The test animation is the Hoff's DJ animation, made for his own full-body model, not for a player's body and separate head; on your character its pose can look wrong. Your own animations, made on the player's rig, come with the converter (step 2).
+
 ### 0.14.3: The custom emote keeps its head (2026-10-14)
 
 **Fixed** (third in-game report)

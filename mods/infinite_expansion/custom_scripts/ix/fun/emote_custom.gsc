@@ -194,13 +194,29 @@ start( emote )
     // cp_agent_utils.gsc set_agent_model: attach( part, "", 1 )). Attached to
     // the tag the game reports instead, the head stayed put while the body
     // moved, and vanished once the animation started (second in-game report).
+    parts = [];
+
     for ( i = 0; i < count; i++ )
     {
         model = self getattachmodelname( i );
 
         if ( isdefined( model ) && model != "" )
+        {
             standin attach( model, "", 1 );
+            parts[parts.size] = model;
+        }
     }
+
+    // The head by the stock field setcharactermodels fills (headmodel, a
+    // token in v1.1.0's table), when the attachment list did not give it
+    // (third in-game report: the copy had no head).
+    if ( isdefined( self.headmodel ) && self.headmodel != "" && !custom_scripts\ix\core\util::array_contains( parts, self.headmodel ) )
+    {
+        standin attach( self.headmodel, "", 1 );
+        parts[parts.size] = self.headmodel + " (headmodel)";
+    }
+
+    custom_scripts\ix\core\log::debug( "emotes: copy of " + self.name + ": body " + self.model + ", " + count + " attached, parts: " + custom_scripts\ix\core\util::join( parts, ", " ) );
 
     state.standin = standin;
     self playerhide();

@@ -92,6 +92,9 @@ class CustomEmotes(unittest.TestCase):
         # How the game dresses a player and an agent: every part with no tag.
         loadout = (DUMP / "cp" / "zombies" / "zombies_loadout.gsc").read_text()
         self.assertIn('self attach( var_1, "", 1 );', function(loadout, "setcharactermodels"))
+        # The head also by the stock field setcharactermodels fills.
+        self.assertIn("self.headmodel = var_1;", function(loadout, "setcharactermodels"))
+        self.assertIn('standin attach( self.headmodel, "", 1 );', start)
         agents = (DUMP / "cp" / "cp_agent_utils.gsc").read_text()
         self.assertIn('var_0 attach( var_4, "", 1 );', function(agents, "set_agent_model"))
 
