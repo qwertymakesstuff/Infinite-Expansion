@@ -300,6 +300,8 @@ Every character of the map is there, not only yours: in Zombies in Spaceland you
 
 The menu closes as an emote starts. A whole-body emote turns the camera behind you so you can see your character (*Emote: camera*: auto, first, third); a hand gesture stays in first person. The camera comes back when it ends. In chat: `!ix emote` lists the map's emotes, `!ix emote <name>` plays one (`!ix emote pap1`, `!ix emote bang`), `!ix emote random`.
 
+**A key for the wheel.** `!ix wheel` opens the menu straight at the emote wheel, and closes the menu when it is open. A mod cannot read a keyboard key itself (`KNOWN_LIMITATIONS.md` L70), but a key can say that line for you. Type this once in the console (`~`): `bind b "say !ix wheel"`. Then **B** brings the wheel up and puts it away. The game keeps binds in your config; `unbind b` removes it. Like every `!ix` command, the line shows in the match's chat (L39).
+
 An emote never holds you: you can walk, and it ends at once if you are hit (*Emote: stop when hit*), go down or die. It does not start in the air, while sprinting, reloading, throwing, climbing or wall running, on a ride or an arcade game, during another gesture, with a weapon the game plays no gestures over, or with a zombie within about three meters. While it plays you cannot aim or knife.
 
 The host's favorites are saved, as settings are, and kept per character across maps (the third character's Pack-a-Punch is `pap3` everywhere). A guest's last for the match (L65). Others in the match see your character's body play it as they do at Pack-a-Punch; this is not yet seen in a real match (L66).
@@ -344,6 +346,7 @@ Changes are **saved** by themselves: the mod stores them in your game config (as
 | `!ix preset` / `!ix preset <name>` / `!ix preset save` | The presets and which is in use / host: apply one / host: save yours as Custom |
 | `!ix guide` / `!ix guide next`, `prev`, `more`, `done` | [Guided Mode](#guided-mode): the current objective and hint / as the menu's buttons |
 | `!ix emote` / `!ix emote <name>` / `!ix emote random` | [Emotes](#emotes): this map's emotes / play one / one at random |
+| `!ix wheel` | Opens the menu at the emote wheel, or closes the menu; bind a key to it: `bind b "say !ix wheel"` |
 
 | Setting | Default | Range | Effect |
 |---------|---------|-------|--------|

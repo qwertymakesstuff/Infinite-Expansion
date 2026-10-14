@@ -264,6 +264,8 @@ The scope is in `ROADMAP.md`. AAE's emotes were studied first (`IW_API_NOTES.md`
 | Favorites (seven, the wheel's) saved across games | Fun | 14 | TESTING | Host: `ix_emote_favorites` in the config; per character across maps; a guest's for the match (L65). R-E4 |
 | Emote safety (death, down, revive, weapon change, rounds, teleports, menus, interrupts) | Fun | 14 | TESTING | Starts only on the ground with nothing else going on and no zombie within 3 m; ends on damage, down, death, a new emote, Emotes off; never holds the player, aiming, melee (and grenades for a hand gesture) back through the stock counters; the camera back as Third person has it; at most 8 seconds. R-E5 |
 | `!ix emote [name / random / list]` | Fun | 14 | TESTING | R-E6 |
+| Emotes from the menu wait for the player to be on the ground again (fix of "Land first", first in-game report) | Fun | 14 | TESTING | `emotes.gsc` `play()`, as `menu.gsc` `open_after_landing`. R-E10 |
+| A key for the emote wheel (B) | Fun | 14 | TESTING | Raw keys: BLOCKED (L70). `!ix wheel` toggles the menu at the wheel; `bind b "say !ix wheel"`. R-E10 |
 | Visible to other players | Fun | 14 | NEEDS TESTING | L66, R-E3 |
 
 ### Custom emotes (after Phase 14, in progress: step 1 of 4)

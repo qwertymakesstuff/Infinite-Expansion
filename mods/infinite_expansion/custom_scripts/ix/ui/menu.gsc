@@ -385,6 +385,25 @@ chat_open( words )
         self tell( problem );
 }
 
+// Opens the menu straight at a page, or closes it when it is open (emotes.gsc
+// "!ix wheel"). A page the tree does not have leaves the menu on its first page.
+toggle_at_page( id )
+{
+    if ( !isdefined( self.ix ) || !isdefined( self.ix.menu ) )
+        return;
+
+    if ( self.ix.menu.open )
+    {
+        close_menu();
+        return;
+    }
+
+    chat_open( undefined );
+
+    if ( self.ix.menu.open && isdefined( level.ix.menu.pages[id] ) )
+        open_page( id );
+}
+
 can_open()
 {
     return open_problem() == "";

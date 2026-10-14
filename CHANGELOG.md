@@ -11,6 +11,12 @@ Custom emotes, step 1 of 4 (on the branch, not released yet):
 - **`Build Custom Emotes.cmd`**: builds `iw7-mod\zone\ix_emotes.ff` on your PC with x64-zt. Step 1 is a proof with none of your own art: it copies one of the game's own animations (The Hoff at his DJ decks, Zombies in Spaceland) under a new name, lists the built zone again before installing it, and writes the animation's bone names to its log. The menu script loads the pack when the game starts.
 - New setting **Emote: custom emotes** (`emote_custom`, on; applies from the next map). UNINSTALL removes the pack.
 
+**Fixed** (first in-game report)
+- **"Land first" when playing an emote from the menu**, on the ground. The menu holds you while it is open and lets go as the emote starts; the game counts you on the ground again only once it has moved you, a moment later. An emote now waits up to a second for that, as the menu does before it opens.
+
+**Added** (first in-game report)
+- **`!ix wheel`**: opens the menu at the emote wheel, or closes the menu. A mod cannot read a keyboard key, so bind one to it: `bind b "say !ix wheel"` in the console makes **B** bring the wheel up and put it away (`KNOWN_LIMITATIONS.md` L70).
+
 **Known**
 - Not yet run on a real install: x64-zt has not built the pack yet, and nothing of it has been seen in a match. What a player without the pack sees, or whether they can join, is the main question of the test (`KNOWN_LIMITATIONS.md` L67–L69, `TESTING.md` R-E7–R-E9).
 

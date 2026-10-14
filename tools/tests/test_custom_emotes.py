@@ -145,5 +145,27 @@ class CustomEmotes(unittest.TestCase):
         self.assertIn('level.dj setmodel( "fullbody_zmb_hero_dj" );', dj)
 
 
+    def test_play_waits_for_landing(self):
+        # From the menu the player was linked until the same frame; the game
+        # counts them on the ground only after it has moved them again
+        # ("Land first" in the first in-game report).
+        play = function(self.emotes, "play")
+        loop = play.index("!self isonground()")
+        self.assertLess(play.index("waittillframeend;"), loop)
+        self.assertLess(loop, play.index("problem = self cannot_emote();"))
+        self.assertIn("waited < 1", play)
+        self.assertIn('self endon( "ix_emote_end" );', play)
+
+    def test_wheel_command_toggles_the_menu(self):
+        self.assertIn('chat::add_command( "wheel", ::wheel_command,', function(self.emotes, "register"))
+        self.assertIn('menu::toggle_at_page( "emote_wheel" );', function(self.emotes, "wheel_command"))
+        menu = (SCRIPTS / "ix" / "ui" / "menu.gsc").read_text()
+        toggle = function(menu, "toggle_at_page")
+        self.assertLess(toggle.index("close_menu();"), toggle.index("chat_open( undefined );"))
+        self.assertIn("open_page( id );", toggle)
+        tree = (SCRIPTS / "ix" / "ui" / "menu_tree.gsc").read_text()
+        self.assertIn('add_page( "emote_wheel", "Emote wheel", "emotes" )', tree)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -53,6 +53,7 @@ register()
     custom_scripts\ix\core\events::subscribe( "player_laststand", ::on_down );
     custom_scripts\ix\core\events::subscribe( "player_death", ::on_down );
     custom_scripts\ix\core\chat::add_command( "emote", ::emote_command, "[name | random | list]: plays one of this map's emotes" );
+    custom_scripts\ix\core\chat::add_command( "wheel", ::wheel_command, "opens the emote wheel, or closes the menu (bind a key to it)" );
     level thread load_when_ready();
 }
 
@@ -196,6 +197,16 @@ play( emote, preview )
 
     self notify( "ix_emote_end" );
     waittillframeend;
+    self endon( "disconnect" );
+    self endon( "ix_emote_end" );
+
+    // From the menu, the player was held (linked) until a moment ago, and the
+    // game counts them on the ground again only once it has moved them: wait
+    // for that, as the menu does before it opens (menu.gsc open_after_landing),
+    // and for a landing after a hop.
+    for ( waited = 0; waited < 1 && isalive( self ) && !self islinked() && !self isonground(); waited += 0.05 )
+        wait 0.05;
+
     problem = self cannot_emote();
 
     if ( problem == "" )
@@ -607,6 +618,23 @@ load_favorites()
         else if ( ids[slot] != "-" )
             self.ix.emote.other_maps[slot] = ids[slot];
     }
+}
+
+// ---------------------------------------------------------------------------
+// Chat: "!ix wheel" opens the menu at the emote wheel, or closes the menu when
+// it is open. A script cannot read a key of the keyboard, only chat lines
+// (iw7-mod's "say" notify) and the game's own commands, so a key works through
+// a bind that says it: bind b "say !ix wheel" (KNOWN_LIMITATIONS.md L70).
+
+wheel_command( words )
+{
+    if ( list().size == 0 )
+    {
+        self tell( "This map has no emotes." );
+        return;
+    }
+
+    self custom_scripts\ix\ui\menu::toggle_at_page( "emote_wheel" );
 }
 
 // ---------------------------------------------------------------------------

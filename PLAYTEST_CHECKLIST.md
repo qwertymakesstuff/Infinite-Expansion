@@ -128,6 +128,7 @@ First, with the game closed, double-click **`Build Custom Emotes.cmd`** in the m
 - [ ] **CE2** Start the game, Solo Match on any map. Console: `[IX] INFO: emotes: 1 custom from ix_emotes`. `listassetpool 6 ix_*` in the console lists `ix_emote_proof`. *(R-E7)*
 - [ ] **CE3** *Emotes* → *Browse emotes* → *Custom* → *Test - Hoff at the decks* → *Play*: you disappear, a copy of your character works the DJ decks in your place, the camera is behind you; after about 5 seconds the copy is gone and you are back, with your weapon. Try it as two different characters. *(R-E8)*
 - [ ] **CE4** Play it again and walk (or press Melee or Use) after a second: it stops at once. Play it and let a zombie hit you: it stops. Nothing stays behind: no copy, no invisible you, no stuck weapon. *(R-E8)*
+- [ ] **CE6** From the menu on the ground, any emote starts (no "Land first"). In the console: `bind b "say !ix wheel"`; then B opens the wheel and B again closes the menu. *(R-E10)*
 - [ ] **CE5** *Emote settings* → *Emote: custom emotes* off: *Play* says "Custom emotes are off". At the next map the console no longer says `1 custom`. *(R-E9)*
 
 ## 13. Co-op (when a friend can join)
