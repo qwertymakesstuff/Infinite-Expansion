@@ -2243,17 +2243,21 @@ namespace IXEmotes
             // in IW7's model space.
             var delta = new Dictionary<string, Quat[]>(StringComparer.OrdinalIgnoreCase);
             var hipsAt = new Vec3[frames];
+            var posAt = new Dictionary<string, Vec3[]>(StringComparer.OrdinalIgnoreCase);
             foreach (var name in bindRot.Keys)
             {
                 var m = scene.Find(name);
                 var d = new Quat[frames];
+                var p = new Vec3[frames];
+                posAt[name] = p;
                 Quat restInv = bindRot[name].Conjugate();
                 for (int f = 0; f < frames; f++)
                 {
                     double[] rel = Mat4.Multiply(skeletonAt(times[f]), m.World(times[f]));
                     Quat world = Mat4.RotationOf(rel);
                     d[f] = (turn * (world * restInv) * turn.Conjugate()).Normalized();
-                    if (string.Equals(name, "hips", StringComparison.OrdinalIgnoreCase)) hipsAt[f] = turn.Rotate(Mat4.Position(rel));
+                    p[f] = turn.Rotate(Mat4.Position(rel));
+                    if (string.Equals(name, "hips", StringComparison.OrdinalIgnoreCase)) hipsAt[f] = p[f];
                 }
                 delta[name] = d;
             }
@@ -2314,6 +2318,46 @@ namespace IXEmotes
                     pos = rig.Rotations[hipsParent].Conjugate().Rotate(pos - rig.Positions[hipsParent]);
                 }
                 hipsLocal[f] = pos;
+            }
+
+            // Feet on the floor: the hips are raised or lowered on every frame
+            // so the lowest foot bone is as high above the body model's floor
+            // as yours is above your animation's lowest point (where your feet
+            // touch the ground), scaled. Taken from the feet, not the hips'
+            // own height, which in game left the body floating (0.14.7 report).
+            var srcFeet = new List<string>();
+            foreach (var n in new string[] { "foot_L", "toe_L", "foot_R", "toe_R" }) if (posAt.ContainsKey(n)) srcFeet.Add(n);
+            var iwFeet = new List<int>();
+            foreach (var n in new string[] { "j_ankle_le", "j_ball_le", "j_ankle_ri", "j_ball_ri" })
+            {
+                int b = rig.Find(n);
+                if (b >= 0) iwFeet.Add(b);
+            }
+            if (srcFeet.Count > 0 && iwFeet.Count > 0)
+            {
+                var srcLow = new double[frames];
+                double srcGround = double.MaxValue;
+                for (int f = 0; f < frames; f++)
+                {
+                    srcLow[f] = double.MaxValue;
+                    foreach (var n in srcFeet) srcLow[f] = Math.Min(srcLow[f], Vec3.Dot(posAt[n][f], iwFrame[2]));
+                    srcGround = Math.Min(srcGround, srcLow[f]);
+                }
+                double iwFloor = double.MaxValue;
+                foreach (int b in iwFeet) iwFloor = Math.Min(iwFloor, Vec3.Dot(rig.Positions[b], iwFrame[2]));
+                double lowest = double.MaxValue, highest = double.MinValue;
+                for (int f = 0; f < frames; f++)
+                {
+                    var world = Positions(rig, world0, iHips, hipsLocal[f], f);
+                    double low = double.MaxValue;
+                    foreach (int b in iwFeet) low = Math.Min(low, Vec3.Dot(world[b], iwFrame[2]));
+                    double lift = iwFloor + scale * (srcLow[f] - srcGround) - low;
+                    Vec3 up = hipsParent >= 0 ? rig.Rotations[hipsParent].Conjugate().Rotate(iwFrame[2]) : iwFrame[2];
+                    hipsLocal[f] = hipsLocal[f] + up * lift;
+                    lowest = Math.Min(lowest, lift);
+                    highest = Math.Max(highest, lift);
+                }
+                report.Append("Feet put on the floor: the hips moved by " + lowest.ToString("0.#", CultureInfo.InvariantCulture) + " to " + highest.ToString("0.#", CultureInfo.InvariantCulture) + " units. ");
             }
             report.Append("Hips scaled by " + scale.ToString("0.###", CultureInfo.InvariantCulture) + ". ");
 
@@ -2455,6 +2499,26 @@ namespace IXEmotes
             result.MissingInRig = missingInRig.ToArray();
             result.Report = report.ToString().Trim();
             return result;
+        }
+
+        // Every bone's model-space position at a frame: the rig's rest
+        // offsets turned by the parents' rotations, j_mainroot at its
+        // animated place.
+        static Vec3[] Positions(Rig rig, Quat[][] world, int hips, Vec3 hipsLocal, int frame)
+        {
+            var pos = new Vec3[rig.Bones.Length];
+            for (int b = 0; b < pos.Length; b++)
+            {
+                int p = rig.Parents[b];
+                Vec3 offset = b == hips ? hipsLocal : rig.LocalPosition(b);
+                if (p < 0)
+                {
+                    pos[b] = b == hips ? hipsLocal : rig.Positions[b];
+                    continue;
+                }
+                pos[b] = pos[p] + world[p][frame].Rotate(offset);
+            }
+            return pos;
         }
 
         static int FindLinked(Rig rig, BoneLink[] links, string source)

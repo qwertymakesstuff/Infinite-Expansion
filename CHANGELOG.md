@@ -4,6 +4,16 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.8: Custom emotes: feet on the floor; a report on the missing head (2026-10-15)
+
+From the first in-game report of Dance Moves: it plays, but the copy floats, and its head is missing.
+
+**Fixed**
+- **The copy floated.** The hips' height came from your rig's hips scaled to the game's body, which did not keep the feet down. Now, on every frame, the hips are raised or lowered so the lowest foot is as high above the floor as yours is above the lowest point of your animation (scaled): when your feet touch the ground, the copy's do. The build log says by how much the hips were moved. **Run `Build Custom Emotes.cmd` again** to rebuild Dance Moves with this.
+
+**Changed**
+- **The missing head is looked into.** The game's own scripts only ever animate full-body models, never a body with a separate head, so the copy's head needs facts from your game: each custom emote now prints two lines to the console (`emotes: copy of …` and `emotes: the copy carries …`): what the copy was dressed with, what it really carries, and how high its head bone is against yours.
+
 ### 0.14.7: Custom emotes: the game's animations now read back (2026-10-15)
 
 **Fixed** (first run of step 2 on the owner's PC: nothing was built)

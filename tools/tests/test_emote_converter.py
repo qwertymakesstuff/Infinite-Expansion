@@ -190,6 +190,7 @@ class Converter(unittest.TestCase):
         case("ascii", 31)
         case("binary", 31, loop=True, binary=True, user_tangents=True)
         case("rest", 5, motion=lambda n, f: None)
+        case("floating", 11, motion=lambda n, f: (BIND[n][0], (BIND[n][1][0], BIND[n][1][1] + 20 + f, BIND[n][1][2])))
         case("missing", 5, drop=("thigh_L", "shin_L", "foot_L", "toe_L"))
         case("long", 301, motion=lambda n, f: None)
         (d / "cases.json").write_text(json.dumps(cases))
@@ -259,14 +260,29 @@ class Converter(unittest.TestCase):
                     worst = max(worst, ef.qangle(turn_iw, expected))
             self.assertLess(worst, 0.05, name)
 
-    def test_hips_move_by_the_scaled_amount(self):
+    def feet_heights(self, name):
+        """Per frame: the lowest IW7 foot bone's height, and the lowest FBX
+        foot bone's height (Y up)."""
+        d = self.decoded(name)
+        truth = self.truth[name]
+        feet = [self.names.index(n) for n in ("j_ankle_le", "j_ball_le", "j_ankle_ri", "j_ball_ri")]
+        out = []
+        for f in range(d.numframes + 1):
+            _, t = ef.rig_world(d, self.names, self.rows, f)
+            out.append((min(t[b][2] for b in feet), min(truth[n][f][1][1] for n in ("foot_L", "toe_L", "foot_R", "toe_R"))))
+        return d, out
+
+    def scale(self):
+        hips = self.names.index("j_mainroot")
+        ground_iw = min(self.rows[i][2][2] for i, n in enumerate(self.names) if n in self.decoded("ascii").bones)
+        ground_src = min(BIND[n][1][1] for n, _, _ in ef.SOURCE_BONES)
+        return (self.rows[hips][2][2] - ground_iw) / (BIND["hips"][1][1] - ground_src)
+
+    def test_hips_sway_by_the_scaled_amount(self):
         d = self.decoded("ascii")
         truth = self.truth["ascii"]
         b = self.names.index("j_mainroot")
-        rest_z = self.rows[b][2][2]
-        ground_iw = min(self.rows[i][2][2] for i, n in enumerate(self.names) if n in d.bones)
-        ground_src = min(BIND[n][1][1] for n, _, _ in ef.SOURCE_BONES)
-        scale = (rest_z - ground_iw) / (BIND["hips"][1][1] - ground_src)
+        scale = self.scale()
         _, t0 = ef.rig_world(d, self.names, self.rows, 0)
         # It starts where the body model's hips are, sideways.
         self.assertAlmostEqual(t0[b][0], self.rows[b][2][0], places=2)
@@ -274,8 +290,22 @@ class Converter(unittest.TestCase):
         for f in (10, 20, 30):
             _, t = ef.rig_world(d, self.names, self.rows, f)
             moved = ef.qrot(ef.TURN, qsub(truth["hips"][f][1], truth["hips"][0][1]))
-            for k in range(3):
+            for k in range(2):
                 self.assertAlmostEqual(t[b][k] - t0[b][k], moved[k] * scale, delta=0.01)
+
+    def test_feet_stay_on_the_floor(self):
+        # The lowest foot is as high above the body model's floor (its lowest
+        # foot bone at rest) as the FBX's is above its own lowest point, scaled;
+        # also when the whole FBX sits 20 cm too high (the 0.14.7 report: the
+        # copy floated).
+        floor = min(self.rows[self.names.index(n)][2][2] for n in ("j_ankle_le", "j_ball_le", "j_ankle_ri", "j_ball_ri"))
+        scale = self.scale()
+        for name in ("ascii", "floating"):
+            _d, heights = self.feet_heights(name)
+            ground = min(src for _, src in heights)
+            for iw, src in heights:
+                self.assertAlmostEqual(iw, floor + scale * (src - ground), delta=0.02, msg=name)
+            self.assertIn("Feet put on the floor", self.r["convert"][name]["report"])
 
     def test_bones_point_as_in_the_fbx_at_rest(self):
         d = self.decoded("rest")

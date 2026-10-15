@@ -216,13 +216,36 @@ start( emote )
         parts[parts.size] = self.headmodel + " (headmodel)";
     }
 
-    custom_scripts\ix\core\log::debug( "emotes: copy of " + self.name + ": body " + self.model + ", " + count + " attached, parts: " + custom_scripts\ix\core\util::join( parts, ", " ) );
+    // Always in the console while the copy's missing head is looked into
+    // (0.14.7 report): what it was dressed with, and report_copy() below.
+    custom_scripts\ix\core\log::info( "emotes: copy of " + self.name + ": body " + self.model + ", " + count + " attached to you, parts: " + custom_scripts\ix\core\util::join( parts, ", " ) );
+    head = self gettagorigin( "j_head" )[2] - self.origin[2];
 
     state.standin = standin;
     self playerhide();
     state.hidden = 1;
     level thread clean_up_if_gone( self, undefined, standin );
     standin scriptmodelplayanim( emote.asset, 1 );
+    level thread report_copy( self, standin, head );
+}
+
+// A quarter of a second in: what the copy really carries and where its head
+// bone is (gettagorigin, as cp_gamelogic.gsc finds a zombie's head), against
+// where the player's was.
+report_copy( player, standin, head )
+{
+    player endon( "disconnect" );
+    wait 0.25;
+
+    if ( !isdefined( standin ) )
+        return;
+
+    names = [];
+
+    for ( i = 0; i < standin getattachsize(); i++ )
+        names[names.size] = standin getattachmodelname( i );
+
+    custom_scripts\ix\core\log::info( "emotes: the copy carries " + names.size + ": " + custom_scripts\ix\core\util::join( names, ", " ) + "; its head bone is " + int( standin gettagorigin( "j_head" )[2] - standin.origin[2] ) + " above its feet (yours: " + int( head ) + ")" );
 }
 
 // Holds the player where they stand, as the menu does (menu.gsc hold): a
