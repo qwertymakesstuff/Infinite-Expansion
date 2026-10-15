@@ -1,4 +1,4 @@
-# Play-test checklist (0.14.4)
+# Play-test checklist (0.14.5)
 
 What to try in a real match, and what should happen. Each item names its row in `TESTING.md` §4 (in brackets), where the details are. Tick what works; for anything that does not, see *If something is wrong* below.
 
@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.4 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 67 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.5 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 67 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*

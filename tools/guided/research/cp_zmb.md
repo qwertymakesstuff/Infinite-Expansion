@@ -99,6 +99,19 @@ Stock step table (DJ:8-19):
 - Item models: part_1 "zmb_frequency_device_radio" (DJ:210), part_2 "zmb_frequency_device_calculator" (DJ:228), part_3 "zmb_frequency_device_umbrella_ground" (DJ:245).
 - status: VERIFIED for the 3 items and the random spawn spots. The spot list is WALKTHROUGH ONLY, because the script only knows struct groups `area_1..3` (DJ:267), and it conflicts between sources. For the boombox, segmentnext/itechpost list the lower-bridge cart, top of Kepler and the underground break room, while magicgameworld/shacknews list the Racin' Stripes perk counter, a cart in Kepler and the Moonlight Cafe counter. Walkthroughs call the three items the parts of the "SETI-COM". The script logs the DJ crafting the frequency device when the items are turned in (DJ:198), but the quest flag fires on the 3rd pickup.
 
+### S1b. mini_ufos (owner's request, 2026-10-15; not a step of the quest line)
+- objective: Send out the mini UFOs
+- location: Table in the Pack-a-Punch room
+- hint_standard: Use the little UFO toys on the table in the Pack-a-Punch room. The four mini UFOs fly out of the room into the park.
+- script (MINI = cp/zombies/zombies_mini_ufo_quest.gsc, WOR = cp/zombies/zombies_wor.gsc):
+  - Started by Spaceland only: `thread scripts\cp\zombies\zombies_mini_ufo_quest::init()` (cp/maps/cp_zmb/cp_zmb.gsc:528).
+  - MINI:11-12 looks up the trigger `pap_room_mini_ufo_trigger` and the structs `pap_room_mini_ufos`; MINI:40 spawns a `park_ufo_statue_toy` model at each (the toys on the table); MINI:49-58 keeps them as `level.rocket_mini_ufo` (blue), `level.disco_mini_ufo` (green), `level.steel_dragon_mini_ufo` (yellow), `level.chromosphere_mini_ufo` (red).
+  - MINI:114-131 `waitforplayertriggered`: `waittill( "trigger", player )` once, then each toy flies (MINI:166 `spawnuniversaldangerzone`, which first sets the model `tag_origin_mini_ufo`, MINI:168) along its path to a `mini_ufo_ready` spot, where `mini_ufo_<colour>_ready` is set (MINI:207).
+  - What they are for: the Arcane Core. WOR:573 `collect_arcane_essense` sends a mini UFO to a trap's crystal; WOR:643-654 the essence is picked up only with a weapon that has the `arcane_base` attachment and charges it. MINI:149 plays `quest_arcane_nocore_start` to a player without one. The UFO quest line's steps (DJ:8-19) never test the mini UFOs.
+- detect: any of the four level fields no longer has the model `park_ufo_statue_toy` (the guide's `mini_ufos_released`). The `mini_ufo_<colour>_ready` flags are set with a built name (MINI:207) and cleared again by WOR (`reset_trap_kill_count`), so they are not used.
+- marker: the trigger `pap_room_mini_ufo_trigger` (MINI:11).
+- status: SCRIPT-VERIFIED; that the trigger is one players press Use on comes from the owner's play-through (the trigger's kind is map entity data).
+
 ### S1. enter_pap_room (quest idx 1)
 - objective: Enter the Pack-a-Punch room
 - location: Center portal (Main Street hub)

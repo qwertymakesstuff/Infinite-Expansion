@@ -4,6 +4,14 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.5: Guided Mode: the mini UFOs in the Pack-a-Punch room (2026-10-15)
+
+**Added**
+- **Zombies in Spaceland guide: "Send out the mini UFOs".** Right after you enter the Pack-a-Punch room, Guided Mode tells you to use the UFO toys on the table there, which send the four mini UFOs out into the park. It closes as soon as they fly. They are what later charges an Arcane Core; the UFO quest itself does not wait for them, so a later quest step also closes this one if you skip it. The guide now has 18 steps.
+
+**Known**
+- Custom emotes from Unity: a Humanoid `.anim` clip stores muscle values, not bone rotations, so it cannot be converted outside Unity (`KNOWN_LIMITATIONS.md` L72).
+
 ### 0.14.4: The custom emote's copy gets its head another way too (2026-10-14)
 
 **Fixed** (fourth in-game report: the copy still had no head)

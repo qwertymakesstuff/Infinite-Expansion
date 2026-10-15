@@ -51,6 +51,17 @@ guide()
         "Use the center portal to enter the Pack-a-Punch room (an earlier visit counts). When the next round starts, the UFO frozen in Polar Peak flashes and plays its tones, and the DJ is ready for you.",
         "flag:pap_portal_used", "ent:center_portal" );
 
+    // Asked for by the owner (2026-10-15): in the Pack-a-Punch room, the UFO
+    // toys on the table send the four mini UFOs out into the park
+    // (zombies_mini_ufo_quest.gsc). Not needed by the UFO quest's own
+    // scripts; a later step's signal closes it if it is skipped.
+    step = custom_scripts\ix\guided\guided::add_step( guide, "mini_ufos", "Send out the mini UFOs", "Table in the Pack-a-Punch room",
+        "Something odd sits on a table in the Pack-a-Punch room.",
+        "Use the little UFO toys on the table in the Pack-a-Punch room. The four mini UFOs fly out of the room into the park.",
+        "Interact with the UFO toys on the table in the Pack-a-Punch room: the four mini UFOs (red, green, blue, yellow) fly out into the park and wait there. The UFO quest does not need them; later they carry the essences that charge an Arcane Core.",
+        "check", "ent:pap_room_mini_ufo_trigger" );
+    step.check = ::mini_ufos_released;
+
     step = custom_scripts\ix\guided\guided::add_step( guide, "talk_dj", "Talk to the DJ", "His DJ window (Cosmic Tunes)",
         "The DJ has something for you once the next round starts.",
         "Find the DJ window that says Talk to DJ (he moves between booths) and talk to him for the frequency device.",
@@ -169,6 +180,19 @@ portals_linked()
     }
 
     return 1;
+}
+
+// zombies_mini_ufo_quest.gsc: using the Pack-a-Punch room's trigger turns
+// each of the four toys (park_ufo_statue_toy) into a flying mini UFO
+// (spawnuniversaldangerzone: tag_origin_mini_ufo).
+mini_ufos_released()
+{
+    return mini_ufo_flying( level.rocket_mini_ufo ) || mini_ufo_flying( level.disco_mini_ufo ) || mini_ufo_flying( level.steel_dragon_mini_ufo ) || mini_ufo_flying( level.chromosphere_mini_ufo );
+}
+
+mini_ufo_flying( ufo )
+{
+    return isdefined( ufo ) && isdefined( ufo.model ) && ufo.model != "park_ufo_statue_toy";
 }
 
 dj_items_found()

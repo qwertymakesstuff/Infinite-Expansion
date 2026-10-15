@@ -34,7 +34,7 @@ start( modules )
     }
 
     level.ix = spawnstruct();
-    level.ix.version = "0.14.4";
+    level.ix.version = "0.14.5";
     level.ix.map = getdvar( "mapname" );
     level.ix.ready = 0;
     level.ix.modules = [];
