@@ -1,12 +1,15 @@
 # Infinite Expansion - builds the custom emotes pack, started by
 # "Build Custom Emotes.cmd".
 #
-# Step 1 of the custom emotes: a proof that uses none of your own art. x64-zt
-# copies one of the game's own character animations (the Hoff at his decks,
-# from Zombies in Spaceland) under a new name into iw7-mod\zone\ix_emotes.ff,
-# and the mod plays it on a copy of your character from the Emotes page's
-# Custom category. It takes a few minutes, because x64-zt loads Spaceland's
-# zone. What it does and why: IXEmotes.Core.ps1.
+# Your animations go in <game>\iw7-mod\emotes\, listed in emotes.txt there
+# (this script creates it with its instructions): each is put on the game's
+# body rig and built into iw7-mod\zone\ix_emotes.ff, and the mod plays it on a
+# copy of your character from the Emotes page's Custom category (step 2).
+# Before anything is built, the converter must read and write back the game's
+# own animations byte for byte. With no animations listed it builds the test
+# emote instead: one of the game's own character animations (the Hoff at his
+# decks) under a new name (step 1). It takes a few minutes, because x64-zt
+# loads Spaceland's zone. What it does and why: IXEmotes.Core.ps1.
 #
 #   -GameDir <folder>    the game folder (found through Steam when left out)
 #   -ZoneTool <file>     a zonetool.exe to use instead of downloading x64-zt
@@ -53,7 +56,7 @@ $show = {
 }
 
 $exitCode = 1
-Write-Host 'INFINITE EXPANSION - CUSTOM EMOTES (step 1: proof with a game animation)' -ForegroundColor Cyan
+Write-Host 'INFINITE EXPANSION - CUSTOM EMOTES' -ForegroundColor Cyan
 try {
     Enable-IXTls12
     if (-not $GameDir) {
@@ -63,17 +66,38 @@ try {
         throw 'Infinite Warfare was not found. Run it again with -GameDir "<the folder with iw7_ship.exe>".'
     }
     Write-IXPictureLog $emotesLog ('Game folder: ' + $GameDir)
-    $built = Invoke-IXEmoteProofBuild -GameDir $GameDir -ZoneTool $ZoneTool -Log $show -KeepWork:$KeepWork
+    $manifest = Initialize-IXEmoteManifest $GameDir
+    $emotes = @(Read-IXEmoteManifest $GameDir)
+    if ($emotes.Count -eq 0) {
+        Write-Host ('No animations are listed in ' + $manifest + ', so this builds the test emote (a game animation).') -ForegroundColor Cyan
+    }
+    else {
+        Write-Host ('Your animations, from ' + $manifest + ':') -ForegroundColor Cyan
+        foreach ($emote in $emotes) {
+            Write-Host ('  ' + $emote.Id + '  ' + $emote.File + ' -> ' + $emote.Name + ' (' + $(if ($emote.Loop) { 'loops' } else { 'plays once' }) + ')') -ForegroundColor Cyan
+            Write-IXPictureLog $emotesLog ('emote ' + $emote.Id + ': ' + $emote.File + ', loop ' + $emote.Loop + ', wheel "' + $emote.Wheel + '", menu "' + $emote.Name + '"')
+        }
+    }
+    $built = Invoke-IXEmoteBuild -GameDir $GameDir -ZoneTool $ZoneTool -Log $show -KeepWork:$KeepWork -Emotes $emotes
     Reset-IXTitle
 
     Write-Host ''
     Write-Host 'Done.' -ForegroundColor Magenta
-    Write-Host ('  ' + $built.Source + ' (' + $built.Zone + ', ' + (Format-IXSeconds $built.Seconds) + ' s) is now ix_emote_proof in ' + $built.Pack) -ForegroundColor Green
-    Write-Host ('  Its ' + @($built.Bones).Count + ' bone names (the body rig to animate) are in ' + $emotesLog) -ForegroundColor Green
+    if ($built.Custom) {
+        foreach ($emote in @($built.Emotes)) {
+            Write-Host ('  ' + $emote.Name + ' (' + $emote.Asset + ', ' + (Format-IXSeconds $emote.Seconds) + ' s, ' + $(if ($emote.Loop) { 'loops' } else { 'plays once' }) + ') is in ' + $built.Pack) -ForegroundColor Green
+        }
+        Write-Host ('  What was checked and how each bone was put on the game''s rig: ' + $emotesLog) -ForegroundColor Green
+    }
+    else {
+        Write-Host ('  ' + $built.Source + ' (' + $built.Zone + ', ' + (Format-IXSeconds $built.Seconds) + ' s) is now ix_emote_proof in ' + $built.Pack) -ForegroundColor Green
+        Write-Host ('  Its ' + @($built.Bones).Count + ' bone names (the body rig to animate) are in ' + $emotesLog) -ForegroundColor Green
+    }
     if (-not $built.Verified) {
         Write-Host '  x64-zt could not list the new pack to check it; it is installed unchecked.' -ForegroundColor Yellow
     }
-    Write-Host '  Start the game: Emotes > Browse emotes > Custom > Test - Hoff at the decks.' -ForegroundColor Green
+    $first = @($built.Emotes)[0]
+    Write-Host ('  Start the game: Emotes > Browse emotes > Custom > ' + $first.Name + '.') -ForegroundColor Green
     $exitCode = 0
 }
 catch {

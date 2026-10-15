@@ -1,4 +1,4 @@
-# Play-test checklist (0.14.5)
+# Play-test checklist (0.14.6)
 
 What to try in a real match, and what should happen. Each item names its row in `TESTING.md` §4 (in brackets), where the details are. Tick what works; for anything that does not, see *If something is wrong* below.
 
@@ -17,7 +17,7 @@ What to try in a real match, and what should happen. Each item names its row in 
 
 ## 1. Start-up and the menu
 
-- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.5 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 67 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
+- [ ] **S1** Start a match. The console shows one `[IX] INFO: init 0.14.6 map=cp_zmb modules=player,weapons,zombies,qol,debug,guided,fun,ui`, then `settings: 67 (0 changed from the default)`, then `ready`; no `script compile error` or `script link error`. *(R-S1)*
 - [ ] **M1** ADS + Melee opens the menu **every** time, also with a quick tap and with toggle ADS. All its text shows: the title, eight rows, the help under the list and the two small lines of keys. *(R-M1, R-M11)*
 - [ ] **M2** W / S move, A / D change a value, Use or Jump selects, Melee goes back and closes. Long pages (the first page, Player, Movement, Debug) scroll past their eighth row. Every page's text is all there. *(R-M2, R-M14)*
 - [ ] **M3** While the menu is open you cannot shoot, throw or knife; after closing, everything works again. Going down closes it. *(R-S3, R-S4)*
@@ -131,6 +131,20 @@ First, with the game closed, double-click **`Build Custom Emotes.cmd`** in the m
 - [ ] **CE4** Play it again and walk (or press Melee or Use) after a second: it stops at once. Play it and let a zombie hit you: it stops. Nothing stays behind: no copy, no invisible you, no stuck weapon. *(R-E8)*
 - [ ] **CE6** From the menu on the ground, any emote starts (no "Land first"). In the console: `bind b "say !ix wheel"`; then B opens the wheel and B again closes the menu. *(R-E10)*
 - [ ] **CE5** *Emote settings* → *Emote: custom emotes* off: *Play* says "Custom emotes are off". At the next map the console no longer says `1 custom`. *(R-E9)*
+
+## 12c. Your own animation: Dance Moves (custom emotes step 2, new)
+
+Game closed. Run `Build Custom Emotes.cmd` once if `iw7-mod\emotes\emotes.txt` is not in the game folder yet (it creates it). Put `DanceMoves.fbx` in `iw7-mod\emotes\` and add this line to `emotes.txt` (it plays once, as you asked):
+
+```
+DanceMoves.fbx | 0 | Dance Moves | Dance Moves
+```
+
+Then run `Build Custom Emotes.cmd` again (a few minutes). Keep `%TEMP%\InfiniteExpansionEmotes.log` whatever happens.
+
+- [ ] **CE7** The window lists `u1  DanceMoves.fbx -> Dance Moves (plays once)`, a `round trip …: identical` line for each game animation, `learned from them: …`, and ends with "Dance Moves (ix_emote_dancemoves, 6.867 s, plays once) is in …". If it stops anywhere (the round trip above all), send the whole log: nothing is installed then. *(R-E12)*
+- [ ] **CE8** Solo Match. Console: `[IX] INFO: emotes: 1 custom from ix_emotes`. *Browse emotes* → *Custom* → *Dance Moves* → *Play*: the copy dances for about 7 seconds, facing the way you faced, feet on the floor, then you are back with your weapon. Tell me what looks wrong (leaning, arms through the body, twisted hands or feet, sliding, floating), best with a video from the front (turn the camera round). *(R-E13)*
+- [ ] **CE9** Play it again and walk after a second: it stops at once; nothing stays behind. *(R-E13)*
 
 ## 13. Co-op (when a friend can join)
 

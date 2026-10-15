@@ -268,7 +268,7 @@ The scope is in `ROADMAP.md`. AAE's emotes were studied first (`IW_API_NOTES.md`
 | A key for the emote wheel (B) | Fun | 14 | TESTING | Raw keys: BLOCKED (L70). `!ix wheel` toggles the menu at the wheel; `bind b "say !ix wheel"`. R-E10 |
 | Visible to other players | Fun | 14 | NEEDS TESTING | L66, R-E3 |
 
-### Custom emotes (after Phase 14, in progress: step 1 of 4)
+### Custom emotes (after Phase 14, in progress: step 2 of 4)
 
 Your own full-body animations, played on a copy of your character (`IW_API_NOTES.md` §24). The plan's four steps are in `ROADMAP.md`.
 
@@ -280,7 +280,9 @@ Your own full-body animations, played on a copy of your character (`IW_API_NOTES
 | Step 1: proof pack from a game animation (`Build Custom Emotes.cmd`) | Tooling | 14+ | NEEDS TESTING | `installer/IXEmotes.Core.ps1`: x64-zt lists `cp_zmb` / `patch_cp_zmb`, dumps `IW7_cp_zom_hoff_dj_desk_01`, renames it `ix_emote_proof`, builds and re-lists `ix_emotes`; logs the bone names. L69, R-E7 |
 | Menu script loads the pack and hands the list to the GSC | UI | 14+ | TESTING | `ui_scripts/InfiniteExpansion/__init__.lua` `loadEmotes()`; `tools/tests/test_menu_script.py` |
 | Seen by other players; a guest without the pack | Fun | 14+ | NEEDS TESTING | L67, R-E7 |
-| Step 2: converter (SEAnim, Cast, then glTF/GLB) through one intermediate, `.xab` reader and writer proven by byte-for-byte round trips | Tooling | 14+ | PLANNED | `ROADMAP.md` |
+| Step 2: your FBX animations converted onto the game's body rig (`iw7-mod\emotes\emotes.txt`: file, loop, wheel and menu names) | Tooling | 14+ | NEEDS TESTING | `installer/IXEmoteConvert.cs` (0.14.6): ASCII and binary FBX of one humanoid rig (L73), retargeted by rotation onto a Spaceland body model's rig dumped with x64-zt (L74), at most 256 frames (L75); `tools/tests/test_emote_converter.py`, `test_installer.py` `CustomEmotesScript`. R-E12, R-E13 |
+| Step 2: `.xab` reader and writer proven by byte-for-byte round trips on the game's own animations before anything is built | Tooling | 14+ | NEEDS TESTING | `Converter.RoundTrip`, `XAnimRules` (`IW_API_NOTES.md` §24b); made-up animations of every track kind round-trip in the tests. R-E12 |
+| Other rigs and formats (glTF, SEAnim, Cast) | Tooling | 14+ | PLANNED | L73 |
 | Step 3: *Build Custom Emotes* in the setup, a manifest, host-side checks | Tooling | 14+ | PLANNED | `ROADMAP.md` |
 | Step 4: docs, tests, version, release | — | 14+ | PLANNED | |
 

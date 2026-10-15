@@ -1322,6 +1322,11 @@ class EmotesScript(unittest.TestCase):
             self.assertNotIn("unchecked", result.stdout)
             self.assertIn("Its 3 bone names", result.stdout)
             self.assertIn("bones (3): bone_a bone_b bone_c", result.stdout)
+            # With no animations listed, the list for them is created with its instructions.
+            manifest = (game / "iw7-mod" / "emotes" / "emotes.txt").read_text()
+            self.assertIn("#   file | loop | wheel name | menu name", manifest)
+            self.assertTrue(all(line.startswith("#") for line in manifest.splitlines()))
+            self.assertIn("No animations are listed in", result.stdout)
 
     def test_type_name_and_zone_come_from_the_listing(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1374,6 +1379,120 @@ class EmotesScript(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("Install Infinite Expansion first", result.stdout)
             self.assertFalse((game / "fake_zonetool.log").exists())
+
+
+@unittest.skipUnless(PWSH, "PowerShell 7 not found: run tools/setup_compilers.sh")
+class CustomEmotesScript(unittest.TestCase):
+    """installer/IXEmotes.ps1 with your own animations (step 2), end to end,
+    with the stand-in for x64-zt laying out its animations and body model as
+    emote_fixtures.py does (made-up numbers, no game data)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        _steam, self.game = make_game(Path(self.tmp.name))
+        (self.game / "zone").mkdir()
+        install_mod(self.game, self.tmp.name)
+        self.source = self.game / "iw7-mod" / "emotes"
+        self.source.mkdir(parents=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_emotes(self, config=None):
+        config = dict(config or {}, fixtures=str(Path(__file__).resolve().parent))
+        (self.game / "fake_zonetool.json").write_text(json.dumps(config))
+        return subprocess.run([PWSH, "-NoProfile", "-NonInteractive", "-File", str(EMOTES), "-GameDir", str(self.game),
+                               "-ZoneTool", str(FAKE_ZONETOOL), "-NoPause"], capture_output=True, text=True, timeout=600)
+
+    def add_fbx(self, name, frames=16, **options):
+        import emote_fixtures as ef
+        data, _truth, _bind = ef.make_fbx(lambda n, f: None, frames=frames, **options)
+        (self.source / name).write_bytes(data)
+
+    def assert_nothing_installed(self):
+        self.assertFalse((self.game / "iw7-mod" / "zone" / "ix_emotes.ff").exists())
+        self.assertFalse((self.game / "iw7-mod" / "zone" / "ix_emotes.txt").exists())
+        for name in ("dump", "zonetool", "zone_source", "ix-zonetool.exe", "zone/ix_emotes.ff"):
+            self.assertFalse((self.game / name).exists(), name)
+
+    def test_builds_your_animations(self):
+        import emote_fixtures as ef
+        self.add_fbx("My Dance.fbx", frames=16)
+        self.add_fbx("spin.FBX", frames=31, binary=True)
+        (self.source / "emotes.txt").write_text("# mine\n\nMy Dance.fbx | 0 | My Dance | My Dance - test\n  spin.FBX|1|Spin|Spin around  \n")
+        result = self.run_emotes()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        pack = json.loads((self.game / "iw7-mod" / "zone" / "ix_emotes.ff").read_text())
+        self.assertEqual(pack["rows"][1:], ["xanim,ix_emote_my_dance", "xanim,ix_emote_spin"])
+        listed = (self.game / "iw7-mod" / "zone" / "ix_emotes.txt").read_text().splitlines()
+        self.assertEqual(listed[2:], ["u1|ix_emote_my_dance|0.5|0|Custom|My Dance|My Dance - test",
+                                      "u2|ix_emote_spin|1|1|Custom|Spin|Spin around"])
+        for xanim, frames, loop in zip(pack["xanims"], (16, 31), (0, 1)):
+            d = ef.decode_xanim(bytes.fromhex(xanim["data"]))
+            self.assertEqual((d.name, d.numframes, d.flags, len(d.bones), d.unread), (xanim["name"], frames - 1, loop, 48, {}))
+        log = (self.game / "fake_zonetool.log").read_text()
+        self.assertEqual(log.count("args -unbuffered-io"), 3)
+        for command in ("dumpasset xanim IW7_cp_zom_hoff_dj_desk_01", "dumpasset xanim iw7_cp_zom_hoff_dj_idle_01",
+                        "dumpasset xmodel body_zmb_hero_jock"):
+            self.assertIn(repr(command + "\n"), log)
+        self.assertNotIn("crash", log)
+        out = result.stdout
+        self.assertIn("round trip IW7_cp_zom_hoff_dj_desk_01: identical", out)
+        self.assertIn("round trip iw7_cp_zom_hoff_dj_idle_01: identical", out)
+        self.assertIn("learned from them: last frame = numframes", out)
+        self.assertIn("body model: xmodel,body_zmb_hero_jock in cp_zmb", out)
+        self.assertIn("j_shoulder_le<-upper_arm_L", out)
+        self.assertIn("My Dance - test (ix_emote_my_dance, 0.5 s, plays once)", out)
+        self.assertIn("Spin around (ix_emote_spin, 1 s, loops)", out)
+        self.assertIn("Custom > My Dance - test.", out)
+        # Your files stay; x64-zt's work is gone.
+        self.assertTrue((self.source / "My Dance.fbx").exists())
+        self.assertIn("My Dance.fbx | 0", (self.source / "emotes.txt").read_text())
+        for name in ("dump", "zonetool", "zone_source", "ix-zonetool.exe", "zone/ix_emotes.ff"):
+            self.assertFalse((self.game / name).exists(), name)
+
+    def test_list_mistakes_are_named_before_x64zt_runs(self):
+        self.add_fbx("a.fbx")
+        cases = [("a.fbx | | A | A", "line 1: the loop is 0 (plays once) or 1 (loops); there is no default."),
+                 ("a.fbx | yes | A | A", "line 1: the loop is 0 (plays once) or 1 (loops); there is no default."),
+                 ("b.fbx | 0 | A | A", "line 1: b.fbx is not in"),
+                 ("a.anim | 0 | A | A", "line 1: the file must be an .fbx"),
+                 ("# c\na.fbx | 0 | A wheel name too long | A", "line 2: the wheel name is 1 to 14"),
+                 ("a.fbx | 0 | A | Ä", "line 1: the menu name is 1 to 27"),
+                 ("a.fbx | 0 | A", 'line 1: write it as "file | loop | wheel name | menu name".')]
+        for text, message in cases:
+            (self.source / "emotes.txt").write_text(text + "\n", encoding="utf-8")
+            result = self.run_emotes()
+            self.assertEqual(result.returncode, 1, text)
+            self.assertIn("emotes.txt " + message, result.stdout, text)
+            self.assertFalse((self.game / "fake_zonetool.log").exists(), text)
+            self.assert_nothing_installed()
+
+    def test_nothing_is_built_unless_the_game_animations_round_trip(self):
+        self.add_fbx("a.fbx")
+        (self.source / "emotes.txt").write_text("a.fbx | 0 | A | A\n")
+        result = self.run_emotes({"corrupt_xanims": ["iw7_cp_zom_hoff_dj_idle_01"]})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("round trip iw7_cp_zom_hoff_dj_idle_01: its randomDataShort array ends before its tracks do.", result.stdout)
+        self.assertIn("do not read and write back byte for byte, so the converter is not trusted with yours and nothing was built", result.stdout)
+        self.assertNotIn("-buildzone", (self.game / "fake_zonetool.log").read_text())
+        self.assert_nothing_installed()
+
+    def test_no_body_model(self):
+        self.add_fbx("a.fbx")
+        (self.source / "emotes.txt").write_text("a.fbx | 0 | A | A\n")
+        result = self.run_emotes({"xmodel_zones": {}})
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("did not list a body model to take the rig from (body_zmb_hero_jock, zmb_body_hero_valley_girl, zmb_hero_nerd, zmb_hero_rapper, fullbody_zmb_hero_dj)", result.stdout)
+        self.assert_nothing_installed()
+
+    def test_an_animation_the_rig_cannot_take(self):
+        self.add_fbx("a.fbx", drop=("head",))
+        (self.source / "emotes.txt").write_text("a.fbx | 0 | A | A\n")
+        result = self.run_emotes()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("a.fbx: The animation's rig lacks head", result.stdout)
+        self.assert_nothing_installed()
 
 
 SCENARIO_XAB = r"""

@@ -85,7 +85,16 @@ The Guided Mode guides (`mods/infinite_expansion/custom_scripts/ix/guided/guides
 - the GSC's limits match the menu script's (ids of at most six letters, names of 14 and 27, 20 emotes), and names and help fit the menu;
 - the proof's names pass those rules, and its animation is one the stock scripts precache and play on a character model.
 
-`test_installer.py` runs the proof build (`EmotesScript`, `EmoteFiles`) against `fake_zonetool.py`, which also answers `dumpcsv` (a zone's assets with the game's type names), `dumpasset <type> <name>` for an animation (a made-up `.xab` in x64-zt's layout from `make_xab`; an unknown type name crashes it, as `type_to_int` would give -1) and build rows of animations; `fake_zonetool.json` can rename the animation type (`xanim_type`), move or remove the animation (`xanim_zones`), change its frames (`xanim_frames`) or make the new zone fail to load (`crash_on_csv`). `test_menu_script.py` covers the menu script's list loading (scenario `emotes` of `menu_harness.lua`).
+`tools/tests/test_emote_converter.py` runs the converter (`installer/IXEmoteConvert.cs`, step 2) through PowerShell 7 on made-up files from `tools/tests/emote_fixtures.py` (none of them game art): IW7 animations in x64-zt's format written and read by a Python reader built from the same description of IW7's data streams (Greyhound's `TranslateXAnim`), an IW7-like body model (`.xmb`, T-posed, every bone turned some odd way), and FBX files, ASCII and binary (zlib arrays, user tangents), of the humanoid rig with known bone rotations. It checks:
+
+- byte-for-byte round trips of short and long animations (inline and table frame indices, notetracks, delta part) and the refusal of ones whose data does not add up;
+- the header rules learned from samples, and the refusal of samples that disagree;
+- that every driven bone turns exactly as its FBX bone turns, in IW7's axes (within 0.05°), that the hips move by the scaled amount, that bones point as the FBX's do at rest, the header fields, missing bones, the 256-frame limit and curve interpolation;
+- that the file compiles with C# 5 rules and uses nothing from System.Core.
+
+`test_installer.py` `CustomEmotesScript` runs Build Custom Emotes with your animations end to end (the list in `iw7-mod\emotes\emotes.txt`, its mistakes, the round trip stopping the build, a missing body model, a rig without a head); `test_custom_emotes.py` `YourAnimations` checks the bone map against the game animation's bone names, the rig models against the stock scripts and the list's limits against the menu script.
+
+`test_installer.py` runs the proof build (`EmotesScript`, `EmoteFiles`) against `fake_zonetool.py`, which also answers `dumpcsv` (a zone's assets with the game's type names), `dumpasset <type> <name>` for an animation (a made-up `.xab` in x64-zt's layout from `make_xab`; an unknown type name crashes it, as `type_to_int` would give -1) and build rows of animations; `fake_zonetool.json` can rename the animation type (`xanim_type`), move or remove the animation (`xanim_zones`), change its frames (`xanim_frames`) or make the new zone fail to load (`crash_on_csv`); with `fixtures` (the folder of `emote_fixtures.py`) its animations get real data streams, it lists and dumps a body model (`dumpasset xmodel`, `xmodel_zones`), and `corrupt_xanims` dumps some that do not read back. `test_menu_script.py` covers the menu script's list loading (scenario `emotes` of `menu_harness.lua`).
 
 ## Launcher icon
 

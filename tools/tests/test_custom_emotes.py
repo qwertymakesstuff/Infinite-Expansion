@@ -184,5 +184,72 @@ class CustomEmotes(unittest.TestCase):
         self.assertIn('add_page( "emote_wheel", "Emote wheel", "emotes" )', tree)
 
 
+# The bones of the game's own body animation the proof copies
+# (iw7_cp_zom_hoff_dj_desk_01), as Build Custom Emotes listed them on the
+# owner's PC (0.14.x log). Bone names only; no animation data.
+HOFF_BONES = """tag_sync j_spine4 j_chest j_helmet j_mainroot tag_ik_foot_loc_ri tag_ik_foot_loc_le j_hip_le j_hip_ri
+j_spinelower j_knee_le j_knee_ri j_spineupper j_ankle_le j_ball_le j_ankle_ri j_ball_ri j_clavicle_le j_clavicle_ri j_neck
+tag_inhand j_shoulder_le j_shoulder_ri j_head j_elbow_le j_wrist_le j_shield_le tag_accessory_left tag_weapon_left
+j_metapinky_le_1 j_thumb_le_1 j_metaindex_le_1 j_metamid_le_1 j_metaring_le_1 j_pinky_le_1 j_ring_le_1 j_thumb_le_2
+j_index_le_1 j_mid_le_1 j_index_le_2 j_index_le_3 j_mid_le_2 j_mid_le_3 j_pinky_le_2 j_pinky_le_3 j_ring_le_2 j_ring_le_3
+j_thumb_le_3 j_gun tag_weapon_right j_elbow_ri j_shield_ri j_wrist_ri j_metaindex_ri_1 j_metapinky_ri_1 j_metaring_ri_1
+j_thumb_ri_1 tag_accessory_right j_index_ri_1 j_mid_ri_1 j_pinky_ri_1 j_ring_ri_1 j_thumb_ri_2 j_index_ri_2 j_index_ri_3
+j_mid_ri_2 j_mid_ri_3 j_pinky_ri_2 j_pinky_ri_3 j_ring_ri_2 j_ring_ri_3 j_thumb_ri_3 j_metamid_ri_1""".split()
+CONVERTER = REPO / "installer" / "IXEmoteConvert.cs"
+
+
+class YourAnimations(unittest.TestCase):
+    """Step 2: the converter's bone map, the rig it reads and the list of your
+    animations, against the stock scripts, the game's bone names and the menu
+    script."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.core = EMOTES_CORE.read_text()
+        cls.converter = CONVERTER.read_text()
+
+    def bone_map(self):
+        """The IW7 bones Humanoid() names, its "<prefix>" + i + "<suffix>"
+        written out for both sides ("le", "ri")."""
+        body = re.search(r"public static List<BoneLink> Humanoid\(\)(.*?)\n        \}\n", self.converter, re.S).group(1)
+        iw = set()
+        for side in ("le", "ri"):
+            for prefix, plus, suffix in re.findall(r'"(j_[a-z0-9_]*)"(\s*\+\s*i(?:\s*\+\s*"([a-z0-9_]*)")?)?', body):
+                iw.add(prefix + (side + suffix if plus else ""))
+            for finger in ("index", "mid", "ring", "pinky"):
+                for n in (1, 2, 3):
+                    iw.add("j_%s_%s_%d" % (finger, side, n))
+        # fi + "1": the finger prefix built above, not a bone itself.
+        return {b for b in iw if not b.endswith("_")}
+
+    def test_every_driven_bone_is_one_the_game_animates(self):
+        bones = self.bone_map()
+        self.assertGreaterEqual(len(bones), 40)
+        self.assertEqual(sorted(b for b in bones if b not in HOFF_BONES), [])
+        self.assertEqual(len(HOFF_BONES), 73)
+
+    def test_rig_models_come_from_the_stock_scripts(self):
+        models = re.findall(r"'([a-z_]+)'", re.search(r"\$IXEmoteRigModels = @\(([^)]*)\)", self.core).group(1))
+        setup = (DUMP / "cp" / "maps" / "cp_zmb" / "cp_zmb_player_character_setup.gsc").read_text()
+        bodies = re.findall(r'register_player_character\( \d+, "\w+", "(\w+)"', setup)
+        self.assertTrue(set(models[:4]) <= set(bodies))
+        dj = (DUMP / "cp" / "maps" / "cp_zmb" / "cp_zmb_dj.gsc").read_text()
+        self.assertEqual(models[4], "fullbody_zmb_hero_dj")
+        self.assertIn('level.dj setmodel( "%s" );' % models[4], dj)
+
+    def test_list_limits_match_the_menu_script(self):
+        self.assertIn("$IXEmoteMax = 20", self.core)
+        self.assertIn("return 20;", function(CUSTOM.read_text(), "max_count"))
+        self.assertIn("@('wheel name', $fields[2], 14), @('menu name', $fields[3], 27)", self.core)
+        self.assertIn("'^[A-Za-z0-9 .\\-]+$'", self.core)
+        # The loop is asked for every emote: no default.
+        self.assertIn("there is no default", self.core)
+
+    def test_asset_names_pass_the_list_rules(self):
+        # ix_emote_ + at most 34 + _NN: within the 48 the menu script allows.
+        self.assertIn("$base.Length -gt 34", self.core)
+        self.assertLessEqual(len("ix_emote_") + 34 + len("_20"), 48)
+
+
 if __name__ == "__main__":
     unittest.main()

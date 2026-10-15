@@ -4,6 +4,16 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.6: Custom emotes, step 2: your own FBX animations (2026-10-15)
+
+**Added**
+- **Your own animations as custom emotes.** Put an FBX in `iw7-mod\emotes\` in the game folder, add a line for it to `iw7-mod\emotes\emotes.txt` (`file | loop | wheel name | menu name`; the first run of the builder creates the file with its instructions) and run `Build Custom Emotes.cmd`. Each animation is put on the game's own body rig, read from your game (a Spaceland player's body model): every bone turns as yours does, from a rest pose lined up with your rig's, and the hips move by the same share of the body's height. It appears under *Browse emotes* → *Custom* with your names; whether it loops is set per emote in the list (no default).
+- **Nothing is built unless the converter is right about the game's format on your PC:** it first reads up to nine of the game's own animations and writes them back, and every one must come out byte for byte the same; three header fields are set the way those animations show. The log (`%TEMP%\InfiniteExpansionEmotes.log`) lists every check, the body model's bones and which of your bones drives which.
+- The converter (`installer/IXEmoteConvert.cs`, compiled by PowerShell on your PC) reads ASCII and binary FBX with the bone names of the humanoid rig of the first animation (`hips`, `spine`, `chest`, `neck`, `head`, arms, legs, fingers, thumbs; `README.md`). With nothing listed, the builder makes the step 1 test emote as before.
+
+**Known**
+- Other rigs and formats (glTF, SEAnim, Cast) are refused for now (`KNOWN_LIMITATIONS.md` L73); no foot or hand contact (L74); at most 256 frames, longer animations play at a lower frame rate (L75); not yet seen in a match (L76, `TESTING.md` R-E13).
+
 ### 0.14.5: Guided Mode: the mini UFOs in the Pack-a-Punch room (2026-10-15)
 
 **Added**

@@ -35,6 +35,15 @@ fake_zonetool.json in the game folder sets what it does:
     xanim_type     the game's name for animations (default "xanim")
     xanim_zones    {zone: [animation, ...]} in place of ZONE_XANIMS
     xanim_frames   [frames, framerate, flags] of every dumped animation
+    fixtures       the folder of emote_fixtures.py: dumped animations are then
+                   laid out with real data streams (emote_fixtures
+                   sample_animation: the zone's first animation "short", the
+                   others with 16-bit frame indices), and "dumpasset xmodel"
+                   of a listed body model writes dump/assets/xmodel/<name>.xmb
+                   (emote_fixtures.make_rig); numbers made up, no game data
+    xmodel_zones   {zone: [model, ...]} in place of ZONE_XMODELS
+    corrupt_xanims animations dumped with one bone too many in their counts,
+                   so they do not read back
     crash_on_csv   zones whose dumpcsv makes it exit with code 7
     hang           true: print the ready line, then never answer again
 Every command it receives is appended to fake_zonetool.log, as Python repr,
@@ -72,6 +81,8 @@ ZONE_IMAGES = {
 
 # Where the custom emotes' proof looks for its animation; made up for the test.
 ZONE_XANIMS = {"cp_zmb": ["IW7_cp_zom_hoff_dj_desk_01", "iw7_cp_zom_hoff_dj_idle_01"], "patch_cp_zmb": []}
+# A zone's body models (listed as "xmodel,<name>"; only with "fixtures").
+ZONE_XMODELS = {"cp_zmb": ["body_zmb_hero_jock"], "patch_cp_zmb": []}
 
 
 # Made-up bone names for the stand-in's animations (not read from any game file).
@@ -132,6 +143,18 @@ def zone_xanims(zone, config):
     return config.get("xanim_zones", ZONE_XANIMS).get(zone, [])
 
 
+def zone_xmodels(zone, config):
+    if not config.get("fixtures"):
+        return []
+    return config.get("xmodel_zones", ZONE_XMODELS).get(zone, [])
+
+
+def fixtures(config):
+    sys.path.insert(0, config["fixtures"])
+    import emote_fixtures
+    return emote_fixtures
+
+
 def dump_csv(zone, config):
     """dumpcsv: the zone's assets as "<type>,<name>" lines."""
     kind = config.get("xanim_type", "xanim")
@@ -140,6 +163,7 @@ def dump_csv(zone, config):
         rows = [f"{kind},{x['name']}" for x in json.load(open(path, encoding="utf-8")).get("xanims", [])]
     else:
         rows = [f"image,{name}" for name in ZONE_IMAGES[zone]] + [f"{kind},{name}" for name in zone_xanims(zone, config)]
+        rows += [f"xmodel,{name}" for name in zone_xmodels(zone, config)]
     write(f"dump/{zone}/{zone}.csv", "".join(row + "\n" for row in rows).encode())
     say(f'Csv "{zone}" dumped...')
 
@@ -223,14 +247,29 @@ def console(config):
             else:
                 dump_csv(zone, config)
                 loaded.add(zone)
+        elif words[:2] == ["dumpasset", "xmodel"] and config.get("fixtures"):
+            names = {n.lower(): n for zone in loaded for n in zone_xmodels(zone, config)}
+            name = names.get(words[2].lower())
+            if name is None:
+                say("Asset not found")
+            else:
+                write(f"dump/assets/xmodel/{name}.xmb", fixtures(config).make_rig(name)[0])
+                say("Dumped to dump/assets")
         elif words[0] == "dumpasset" and words[1] not in ("material", "image"):
             if words[1] != config.get("xanim_type", "xanim"):
                 log("dumpasset with an unknown type: crash")
                 return 6
-            names = {n.lower(): n for zone in loaded for n in zone_xanims(zone, config)}
-            name = names.get(words[2].lower())
+            names = {n.lower(): (n, i) for zone in loaded for i, n in enumerate(zone_xanims(zone, config))}
+            name, index = names.get(words[2].lower(), (None, 0))
             if name is None:
                 say("Asset not found")
+            elif config.get("fixtures"):
+                variant = ("short", "long_inline", "long_indices")[min(index, 2)]
+                data = bytearray(fixtures(config).sample_animation(name, variant))
+                if name in config.get("corrupt_xanims", []):
+                    data[6 + 121] += 1
+                write(f"dump/assets/xanim/{name}.xab", bytes(data))
+                say("Dumped to dump/assets")
             else:
                 frames, framerate, flags = config.get("xanim_frames", [151, 30.0, 0])
                 write(f"dump/assets/xanim/{name}.xab", make_xab(name, frames, framerate, flags))
@@ -267,7 +306,7 @@ def build(zone):
                 say(f"{path} is not an animation")
                 return 2
             inner = data[144:data.index(0, 144)].decode()
-            xanims.append({"name": name, "inner": inner, "size": len(data), "tail": data[data.index(0, 144) + 1:].hex()})
+            xanims.append({"name": name, "inner": inner, "size": len(data), "tail": data[data.index(0, 144) + 1:].hex(), "data": data.hex()})
             continue
         if not row.startswith("material,"):
             continue
