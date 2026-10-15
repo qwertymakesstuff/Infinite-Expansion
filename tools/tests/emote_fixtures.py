@@ -148,7 +148,7 @@ class Track:
 
 
 def encode_xanim(name, bones, rotations, translations, numframes, framerate=30.0, flags=0,
-                 long_indices=False, notify=None, delta=b"", asset_type=0, frequency=None, pad_byte=False):
+                 long_indices=False, notify=None, delta=b"", asset_type=0, frequency=None, pad_byte=False, untranslated=None):
     """An animation file as x64-zt dumps one. rotations: one Track per bone, in
     the order of the bones, grouped by kind (0..4); translations: Tracks of kind
     5, 6, 7 in that order. Frame indices are bytes below 256 frames, else
@@ -199,6 +199,10 @@ def encode_xanim(name, bones, rotations, translations, numframes, framerate=30.0
             else:
                 rs.extend(struct.pack("<%dH" % len(t.keys), *t.keys))
             frames_out(count, t.frames)
+    # Then the bones without a translation, in order (what the game's own
+    # animations hold at the end of dataByte; owner's log, 0.14.6).
+    moved = {t.bone for t in translations}
+    db.extend(untranslated if untranslated is not None else [b for b in range(len(bones)) if b not in moved])
     if pad_byte:
         db.append(0)    # a byte no track reads
     counts[8] = len(bones) - counts[5] - counts[6] - counts[7]
@@ -342,6 +346,7 @@ def decode_xanim(data):
             keys = take("rb", "%dB" % ((count + 1) * 3)) if kind == 5 else take("rs", "%dH" % ((count + 1) * 3))
             fr = frames(count)
             d.translations[d.bones[b]] = {f: tuple(mins[k] + size[k] * keys[i * 3 + k] for k in range(3)) for i, f in enumerate(fr)}
+    d.untranslated = [take("db", "B")[0] for _ in range(d.counts[8])]
     d.unread = {k: len(streams[k]) - pos[k] for k in streams if len(streams[k]) != pos[k]}
     return d
 

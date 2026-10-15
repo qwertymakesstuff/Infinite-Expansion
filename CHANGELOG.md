@@ -4,6 +4,12 @@ All notable changes to this project. Format based on *Keep a Changelog*.
 
 ## [Unreleased]
 
+### 0.14.7: Custom emotes: the game's animations now read back (2026-10-15)
+
+**Fixed** (first run of step 2 on the owner's PC: nothing was built)
+- **Every game animation but one failed the byte-for-byte check**, each with a few bytes left unread at the end of its `dataByte` array, and the one that passed has a translation on its only bone. IW7 lists there, in order, the bones that have no translation (`boneCount[8]` of them), which Greyhound's reader skips. The converter now reads that list, checks that it names exactly the bones no translation names (so a wrong reading still stops the build), writes it back, and writes it for your animations too.
+- The log shows each checked animation's bone counts.
+
 ### 0.14.6: Custom emotes, step 2: your own FBX animations (2026-10-15)
 
 **Added**

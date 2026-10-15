@@ -604,6 +604,11 @@ namespace IXEmotes
 
         public List<RotationTrack> Rotations = new List<RotationTrack>();
         public List<TranslationTrack> Translations = new List<TranslationTrack>();
+        // The bones without a translation, by index (boneCount[8] of them),
+        // after the last translation in dataByte: what the game's own
+        // animations hold there (owner's log, 0.14.6: each sample's unread
+        // dataByte was exactly that long). Greyhound skips them.
+        public int[] Untranslated = new int[0];
 
         public ulong Pointer(int offset) { return BitConverter.ToUInt64(Header, offset); }
         public float Framerate { get { return BitConverter.ToSingle(Header, 100); } }
@@ -776,15 +781,51 @@ namespace IXEmotes
                     Translations.Add(t);
                 }
             }
+            Untranslated = new int[BoneCount(8)];
+            for (int i = 0; i < Untranslated.Length; i++)
+            {
+                Untranslated[i] = boneTypeSize == 1 ? s.Byte() : s.Short();
+            }
             string left = s.Leftover();
             if (left != null)
             {
-                throw new EmoteException(Name + ": " + left);
+                throw new EmoteException(Name + ": " + left + " " + Counts());
+            }
+            if (Untranslated.Length > 0)
+            {
+                // They must be exactly the bones no translation names.
+                var seen = new bool[BoneCount(9)];
+                foreach (var t in Translations) seen[t.Bone] = true;
+                foreach (int b in Untranslated)
+                {
+                    if (b >= seen.Length || seen[b])
+                    {
+                        throw new EmoteException(Name + ": the bones listed after its translations are not the bones without one (" + string.Join(" ", Array.ConvertAll(Untranslated, x => x.ToString())) + "). " + Counts());
+                    }
+                    seen[b] = true;
+                }
+                foreach (bool b in seen)
+                {
+                    if (!b) throw new EmoteException(Name + ": some bones have neither a translation nor a place in the list after them. " + Counts());
+                }
             }
             if (RandomDataInt != null && Bytes(RandomDataInt).Length > 0)
             {
                 throw new EmoteException(Name + " uses randomDataInt, which no IW7 reader reads.");
             }
+        }
+
+        public string Counts()
+        {
+            var c = new string[10];
+            for (int i = 0; i < 10; i++) c[i] = BoneCount(i).ToString();
+            return "(boneCount " + string.Join(" ", c) + ", numframes " + NumFrames + ")";
+        }
+
+        public bool UntranslatedAscending()
+        {
+            for (int i = 1; i < Untranslated.Length; i++) if (Untranslated[i] <= Untranslated[i - 1]) return false;
+            return true;
         }
 
         ushort[] ReadInline(Streams s, int frameSize, int keyCount)
@@ -869,6 +910,10 @@ namespace IXEmotes
                     }
                     WriteFrames(s, frameSize, t.KeyCount, t.Frames);
                 }
+            }
+            foreach (int b in Untranslated)
+            {
+                if (boneTypeSize == 1) s.Byte(b); else s.Short(b);
             }
             DataByte = Replace(DataByte, s.DataByte.ToArray(), 1);
             DataShort = Replace(DataShort, s.DataShort.ToArray(), 2);
@@ -1872,7 +1917,7 @@ namespace IXEmotes
         public static XAnimRules Learn(IList<XAnim> samples)
         {
             var r = new XAnimRules();
-            int last = 0, lastMinus = 0, freqA = 0, freqB = 0, timed = 0, noneA = 0, noneB = 0, keyed = 0;
+            int last = 0, lastMinus = 0, freqA = 0, freqB = 0, timed = 0, noneA = 0, noneB = 0, keyed = 0, unordered = 0;
             foreach (var a in samples)
             {
                 int n = a.NumFrames;
@@ -1891,6 +1936,7 @@ namespace IXEmotes
                     else if (Math.Abs(f - a.Framerate / (n + 1.0)) <= 1e-4 * Math.Max(1, Math.Abs(f))) freqB++;
                 }
                 int moved = a.BoneCount(5) + a.BoneCount(6) + a.BoneCount(7);
+                if (!a.UntranslatedAscending()) unordered++;
                 if (a.BoneCount(8) == a.BoneCount(9) - moved) noneA++;
                 else if (a.BoneCount(8) == 0) noneB++;
             }
@@ -1910,7 +1956,11 @@ namespace IXEmotes
                 throw new EmoteException("The game's animations do not show how they count bones without a translation.");
             }
             r.NoneTranslatedCounted = noneA > 0;
-            r.Notes = "last frame " + (r.LastFrameIsNumFrames ? "= numframes" : "= numframes - 1") + " (" + keyed + " of " + total + " samples keyed); frequency = framerate / " + (r.FrequencyPerNumFrames ? "numframes" : "(numframes + 1)") + "; boneCount[8] " + (r.NoneTranslatedCounted ? "= bones without a translation" : "= 0");
+            if (unordered > 0)
+            {
+                throw new EmoteException(unordered + " of the game's animations list their bones without a translation out of order; the converter writes them in order.");
+            }
+            r.Notes = "last frame " + (r.LastFrameIsNumFrames ? "= numframes" : "= numframes - 1") + " (" + keyed + " of " + total + " samples keyed); frequency = framerate / " + (r.FrequencyPerNumFrames ? "numframes" : "(numframes + 1)") + "; boneCount[8] " + (r.NoneTranslatedCounted ? "= bones without a translation, listed in order after the translations" : "= 0");
             return r;
         }
     }
@@ -2337,6 +2387,12 @@ namespace IXEmotes
                 anim.Translations.Add(t);
             }
 
+            if (rules.NoneTranslatedCounted)
+            {
+                var still = new List<int>();
+                for (int i = 0; i < anim.Bones.Count; i++) if (i != hipsIndex) still.Add(i);
+                anim.Untranslated = still.ToArray();
+            }
             byte[] h = anim.Header;
             int bones = anim.Bones.Count;
             if (bones > 255) throw new EmoteException("More than 255 bones.");

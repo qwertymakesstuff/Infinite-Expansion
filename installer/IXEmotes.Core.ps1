@@ -583,7 +583,7 @@ function Invoke-IXEmoteBuild {
                 }
                 $anim = Invoke-IXEmoteConverter { [IXEmotes.Converter]::ReadDecoded($bytes, $name) }
                 $decoded.Add($anim)
-                & $report ('round trip ' + $name + ': identical (' + $bytes.Length + ' bytes, ' + $anim.Rotations.Count + ' rotations, ' + $anim.Translations.Count + ' translations)') $false
+                & $report ('round trip ' + $name + ': identical (' + $bytes.Length + ' bytes, ' + $anim.Rotations.Count + ' rotations, ' + $anim.Translations.Count + ' translations, ' + $anim.Untranslated.Length + ' bones listed without one ' + $anim.Counts() + ')') $false
             }
             if ($failed.Count -gt 0) {
                 throw ('These game animations do not read and write back byte for byte, so the converter is not trusted with yours and nothing was built: ' + ($failed -join '; '))

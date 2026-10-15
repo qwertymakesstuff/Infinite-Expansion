@@ -173,6 +173,8 @@ class Converter(unittest.TestCase):
         (d / "xab" / "bad_counts.xab").write_bytes(bytes(bad_counts))
         (d / "xab" / "bad_padding.xab").write_bytes(ef.sample_animation("bad_padding", "short", pad_byte=True))
         (d / "xab" / "bad_truncated.xab").write_bytes(short[:-40])
+        # A translated bone (1, j_mainroot) in the list of bones without one.
+        (d / "xab" / "bad_untranslated.xab").write_bytes(ef.sample_animation("bad_untranslated", "short", untranslated=[0, 1, 4, 5, 6]))
         (d / "xab" / "odd_frequency.xab").write_bytes(ef.sample_animation("odd_frequency", "short", frequency=1.0))
         cls.rig, cls.names, cls.rows = ef.make_rig()
         (d / "rig.xmb").write_bytes(cls.rig)
@@ -218,6 +220,10 @@ class Converter(unittest.TestCase):
         self.assertIn("do not use all of its data", rt["bad_padding"])
         self.assertIn("dataByte", rt["bad_padding"])
         self.assertIn("ends early", rt["bad_truncated"])
+        self.assertIn("the bones listed after its translations are not the bones without one (0 1 4 5 6). (boneCount 1 2 2 1 3 1 1 2 5 9, numframes 40)", rt["bad_untranslated"])
+        # The bones without a translation follow the translations, in order.
+        for name, data in self.samples.items():
+            self.assertEqual(ef.decode_xanim(data).untranslated, [0, 3, 4, 5, 6], name)
 
     def test_rules_are_learned_from_the_samples(self):
         self.assertEqual(self.r["rules"][:3], [True, True, True])
@@ -297,6 +303,8 @@ class Converter(unittest.TestCase):
             self.assertEqual((d.numframes, d.framerate, d.flags), (30, 30.0, loop))
             self.assertAlmostEqual(d.frequency, 1.0, places=6)
             self.assertEqual(d.counts, [0, 0, 48, 0, 0, 0, 1, 0, 47, 48])
+            hips = d.bones.index("j_mainroot")
+            self.assertEqual(d.untranslated, [b for b in range(48) if b != hips])
             self.assertEqual(d.asset_type, template.asset_type)
             data = (self.dir / (name + ".out.xab")).read_bytes()
             head = data[6:6 + 0x88]
